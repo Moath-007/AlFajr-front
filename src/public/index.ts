@@ -8,3 +8,5 @@ export { PublicCartProvider } from './PublicCartProvider';
 export { usePublicCart } from './usePublicCart';
 export { RETAIL_CART_STORAGE_KEY } from './PublicCartContext';
 export type { PublicCartItem, PublicCartContextValue, AddCartItemResult } from './PublicCartContext';
+export { getPublicCompanyDetails } from './companyProfile';
+export type { PublicCompanyDetails } from './companyProfile';

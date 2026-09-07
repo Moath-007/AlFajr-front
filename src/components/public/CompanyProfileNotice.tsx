@@ -10,7 +10,7 @@ export default function CompanyProfileNotice() {
     return (
       <div className="border-b border-amber-200 bg-amber-50 text-amber-950" role="status">
         <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-2.5 text-center text-xs font-semibold sm:text-sm">
-          <Building2 className="h-4 w-4 shrink-0 text-[#9C7537]" />
+          <Building2 className="h-4 w-4 shrink-0 text-[#C2A66D]" />
           بيانات الشركة غير متاحة حاليًا، بينما يمكنك متابعة تصفح الموقع.
         </div>
       </div>

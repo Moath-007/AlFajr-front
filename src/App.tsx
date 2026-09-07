@@ -18,6 +18,7 @@ import CartPage from '@/components/public/CartPage';
 import CheckoutPage from '@/components/public/CheckoutPage';
 import AnnouncementBar from '@/components/public/AnnouncementBar';
 import CompanyProfileNotice from '@/components/public/CompanyProfileNotice';
+import PublicNotFoundPage from '@/components/public/PublicNotFoundPage';
 import { PublicCatalogProvider } from '@/public/PublicCatalogProvider';
 import { PublicCompanyProvider } from '@/public/PublicCompanyProvider';
 import { PublicCartProvider } from '@/public/PublicCartProvider';
@@ -280,7 +281,7 @@ function PublicSiteContent({ onNavigate }: { onNavigate: NavigateHandler }) {
                     searchQuery={searchQuery}
                 />
             </div>
-            <CompanyProfileNotice />
+            {location.pathname !== '/contact' && <CompanyProfileNotice />}
             <div className="flex-1">
                 <Routes>
                     <Route path="" element={<HomePage onNavigate={onNavigate} />} />
@@ -291,6 +292,7 @@ function PublicSiteContent({ onNavigate }: { onNavigate: NavigateHandler }) {
                     <Route path="contact" element={<ContactPage />} />
                     <Route path="cart" element={<CartPage onNavigate={onNavigate} />} />
                     <Route path="checkout" element={<CheckoutPage onNavigate={onNavigate} />} />
+                    <Route path="*" element={<PublicNotFoundPage onNavigate={onNavigate} />} />
                 </Routes>
             </div>
             <PublicFooter onNavigate={onNavigate} />

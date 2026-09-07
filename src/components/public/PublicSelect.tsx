@@ -202,12 +202,12 @@ export default function PublicSelect({
         onKeyDown={handleKeyDown}
         className={`flex h-12 w-full items-center justify-between gap-3 rounded-xl border bg-white py-2.5 pe-4 ps-3 text-right text-sm font-bold shadow-sm outline-none transition ${
           isOpen
-            ? 'border-[#9C7537] ring-4 ring-[#9C7537]/10'
-            : 'border-stone-200 hover:border-[#9C7537]/60 hover:bg-stone-50/50 focus:border-[#9C7537] focus:ring-4 focus:ring-[#9C7537]/10'
+            ? 'border-[#C2A66D] ring-4 ring-[#C2A66D]/10'
+            : 'border-stone-200 hover:border-[#C2A66D]/60 hover:bg-stone-50/50 focus:border-[#C2A66D] focus:ring-4 focus:ring-[#C2A66D]/10'
         } disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400 disabled:shadow-none`}
       >
         <span className={`min-w-0 flex-1 truncate ${selectedOption ? 'text-stone-700' : 'text-stone-400'}`}>{selectedOption?.label ?? placeholder}</span>
-        <ChevronDown className={`pointer-events-none h-4 w-4 shrink-0 text-[#9C7537] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${disabled ? 'text-stone-400' : ''}`} aria-hidden="true" />
+        <ChevronDown className={`pointer-events-none h-4 w-4 shrink-0 text-[#C2A66D] transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${disabled ? 'text-stone-400' : ''}`} aria-hidden="true" />
       </button>
 
       {isOpen && position && createPortal(
@@ -250,7 +250,7 @@ export default function PublicSelect({
                 }`}
               >
                 <span className="min-w-0 flex-1 leading-6">{option.label}</span>
-                {isSelected && <Check className="h-4 w-4 shrink-0 text-[#D8B16D]" aria-hidden="true" />}
+                {isSelected && <Check className="h-4 w-4 shrink-0 text-[#E8DCC2]" aria-hidden="true" />}
               </button>
             );
           })}

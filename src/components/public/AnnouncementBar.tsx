@@ -8,7 +8,7 @@ export default function AnnouncementBar() {
 
   return (
     <div
-      className="public-announcement-ticker overflow-hidden bg-[#9C7537] text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white/70"
+      className="public-announcement-ticker overflow-hidden bg-[#C2A66D] text-[#162E21] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#162E21]/45"
       role="status"
       aria-label="إعلان الشركة"
       tabIndex={0}
