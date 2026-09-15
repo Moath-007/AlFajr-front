@@ -1,4 +1,9 @@
-import type { DecimalString, IsoDateTimeString, NumericId } from './common';
+import type {
+  DecimalString,
+  IsoDateTimeString,
+  NumericId,
+  PaginationResponseDto,
+} from "./common";
 
 export interface ProductCategoryResponseDto {
   id: NumericId;
@@ -42,7 +47,22 @@ export interface ProductResponseDto {
 export interface ProductsListResponseDto {
   message: string;
   products: ProductResponseDto[];
+  pagination: AdminProductsPaginationDto;
 }
+
+export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
+export interface AdminProductsQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  category_id?: NumericId;
+  color_id?: NumericId;
+  is_active?: boolean;
+  stock_status?: StockStatus;
+  sort_by?: "created_at" | "name" | "code";
+  sort_order?: "asc" | "desc";
+}
+export type AdminProductsPaginationDto = PaginationResponseDto;
 
 export interface ProductDetailsResponseDto {
   message: string;
@@ -88,9 +108,10 @@ export interface CatalogProductSummaryDto {
   price: DecimalString;
   has_discount: boolean;
   in_stock: boolean;
+  total_stock_quantity?: number;
 }
 
-export type CatalogSort = 'default' | 'price_asc' | 'price_desc';
+export type CatalogSort = "default" | "price_asc" | "price_desc";
 
 export interface CatalogProductsQuery {
   page?: number;

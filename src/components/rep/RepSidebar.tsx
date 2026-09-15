@@ -1,112 +1,165 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
-  LayoutDashboard, ShoppingCart, ClipboardList, LogOut, Menu, X, Sparkles,
-} from 'lucide-react';
+  Boxes,
+  ClipboardList,
+  HandCoins,
+  House,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ShoppingCart,
+  X,
+} from "lucide-react";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
-interface RepSidebarProps {
-  currentPage: string;
-  onNavigate: (page: string) => void;
+interface Props {
+  currentPath: string;
+  onNavigate: (path: string) => void;
   onLogout: () => void;
   repName: string;
+  cartCount: number;
 }
-
-const navItems = [
-  { id: 'dashboard', label: 'الرئيسية', icon: LayoutDashboard },
-  { id: 'create-order', label: 'إنشاء طلب', icon: ShoppingCart },
-  { id: 'my-orders', label: 'طلباتي', icon: ClipboardList },
+const items = [
+  { path: "/rep", label: "لوحة التحكم", icon: LayoutDashboard, exact: true },
+  { path: "/rep/products", label: "منتجات الجملة", icon: Boxes },
+  { path: "/rep/orders/new", label: "إنشاء طلب", icon: ShoppingCart },
+  { path: "/rep/orders", label: "طلباتي", icon: ClipboardList },
+  { path: "/rep/receivables", label: "التحصيلات", icon: HandCoins },
 ];
 
-export default function RepSidebar({ currentPage, onNavigate, onLogout, repName }: RepSidebarProps) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const handleNav = (id: string) => {
-    onNavigate(id);
-    setMobileOpen(false);
+export default function RepSidebar({
+  currentPath,
+  onNavigate,
+  onLogout,
+  repName,
+  cartCount,
+}: Props) {
+  const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem("al-fajr-rep-sidebar-collapsed") === "true",
+  );
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const active = (path: string, exact?: boolean) => {
+    if (exact) return currentPath === path;
+    if (path === "/rep/orders")
+      return currentPath.startsWith(path) && currentPath !== "/rep/orders/new";
+    return currentPath.startsWith(path);
   };
-
-  return (
-      <>
-        {/* زر القائمة للجوال باللون الأخضر الفاخر */}
+  const content = (
+    <>
+      <div className="border-b border-white/10 p-5">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => onNavigate("/rep")}
+            className="flex items-center gap-3 text-right"
+          >
+            <span className="grid h-12 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-white">
+              <img
+                src="/assets/al-fajr-logo.png"
+                alt="شعار شركة الفجر"
+                className="h-full w-full object-cover object-[center_45%]"
+              />
+            </span>
+            <span className={collapsed ? "lg:hidden" : ""}>
+              <strong className="block text-white">شركة الفجر</strong>
+              <small className="text-stone-400">بوابة المندوب</small>
+            </span>
+          </button>
+          <button
+            onClick={() => setOpen(false)}
+            className="p-2 lg:hidden"
+            aria-label="إغلاق القائمة"
+          >
+            <X />
+          </button>
+        </div>
+        <p className={`mt-5 truncate rounded-xl bg-white/5 px-3 py-2 text-sm font-bold text-stone-300 ${collapsed ? "lg:hidden" : ""}`}>
+          {repName}
+        </p>
+      </div>
+      <nav className="flex-1 space-y-1 p-4">
+        {items.map(({ path, label, icon: Icon, exact }) => (
+          <button
+            key={path}
+            onClick={() => {
+              onNavigate(path);
+              setOpen(false);
+            }}
+            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold transition ${collapsed ? "lg:justify-center lg:px-2" : ""} ${active(path, exact) ? "bg-gold text-brand" : "text-stone-300 hover:bg-white/10 hover:text-white"}`}
+          >
+            <Icon className="h-5 w-5" />
+            <span className={collapsed ? "lg:hidden" : ""}>{label}</span>
+            {path === "/rep/orders/new" && cartCount > 0 && (
+              <span className={`mr-auto rounded-full bg-brand px-2 py-0.5 text-[10px] text-white ${collapsed ? "lg:hidden" : ""}`}>
+                {cartCount}
+              </span>
+            )}
+          </button>
+        ))}
+      </nav>
+      <div className="space-y-1 border-t border-white/10 p-4">
         <button
-            onClick={() => setMobileOpen(true)}
-            className="lg:hidden fixed top-4 right-4 z-30 rounded-2xl bg-emerald-950 text-amber-400 p-3 shadow-lg border border-emerald-800 flex items-center justify-center backdrop-blur-md"
+          onClick={() => {
+            onNavigate("/");
+            setOpen(false);
+          }}
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-stone-300 transition hover:bg-white/10 hover:text-white"
         >
-          <Menu className="h-5 w-5" />
+          <House className="h-5 w-5" /> <span className={collapsed ? "lg:hidden" : ""}>العودة للرئيسية</span>
         </button>
-
-        {/* خلفية مظلمة عند فتح القائمة للجوال */}
-        {mobileOpen && (
-            <div className="lg:hidden fixed inset-0 z-30 bg-emerald-950/70 backdrop-blur-xs transition-opacity" onClick={() => setMobileOpen(false)} />
-        )}
-
-        {/* الشريط الجانبي بالهوية الخضراء الفاخرة */}
-        <aside
-            className={`fixed lg:sticky top-0 right-0 z-40 h-screen w-64 bg-emerald-950 text-emerald-100 flex flex-col border-l border-emerald-900/80 transition-transform duration-300 lg:translate-x-0 ${
-                mobileOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
-            }`}
+        <button
+          onClick={() => {
+            setOpen(false);
+            setConfirmLogout(true);
+          }}
+          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-stone-300 transition hover:bg-red-500/15 hover:text-red-200"
         >
-          {/* الهيدر وشعار الشركة */}
-          <div className="flex items-center justify-between p-6 border-b border-emerald-900/60">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500 text-emerald-950 font-black text-xl shadow-md">
-                ف
-              </div>
-              <div>
-                <div className="text-white font-black text-sm tracking-wide">شركة الفجر</div>
-                <div className="text-[11px] font-bold text-amber-400/90 flex items-center gap-1 mt-0.5">
-                  <Sparkles className="h-3 w-3" />
-                  <span>لوحة المندوب</span>
-                </div>
-              </div>
-            </div>
-            <button onClick={() => setMobileOpen(false)} className="lg:hidden text-emerald-300 hover:text-white p-1 rounded-xl bg-emerald-900">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          {/* بطاقة معلومات المندوب */}
-          <div className="mx-4 my-4 p-3.5 rounded-2xl bg-emerald-900/50 border border-emerald-800/60 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 text-xs font-black border border-amber-500/30">
-              {repName.charAt(0)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-bold text-emerald-400">المندوب الحالي</div>
-              <div className="text-xs font-black text-white truncate">{repName}</div>
-            </div>
-          </div>
-
-          {/* القائمة الرئيسية */}
-          <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-1.5">
-            {navItems.map((item) => {
-              const isActive = currentPage === item.id;
-              return (
-                  <button
-                      key={item.id}
-                      onClick={() => handleNav(item.id)}
-                      className={`flex items-center gap-3.5 w-full px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                          isActive
-                              ? 'bg-amber-500 text-emerald-950 font-black shadow-lg shadow-amber-500/20 scale-[1.02]'
-                              : 'text-emerald-300/80 hover:bg-emerald-900/60 hover:text-white'
-                      }`}
-                  >
-                    <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-950' : 'text-amber-400'}`} />
-                    <span>{item.label}</span>
-                  </button>
-              );
-            })}
-          </nav>
-
-          {/* زر تسجيل الخروج */}
-          <div className="p-4 border-t border-emerald-900/60">
-            <button
-                onClick={onLogout}
-                className="flex items-center gap-3.5 w-full px-4 py-3 rounded-2xl text-xs font-bold text-rose-300 hover:bg-rose-500/15 hover:text-rose-200 transition-all border border-transparent hover:border-rose-500/20"
-            >
-              <LogOut className="h-5 w-5 shrink-0 text-rose-400" />
-              <span>تسجيل الخروج</span>
-            </button>
-          </div>
-        </aside>
-      </>
+          <LogOut className="h-5 w-5" /> <span className={collapsed ? "lg:hidden" : ""}>تسجيل الخروج</span>
+        </button>
+      </div>
+    </>
+  );
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed right-4 top-4 z-40 rounded-xl bg-brand p-3 text-white shadow-lg lg:hidden"
+        aria-label="فتح قائمة المندوب"
+      >
+        <Menu />
+      </button>
+      <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col bg-brand transition-[width] lg:flex ${collapsed ? "w-20" : "w-72"}`}>
+        <button type="button" onClick={() => setCollapsed((value) => { const next = !value; localStorage.setItem("al-fajr-rep-sidebar-collapsed", String(next)); return next; })} className="absolute -left-3 top-6 z-10 rounded-full bg-gold p-1.5 text-brand shadow" aria-label={collapsed ? "فتح القائمة الجانبية" : "طي القائمة الجانبية"} title={collapsed ? "فتح القائمة" : "طي القائمة"}>
+          {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </button>
+        {content}
+      </aside>
+      {open && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setOpen(false)}
+            aria-label="إغلاق القائمة"
+          />
+          <aside className="absolute inset-y-0 right-0 flex w-[min(86vw,290px)] flex-col bg-brand text-white shadow-2xl">
+            {content}
+          </aside>
+        </div>
+      )}
+      <ConfirmDialog
+        open={confirmLogout}
+        onClose={() => setConfirmLogout(false)}
+        onConfirm={() => {
+          setConfirmLogout(false);
+          onLogout();
+        }}
+        title="تسجيل الخروج"
+        message="هل أنت متأكد أنك تريد تسجيل الخروج؟"
+        confirmLabel="تسجيل الخروج"
+        cancelLabel="إلغاء"
+      />
+    </>
   );
 }

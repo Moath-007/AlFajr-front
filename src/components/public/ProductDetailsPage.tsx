@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Check, Minus, PackageOpen, Plus, RefreshCw, ShoppingBag } from 'lucide-react';
+import { ArrowRight, Check, PackageOpen, RefreshCw, ShoppingBag } from 'lucide-react';
 import { ApiError, productsService, resolveApiAssetUrl, type CatalogProductDetailsDto, type CatalogVariantResponseDto } from '@/api';
 import { usePublicCart } from '@/public';
+import QuantityInput from '@/components/ui/QuantityInput';
 
 interface ProductDetailsPageProps {
   productId: number;
@@ -105,13 +106,13 @@ export default function ProductDetailsPage({ productId, onBack }: ProductDetails
 
           <div className="mt-5">
             <h2 className="text-sm font-black text-[#162E21]">اختر المقاس واللون</h2>
-            {product.variants.length === 0 ? <p className="mt-3 rounded-xl bg-stone-100 p-3 text-sm font-bold text-stone-500">لا توجد خيارات متاحة لهذا المنتج.</p> : <div className="mt-2.5 grid gap-2 sm:grid-cols-2">{product.variants.map((variant) => <button key={variant.id} disabled={variant.stock_quantity <= 0} onClick={() => selectVariant(variant)} aria-pressed={selectedVariantId === variant.id} className={`rounded-xl border px-3 py-2.5 text-right transition ${selectedVariantId === variant.id ? 'border-[#C2A66D] bg-[#C2A66D]/[0.07] ring-2 ring-[#C2A66D]/10' : 'border-stone-200 bg-white hover:border-[#C2A66D]/50'} disabled:cursor-not-allowed disabled:bg-stone-50 disabled:opacity-55`}><span className="block text-sm font-black text-[#162E21]">{variant.size} — {variant.color.name}</span><span className="mt-0.5 block text-xs font-bold text-stone-400">{variant.stock_quantity > 0 ? `متوفر: ${variant.stock_quantity}` : 'غير متوفر'}</span></button>)}</div>}
+            {product.variants.length === 0 ? <p className="mt-3 rounded-xl bg-stone-100 p-3 text-sm font-bold text-stone-500">لا توجد خيارات متاحة لهذا المنتج.</p> : <div className="mt-2.5 grid gap-2 sm:grid-cols-2">{product.variants.map((variant) => <button key={variant.id} disabled={variant.stock_quantity <= 0} onClick={() => selectVariant(variant)} aria-pressed={selectedVariantId === variant.id} className={`rounded-xl border px-3 py-2.5 text-right transition ${selectedVariantId === variant.id ? 'border-[#C2A66D] bg-[#C2A66D]/[0.07] ring-2 ring-[#C2A66D]/10' : 'border-stone-200 bg-white hover:border-[#C2A66D]/50'} disabled:cursor-not-allowed disabled:bg-stone-50 disabled:opacity-55`}><span className="block text-sm font-black text-[#162E21]">{variant.size} — {variant.color.name}</span><span className="mt-0.5 block text-xs font-bold text-stone-400">{variant.stock_quantity > 0 ? 'متوفر' : 'غير متوفر'}</span></button>)}</div>}
           </div>
 
           {selectedVariant && <div className="mt-5 rounded-2xl bg-stone-50 p-4"><p className="text-xs font-bold text-stone-500">السعر للخيار المحدد</p><div className="mt-1.5 flex flex-wrap items-baseline gap-2.5">{hasDiscount && originalPrice !== null && <><span className="text-sm font-bold text-stone-400 line-through">{formatPrice(originalPrice)}</span><span className="rounded-md bg-[#C2A66D]/10 px-1.5 py-0.5 text-xs font-black text-[#C2A66D]">خصم {formatPrice(Number(selectedVariant.discount))}</span></>}<span className="text-2xl font-black text-[#C2A66D]">{effectivePrice !== null ? formatPrice(effectivePrice) : '—'}</span></div></div>}
 
           <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
-            <div className="flex h-11 items-center justify-between rounded-xl border border-stone-200 bg-white sm:w-32"><button onClick={() => setQuantity((current) => Math.max(1, current - 1))} disabled={quantity <= 1} className="h-full px-3 text-stone-500 disabled:opacity-30" aria-label="تقليل الكمية"><Minus className="h-4 w-4" /></button><span className="text-sm font-black text-[#162E21]">{quantity}</span><button onClick={() => setQuantity((current) => Math.min(selectedVariant?.stock_quantity ?? 1, current + 1))} disabled={!selectedVariant || quantity >= selectedVariant.stock_quantity} className="h-full px-3 text-stone-500 disabled:opacity-30" aria-label="زيادة الكمية"><Plus className="h-4 w-4" /></button></div>
+            <QuantityInput value={quantity} max={selectedVariant?.stock_quantity ?? 0} disabled={!selectedVariant} onChange={setQuantity} showStock={false} className="sm:w-fit" />
             <button onClick={addToCart} disabled={!canAdd} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#162E21] px-5 py-2.5 text-sm font-black text-white transition hover:bg-[#21452f] disabled:cursor-not-allowed disabled:opacity-45">{added ? <><Check className="h-4 w-4" /> تمت الإضافة</> : <><ShoppingBag className="h-4 w-4" /> إضافة إلى السلة</>}</button>
           </div>
           {cartMessage && <p className={`mt-3 text-sm font-bold ${added ? 'text-green-700' : 'text-red-700'}`} role="status">{cartMessage}</p>}

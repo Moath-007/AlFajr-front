@@ -1,117 +1,166 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
-  LayoutDashboard, Package, Boxes, Users, ClipboardList, BarChart3,
-  Settings, LogOut, Menu, X, Store, Sparkles,
-} from 'lucide-react';
-
-interface OwnerSidebarProps {
+  BarChart3,
+  Boxes,
+  ClipboardList,
+  FileText,
+  HandCoins,
+  House,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Package,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings2,
+  ShoppingBasket,
+  Store,
+  Users,
+  X,
+} from "lucide-react";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+interface Props {
   currentPage: string;
   onNavigate: (page: string) => void;
   onLogout: () => void;
+  adminName: string;
 }
-
-const navItems = [
-  { id: 'dashboard', label: 'الرئيسية', icon: LayoutDashboard },
-  { id: 'products', label: 'المنتجات', icon: Package },
-  { id: 'categories', label: 'التصنيفات', icon: Boxes },
-  { id: 'inventory', label: 'المخزون', icon: Boxes },
-  { id: 'reps', label: 'المناديب', icon: Users },
-  { id: 'orders', label: 'الطلبات', icon: ClipboardList },
-  { id: 'reports', label: 'التقارير', icon: BarChart3 },
-  { id: 'settings', label: 'إعدادات المحل', icon: Settings },
+const items = [
+  { id: "dashboard", label: "لوحة التحكم", icon: LayoutDashboard },
+  { id: "orders", label: "الطلبات", icon: ClipboardList },
+  { id: "store-sale", label: "بيع من المحل", icon: ShoppingBasket },
+  { id: "products", label: "المنتجات", icon: Package },
+  { id: "inventory", label: "المخزون", icon: Boxes },
+  { id: "receivables", label: "التحصيلات", icon: HandCoins },
+  { id: "customer-statements", label: "كشف حساب الزبون", icon: FileText },
+  { id: "reps", label: "المناديب", icon: Users },
+  { id: "product-settings", label: "إدارة التصنيفات", icon: Settings2 },
+  { id: "company", label: "بيانات الشركة", icon: Store },
+  { id: "reports", label: "التقارير", icon: BarChart3 },
 ];
-
-export default function OwnerSidebar({ currentPage, onNavigate, onLogout }: OwnerSidebarProps) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const handleNav = (id: string) => {
+export default function OwnerSidebar({
+  currentPage,
+  onNavigate,
+  onLogout,
+  adminName,
+}: Props) {
+  const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem("al-fajr-admin-sidebar-collapsed") === "true",
+  );
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const go = (id: string) => {
     onNavigate(id);
-    setMobileOpen(false);
+    setOpen(false);
   };
-
-  return (
-      <>
-        {/* زر القائمة للجوال بالهوية الخضراء الفاخرة */}
+  const content = (
+    <>
+      <div className="border-b border-white/10 p-5">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => go("dashboard")}
+            className="flex min-w-0 items-center gap-3 text-right"
+          >
+            <span className="grid h-12 w-16 shrink-0 place-items-center overflow-hidden rounded-xl bg-white">
+              <img
+                src="/assets/al-fajr-logo.png"
+                alt="شعار شركة الفجر"
+                className="h-full w-full object-cover object-[center_45%]"
+              />
+            </span>
+            <span className={collapsed ? "lg:hidden" : "min-w-0"}>
+              <strong className="block truncate text-white">شركة الفجر</strong>
+              <small className="text-stone-400">لوحة الإدارة</small>
+            </span>
+          </button>
+          <button
+            onClick={() => setOpen(false)}
+            className="rounded-lg p-2 text-stone-300 lg:hidden"
+            aria-label="إغلاق القائمة"
+          >
+            <X />
+          </button>
+        </div>
+        <div className={`mt-4 rounded-xl bg-white/5 px-3 py-2 ${collapsed ? "lg:hidden" : ""}`}>
+          <small className="block text-stone-400">مدير النظام</small>
+          <strong className="mt-0.5 block truncate text-sm text-white">
+            {adminName}
+          </strong>
+        </div>
+      </div>
+      <nav
+        className="flex-1 space-y-1 overflow-y-auto p-3"
+        aria-label="قائمة الإدارة"
+      >
+        {items.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => go(id)}
+            className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-bold transition ${collapsed ? "lg:justify-center lg:px-2" : ""} ${currentPage === id ? "bg-gold text-brand" : "text-stone-300 hover:bg-white/10 hover:text-white"}`}
+          >
+            <Icon className="h-5 w-5" />
+            <span className={collapsed ? "lg:hidden" : ""}>{label}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="space-y-1 border-t border-white/10 p-3">
         <button
-            onClick={() => setMobileOpen(true)}
-            className="lg:hidden fixed top-4 right-4 z-30 rounded-2xl bg-emerald-950 text-amber-400 p-3 shadow-lg border border-emerald-800 flex items-center justify-center backdrop-blur-md"
+          onClick={() => go("public-home")}
+          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-bold text-stone-300 hover:bg-white/10"
         >
-          <Menu className="h-5 w-5" />
+          <House className="h-5 w-5" /> <span className={collapsed ? "lg:hidden" : ""}>الرئيسية العامة</span>
         </button>
-
-        {/* خلفية مظلمة عند فتح القائمة للجوال */}
-        {mobileOpen && (
-            <div className="lg:hidden fixed inset-0 z-30 bg-emerald-950/70 backdrop-blur-xs transition-opacity" onClick={() => setMobileOpen(false)} />
-        )}
-
-        {/* الشريط الجانبي لصاحب المحل */}
-        <aside
-            className={`fixed lg:sticky top-0 right-0 z-40 h-screen w-64 bg-emerald-950 text-emerald-100 flex flex-col border-l border-emerald-900/80 transition-transform duration-300 lg:translate-x-0 ${
-                mobileOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
-            }`}
+        <button
+          onClick={() => {
+            setOpen(false);
+            setConfirmLogout(true);
+          }}
+          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3.5 text-sm font-bold text-red-200 hover:bg-red-500/15"
         >
-          {/* الهيدر وشعار الشركة */}
-          <div className="flex items-center justify-between p-6 border-b border-emerald-900/60">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500 text-emerald-950 font-black text-xl shadow-md">
-                ف
-              </div>
-              <div>
-                <div className="text-white font-black text-sm tracking-wide">شركة الفجر</div>
-                <div className="text-[11px] font-bold text-amber-400/90 flex items-center gap-1 mt-0.5">
-                  <Sparkles className="h-3 w-3" />
-                  <span>لوحة التحكم</span>
-                </div>
-              </div>
-            </div>
-            <button onClick={() => setMobileOpen(false)} className="lg:hidden text-emerald-300 hover:text-white p-1 rounded-xl bg-emerald-900">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          {/* بطاقة معلومات صاحب المحل */}
-          <div className="mx-4 my-4 p-3.5 rounded-2xl bg-emerald-900/50 border border-emerald-800/60 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 text-xs font-black border border-amber-500/30">
-              <Store className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-bold text-emerald-400">الحساب الرئيسي</div>
-              <div className="text-xs font-black text-white truncate">صاحب المحل</div>
-            </div>
-          </div>
-
-          {/* القائمة الرئيسية */}
-          <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-1.5 scrollbar-thin scrollbar-thumb-emerald-800">
-            {navItems.map((item) => {
-              const isActive = currentPage === item.id;
-              return (
-                  <button
-                      key={item.id}
-                      onClick={() => handleNav(item.id)}
-                      className={`flex items-center gap-3.5 w-full px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                          isActive
-                              ? 'bg-amber-500 text-emerald-950 font-black shadow-lg shadow-amber-500/20 scale-[1.02]'
-                              : 'text-emerald-300/80 hover:bg-emerald-900/60 hover:text-white'
-                      }`}
-                  >
-                    <item.icon className={`h-5 w-5 shrink-0 ${isActive ? 'text-emerald-950' : 'text-amber-400'}`} />
-                    <span>{item.label}</span>
-                  </button>
-              );
-            })}
-          </nav>
-
-          {/* زر تسجيل الخروج */}
-          <div className="p-4 border-t border-emerald-900/60">
-            <button
-                onClick={onLogout}
-                className="flex items-center gap-3.5 w-full px-4 py-3 rounded-2xl text-xs font-bold text-rose-300 hover:bg-rose-500/15 hover:text-rose-200 transition-all border border-transparent hover:border-rose-500/20"
-            >
-              <LogOut className="h-5 w-5 shrink-0 text-rose-400" />
-              <span>تسجيل الخروج</span>
-            </button>
-          </div>
-        </aside>
-      </>
+          <LogOut className="h-5 w-5" /> <span className={collapsed ? "lg:hidden" : ""}>تسجيل الخروج</span>
+        </button>
+      </div>
+    </>
+  );
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="fixed right-4 top-4 z-40 rounded-xl bg-brand p-3 text-white shadow-lg lg:hidden"
+        aria-label="فتح قائمة الإدارة"
+      >
+        <Menu />
+      </button>
+      <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col bg-brand transition-[width] lg:flex ${collapsed ? "w-20" : "w-64"}`}>
+        <button type="button" onClick={() => setCollapsed((value) => { const next = !value; localStorage.setItem("al-fajr-admin-sidebar-collapsed", String(next)); return next; })} className="absolute -left-3 top-6 z-10 rounded-full bg-gold p-1.5 text-brand shadow" aria-label={collapsed ? "فتح القائمة الجانبية" : "طي القائمة الجانبية"} title={collapsed ? "فتح القائمة" : "طي القائمة"}>
+          {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </button>
+        {content}
+      </aside>
+      {open && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setOpen(false)}
+            aria-label="إغلاق القائمة"
+          />
+          <aside className="absolute inset-y-0 right-0 flex w-[min(86vw,280px)] flex-col bg-brand">
+            {content}
+          </aside>
+        </div>
+      )}
+      <ConfirmDialog
+        open={confirmLogout}
+        onClose={() => setConfirmLogout(false)}
+        onConfirm={() => {
+          setConfirmLogout(false);
+          onLogout();
+        }}
+        severity="normal"
+        title="تسجيل الخروج"
+        message="هل أنت متأكد أنك تريد تسجيل الخروج؟"
+        confirmLabel="تسجيل الخروج"
+      />
+    </>
   );
 }

@@ -19,3 +19,8 @@ export interface LoginResponseDto {
   access_token: string;
   user: LoginUserResponseDto;
 }
+
+export interface VerifyPasswordResponseDto {
+  message: string;
+  verified: boolean;
+}

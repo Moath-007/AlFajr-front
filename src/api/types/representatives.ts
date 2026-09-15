@@ -1,4 +1,4 @@
-import type { IsoDateTimeString, NumericId } from './common';
+import type { IsoDateTimeString, NumericId } from "./common";
 
 export interface RepresentativeRoleResponseDto {
   role_id: NumericId;
@@ -8,7 +8,7 @@ export interface RepresentativeRoleResponseDto {
 export interface RepresentativeResponseDto {
   user_id: NumericId;
   name: string;
-  phone?: string | null;
+  phone: string | null;
   email: string;
   is_active: boolean;
   created_at: IsoDateTimeString;
@@ -46,7 +46,7 @@ export interface UpdateRepresentativeDto {
 export interface RepresentativeWithoutCreatedAtResponseDto {
   user_id: NumericId;
   name: string;
-  phone?: string | null;
+  phone: string | null;
   email: string;
   is_active: boolean;
   roles: RepresentativeRoleResponseDto;
@@ -64,7 +64,7 @@ export interface UpdateRepresentativeStatusDto {
 export interface RepresentativeStatusDataDto {
   user_id: NumericId;
   name: string;
-  phone?: string | null;
+  phone: string | null;
   email: string;
   is_active: boolean;
 }

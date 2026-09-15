@@ -1,9 +1,14 @@
-import type { DecimalString, IsoDateTimeString, NumericId } from './common';
+import type {
+  DecimalString,
+  IsoDateTimeString,
+  NumericId,
+  PaginationResponseDto,
+} from "./common";
 
-export type OrderType = 'Retail' | 'Wholesale' | 'StoreSale';
-export type ApiOrderStatus = 'Pending' | 'Completed' | 'Cancelled';
-export type PaymentStatus = 'Unpaid' | 'PartiallyPaid' | 'Paid';
-export type PaymentMethod = 'Cash' | 'Check';
+export type OrderType = "Retail" | "Wholesale" | "StoreSale";
+export type ApiOrderStatus = "Pending" | "Completed" | "Cancelled";
+export type PaymentStatus = "Unpaid" | "PartiallyPaid" | "Paid";
+export type PaymentMethod = "Cash" | "Check";
 
 export interface OrderItemDto {
   product_variant_id: NumericId;
@@ -69,7 +74,7 @@ export interface OrderActionResponseDto {
 }
 
 export interface UpdateOrderStatusDto {
-  status: Extract<ApiOrderStatus, 'Completed' | 'Cancelled'>;
+  status: Extract<ApiOrderStatus, "Completed" | "Cancelled">;
 }
 
 export interface OrderCustomerResponseDto {
@@ -143,6 +148,101 @@ export interface OrderResponseDto {
 export interface OrdersListResponseDto {
   message: string;
   orders: OrderResponseDto[];
+}
+
+export interface OrdersQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: ApiOrderStatus;
+  order_type?: OrderType;
+  payment_status?: PaymentStatus;
+  customer_id?: NumericId;
+  representative_id?: NumericId;
+  date_from?: string;
+  date_to?: string;
+  min_total?: number;
+  max_total?: number;
+  sort_by?: "created_at" | "total_amount";
+  sort_order?: "asc" | "desc";
+}
+
+export type OrdersPaginationDto = PaginationResponseDto;
+
+export interface OrderListCustomerDto {
+  id: NumericId;
+  name: string;
+  phone: string;
+}
+export interface OrderListRepresentativeDto {
+  id: NumericId;
+  name: string;
+}
+
+export interface OrderListItemResponseDto {
+  id: NumericId;
+  order_type: OrderType;
+  status: ApiOrderStatus;
+  payment_status: PaymentStatus;
+  customer: OrderListCustomerDto;
+  representative?: OrderListRepresentativeDto | null;
+  total_amount: DecimalString;
+  paid_amount: DecimalString;
+  remaining_amount: DecimalString;
+  created_at: IsoDateTimeString;
+}
+
+export interface OrdersSummaryListResponseDto {
+  message: string;
+  orders: OrderListItemResponseDto[];
+  pagination: OrdersPaginationDto;
+}
+
+export interface RepresentativeOrderStatsDto {
+  total_orders: number;
+  pending_orders: number;
+  completed_orders: number;
+  cancelled_orders: number;
+  completed_sales_total: DecimalString;
+}
+
+export interface RepresentativeOrderStatsResponseDto {
+  message: string;
+  stats: RepresentativeOrderStatsDto;
+}
+export type ReceivablesResponseDto = OrdersSummaryListResponseDto;
+
+export interface OrderPaymentInfoDataDto extends OrderListItemResponseDto {
+  payments: OrderPaymentResponseDto[];
+}
+
+export interface OrderPaymentInfoResponseDto {
+  message: string;
+  order: OrderPaymentInfoDataDto;
+}
+
+export interface UpdateOrderPaymentDto {
+  payment_id?: NumericId;
+  amount: number;
+  payment_method: PaymentMethod;
+  check_number?: string;
+  notes?: string;
+}
+
+export interface UpdateOrderDto {
+  customer_name: string;
+  phone: string;
+  email?: string;
+  delivery_address?: string;
+  notes?: string;
+  order_discount?: number;
+  items: UpdateOrderItemDto[];
+  payments?: UpdateOrderPaymentDto[];
+}
+
+export interface UpdateOrderItemDto {
+  product_variant_id: NumericId;
+  quantity: number;
 }
 
 export interface OrderDetailsResponseDto {

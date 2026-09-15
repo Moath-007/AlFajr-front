@@ -9,6 +9,7 @@ export interface ApiRequestOptions {
   body?: unknown;
   headers?: HeadersInit;
   signal?: AbortSignal;
+  suppressUnauthorizedNotification?: boolean | ((payload: unknown) => boolean);
 }
 
 async function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
@@ -34,7 +35,10 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
   const payload = await parseResponse(response);
 
   if (!response.ok) {
-    if (response.status === 401) notifyUnauthorized();
+    const suppressUnauthorized = typeof options.suppressUnauthorizedNotification === 'function'
+      ? options.suppressUnauthorizedNotification(payload)
+      : options.suppressUnauthorizedNotification;
+    if (response.status === 401 && !suppressUnauthorized) notifyUnauthorized();
     throw new ApiError(normalizeApiError(response.status, payload));
   }
 

@@ -1,264 +1,497 @@
-import { Package, Boxes, Users, ClipboardList, Clock, CheckCircle2, XCircle, TrendingUp, ArrowUpRight, Sparkles, ShoppingBag } from 'lucide-react';
-import type { Product, Category, Representative, Order } from '@/types';
-import { formatPrice, formatDate, getStatusLabel, getStatusBadgeClass } from '@/utils/helpers';
-import { Chart } from '@/components/charts/Chart';
-import EmptyState from '@/components/ui/EmptyState';
+import { useCallback, useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  Boxes,
+  CheckCircle2,
+  ClipboardList,
+  Clock3,
+  PackageX,
+  RefreshCw,
+  RotateCcw,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { dashboardService, type AdminDashboardResponseDto } from "@/api";
+import { Skeleton } from "@/components/ui/Skeleton";
+import EmptyState from "@/components/ui/EmptyState";
+import {
+  OrderStatusBadge,
+  PaymentStatusBadge,
+} from "@/components/rep/RepOrderUi";
+import { RepDateInput } from "@/components/rep/RepFormControls";
+import {
+  apiMessages,
+  formatMoney,
+  formatOrderDate,
+} from "@/components/rep/repOrderUtils";
 
-interface OwnerDashboardProps {
-  products: Product[];
-  categories: Category[];
-  reps: Representative[];
-  orders: Order[];
-  onNavigate: (page: string, params?: Record<string, string>) => void;
+const STOCK_THRESHOLD_STORAGE_KEY = "owner-dashboard-stock-threshold";
+
+function savedStockThreshold() {
+  const value = Number(localStorage.getItem(STOCK_THRESHOLD_STORAGE_KEY));
+  return Number.isInteger(value) && value > 0 ? value : 5;
 }
 
-export default function OwnerDashboard({ products, categories, reps, orders, onNavigate }: OwnerDashboardProps) {
-  const pendingOrders = orders.filter((o) => o.status === 'pending');
-  const completedOrders = orders.filter((o) => o.status === 'completed');
-  const cancelledOrders = orders.filter((o) => o.status === 'cancelled');
-  const totalValue = orders.filter((o) => o.status !== 'cancelled').reduce((sum, o) => sum + o.total, 0);
-
-  const stats = [
-    { label: 'إجمالي المنتجات', value: products.length, icon: Package, color: 'bg-brand text-amber-400', border: 'border-brand/10' },
-    { label: 'إجمالي التصنيفات', value: categories.length, icon: Boxes, color: 'bg-amber-500 text-stone-950', border: 'border-amber-500/10' },
-    { label: 'عدد المناديب', value: reps.length, icon: Users, color: 'bg-blue-600 text-white', border: 'border-blue-500/10' },
-    { label: 'إجمالي الطلبات', value: orders.length, icon: ClipboardList, color: 'bg-purple-600 text-white', border: 'border-purple-500/10' },
-    { label: 'الطلبات المعلقة', value: pendingOrders.length, icon: Clock, color: 'bg-amber-600 text-white', border: 'border-amber-600/10' },
-    { label: 'الطلبات المكتملة', value: completedOrders.length, icon: CheckCircle2, color: 'bg-emerald-600 text-white', border: 'border-emerald-500/10' },
-    { label: 'الطلبات الملغاة', value: cancelledOrders.length, icon: XCircle, color: 'bg-rose-600 text-white', border: 'border-rose-500/10' },
-    { label: 'إجمالي قيمة الطلبات', value: formatPrice(totalValue), icon: TrendingUp, color: 'bg-teal-600 text-white', border: 'border-teal-500/10' },
-  ];
-
-  // Orders over time (last 7 entries by date)
-  const ordersByDate = (() => {
-    const map = new Map<string, number>();
-    [...orders].reverse().forEach((o) => {
-      const d = o.createdAt.slice(0, 10);
-      map.set(d, (map.get(d) || 0) + 1);
-    });
-    return Array.from(map.entries()).slice(-7).map(([date, count]) => ({ label: formatDate(date), value: count }));
-  })();
-
-  // Orders by status
-  const ordersByStatus = [
-    { label: 'قيد الانتظار', value: pendingOrders.length, color: '#d97706' },
-    { label: 'مكتمل', value: completedOrders.length, color: '#162E21' },
-    { label: 'ملغي', value: cancelledOrders.length, color: '#e11d48' },
-  ];
-
-  // Most requested products
-  const productCount = new Map<string, { name: string; count: number }>();
-  orders.forEach((o) => {
-    o.items.forEach((item) => {
-      const existing = productCount.get(item.productId);
-      if (existing) existing.count += item.quantity;
-      else productCount.set(item.productId, { name: item.productName, count: item.quantity });
-    });
-  });
-  const topProducts = Array.from(productCount.values()).sort((a, b) => b.count - a.count).slice(0, 5);
-  const maxCount = topProducts[0]?.count || 1;
-
-  const recentOrders = [...orders].slice(0, 5);
-
+export default function OwnerDashboard({
+  onNavigate,
+}: {
+  onNavigate: (page: string) => void;
+}) {
+  const [data, setData] = useState<AdminDashboardResponseDto | null>(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [appliedFrom, setAppliedFrom] = useState("");
+  const [appliedTo, setAppliedTo] = useState("");
+  const [initialStockThreshold] = useState(savedStockThreshold);
+  const [stockThreshold, setStockThreshold] = useState(
+    String(initialStockThreshold),
+  );
+  const [appliedStockThreshold, setAppliedStockThreshold] = useState(
+    initialStockThreshold,
+  );
+  const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [retryKey, setRetryKey] = useState(0);
+  const load = useCallback(
+    (signal?: AbortSignal) => {
+      setLoading(true);
+      setErrors([]);
+      return dashboardService
+        .get(
+          {
+            date_from: appliedFrom || undefined,
+            date_to: appliedTo || undefined,
+            low_stock_threshold: appliedStockThreshold,
+          },
+          signal,
+        )
+        .then(setData)
+        .catch((error) => {
+          if (!signal?.aborted)
+            setErrors(apiMessages(error, "تعذر تحميل لوحة التحكم."));
+        })
+        .finally(() => {
+          if (!signal?.aborted) setLoading(false);
+        });
+    },
+    [appliedFrom, appliedStockThreshold, appliedTo],
+  );
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
+  }, [load, retryKey]);
+  const applyDates = () => {
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      setErrors(["تاريخ البداية يجب أن يسبق تاريخ النهاية."]);
+      return;
+    }
+    setAppliedFrom(dateFrom);
+    setAppliedTo(dateTo);
+  };
+  const resetDates = () => {
+    setDateFrom("");
+    setDateTo("");
+    setAppliedFrom("");
+    setAppliedTo("");
+  };
+  const applyStockThreshold = () => {
+    const threshold = Number(stockThreshold);
+    if (!Number.isInteger(threshold) || threshold < 1) {
+      setErrors(["حد المخزون المنخفض يجب أن يكون عددًا صحيحًا أكبر من صفر."]);
+      return;
+    }
+    localStorage.setItem(STOCK_THRESHOLD_STORAGE_KEY, String(threshold));
+    setAppliedStockThreshold(threshold);
+  };
   return (
-    <div className="space-y-8 animate-fade-in pb-16">
-      
-      {/* رأس لوحة التحكم الترحيبي الفخم */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-brand via-brand-700 to-stone-900 p-8 rounded-3xl text-white shadow-xl">
-        <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold mb-3 border border-amber-500/30">
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>لوحة تحكم الإدارة العليا</span>
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-2">أهلاً بك، صاحب المحل</h1>
-            <p className="text-stone-300 text-sm sm:text-base max-w-xl leading-relaxed">
-              إليك نظرة شاملة ومحدثة على حركة المبيعات، أداء المناديب، وإحصائيات المخزون لشركة الفجر.
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 shrink-0">
-            <div className="h-12 w-12 rounded-xl bg-amber-500 text-stone-950 flex items-center justify-center font-black shadow-md">
-              <ShoppingBag className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="text-xs text-stone-300 font-medium">إجمالي المبيعات النشطة</div>
-              <div className="text-xl font-black text-amber-400 mt-0.5">{formatPrice(totalValue)}</div>
-            </div>
-          </div>
+    <div className="space-y-6 pb-12">
+      <header className="flex flex-col justify-between gap-4 border-b border-stone-200 pb-5 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-xs font-black text-gold-dark">نظرة تشغيلية</p>
+          <h1 className="mt-1 text-3xl font-black text-brand">لوحة التحكم</h1>
+          <p className="mt-2 text-sm text-stone-500">
+            ملخص مباشر للمبيعات والطلبات والمستحقات والمخزون.
+          </p>
         </div>
-      </div>
-
-      {/* بطاقات الإحصائيات (Stats Grid) */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {stats.map((s, i) => (
-          <div 
-            key={i} 
-            className="bg-white p-6 rounded-3xl border border-stone-200/80 shadow-xs hover:shadow-md transition-all duration-300 group"
+        {data?.date_semantics?.timezone && (
+          <span className="text-xs font-bold text-stone-400">
+            التوقيت: {data.date_semantics.timezone}
+          </span>
+        )}
+      </header>
+      <section className="rounded-2xl border bg-white p-4 shadow-sm">
+        <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[220px_220px_auto_auto_1fr]">
+          <RepDateInput
+            label="من تاريخ"
+            value={dateFrom}
+            onChange={setDateFrom}
+            max={dateTo || undefined}
+          />
+          <RepDateInput
+            label="إلى تاريخ"
+            value={dateTo}
+            onChange={setDateTo}
+            min={dateFrom || undefined}
+          />
+          <button
+            onClick={applyDates}
+            className="min-h-11 rounded-xl bg-brand px-5 text-sm font-black text-white"
           >
-            <div className="flex items-center justify-between mb-4">
-              <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${s.color} shadow-sm group-hover:scale-110 transition-transform`}>
-                <s.icon className="h-6 w-6" />
-              </div>
-              <span className="text-xs font-bold text-stone-400 bg-stone-50 px-2.5 py-1 rounded-lg border border-stone-100">
-                مؤشر نشط
-              </span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">{s.value}</div>
-            <div className="text-xs font-bold text-stone-400 mt-1.5">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* قسم الرسوم البيانية */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <div className="bg-white p-7 rounded-3xl border border-stone-200/80 shadow-xs">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-black text-stone-900 text-lg">الطلبات خلال الفترة الأخيرة</h3>
-            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-              حركة يومية
-            </span>
-          </div>
-          <div className="pt-2">
-            <Chart type="bar" data={ordersByDate} color="#162E21" />
-          </div>
+            تطبيق
+          </button>
+          {(dateFrom || dateTo || appliedFrom || appliedTo) && (
+            <button
+              onClick={resetDates}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-bold text-stone-600"
+            >
+              <RotateCcw className="h-4 w-4" /> الفترة الافتراضية
+            </button>
+          )}
+          <p className="text-xs text-stone-400 lg:text-left">
+            الافتراضي: الشهر الحالي حتى اليوم.
+          </p>
         </div>
-        
-        <div className="bg-white p-7 rounded-3xl border border-stone-200/80 shadow-xs">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-black text-stone-900 text-lg">توزيع الطلبات حسب الحالة</h3>
-            <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
-              نسب مئوية
-            </span>
-          </div>
-          <div className="pt-2">
-            <Chart type="donut" data={ordersByStatus} />
-          </div>
-        </div>
-      </div>
-
-      {/* المنتجات الأكثر طلباً ومبيعات الحالات */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        
-        {/* المنتجات الأكثر طلباً */}
-        <div className="bg-white p-7 rounded-3xl border border-stone-200/80 shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-black text-stone-900 text-lg">المنتجات الأكثر طلباً</h3>
-              <span className="text-xs font-bold text-stone-500 bg-stone-100 px-3 py-1 rounded-full">
-                الأعلى مبيعاً
-              </span>
-            </div>
-
-            {topProducts.length === 0 ? (
-              <div className="py-12">
-                <EmptyState title="لا توجد بيانات" description="لم يتم تسجيل طلبات بعد" />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {topProducts.map((p, i) => (
-                  <div key={i} className="bg-stone-50/80 p-4 rounded-2xl border border-stone-100/80">
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="font-bold text-stone-800 truncate max-w-[65%]">{p.name}</span>
-                      <span className="text-amber-600 font-black bg-amber-500/10 px-3 py-0.5 rounded-xl text-xs">
-                        {p.count} وحدة
-                      </span>
-                    </div>
-                    <div className="h-2.5 rounded-full bg-stone-200/80 overflow-hidden">
-                      <div 
-                        className="h-full rounded-full bg-gradient-to-l from-amber-500 to-amber-600 transition-all duration-700" 
-                        style={{ width: `${(p.count / maxCount) * 100}%` }} 
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* قيمة المبيعات حسب الحالة */}
-        <div className="bg-white p-7 rounded-3xl border border-stone-200/80 shadow-xs">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-black text-stone-900 text-lg">قيمة المبيعات حسب الحالة</h3>
-            <span className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
-              بالعملة المحلية
-            </span>
-          </div>
-          <div className="pt-2">
-            <Chart
-              type="bar"
-              data={[
-                { label: 'قيد الانتظار', value: pendingOrders.reduce((s, o) => s + o.total, 0) },
-                { label: 'مكتمل', value: completedOrders.reduce((s, o) => s + o.total, 0) },
-                { label: 'ملغي', value: cancelledOrders.reduce((s, o) => s + o.total, 0) },
-              ]}
-              color="#d97706"
-            />
-          </div>
-        </div>
-
-      </div>
-
-      {/* جدول آخر الطلبات */}
-      <div className="bg-white rounded-3xl border border-stone-200/80 shadow-xs overflow-hidden">
-        <div className="flex items-center justify-between p-7 border-b border-stone-100">
-          <div>
-            <h3 className="font-black text-stone-900 text-lg">آخر الطلبات المسجلة</h3>
-            <p className="text-xs text-stone-400 mt-0.5">سجل أحدث الطلبات الواردة من المناديب والزبائن</p>
-          </div>
-          <button 
-            onClick={() => onNavigate('orders')} 
-            className="inline-flex items-center gap-1 text-sm font-bold text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100/70 px-4 py-2 rounded-xl transition-colors"
+      </section>
+      {errors.length > 0 && (
+        <div className="rep-error text-center" role="alert">
+          <p>{errors.join("، ")}</p>
+          <button
+            onClick={() => setRetryKey((value) => value + 1)}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm"
           >
-            <span>عرض كل الطلبات</span>
-            <ArrowUpRight className="h-4 w-4 rtl:rotate-90" />
+            <RefreshCw className="h-4 w-4" /> إعادة المحاولة
           </button>
         </div>
-
-        {recentOrders.length === 0 ? (
-          <div className="p-12">
-            <EmptyState title="لا توجد طلبات" description="لم يتم استلام أي طلبات جديدة حتى الآن." />
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-stone-50/80 text-stone-500 border-b border-stone-100">
-                <tr>
-                  <th className="px-6 py-4 text-right font-bold">رقم الطلب</th>
-                  <th className="px-6 py-4 text-right font-bold">المندوب</th>
-                  <th className="px-6 py-4 text-right font-bold">الزبون</th>
-                  <th className="px-6 py-4 text-right font-bold">التاريخ</th>
-                  <th className="px-6 py-4 text-right font-bold">الإجمالي</th>
-                  <th className="px-6 py-4 text-right font-bold">الحالة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {recentOrders.map((o) => (
-                  <tr 
-                    key={o.id} 
-                    className="hover:bg-stone-50/80 transition-colors cursor-pointer group" 
-                    onClick={() => onNavigate('orders', { id: o.id })}
+      )}
+      {loading ? (
+        <DashboardLoading />
+      ) : (
+        data && (
+          <>
+            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <Metric
+                icon={TrendingUp}
+                label="إجمالي المبيعات"
+                value={formatMoney(data.summary.completed_sales_total)}
+                tone="green"
+              />
+              <Metric
+                icon={CheckCircle2}
+                label="الطلبات المكتملة"
+                value={data.summary.completed_orders_count}
+              />
+              <Metric
+                icon={Clock3}
+                label="الطلبات المعلقة"
+                value={data.summary.pending_orders_count}
+                tone="amber"
+              />
+              <Metric
+                icon={AlertTriangle}
+                label="إجمالي المستحقات"
+                value={formatMoney(data.summary.outstanding_amount)}
+                tone="red"
+              />
+              <Metric
+                icon={ClipboardList}
+                label="الطلبات المستحقة"
+                value={data.summary.outstanding_orders_count}
+                tone="red"
+              />
+            </section>
+            <div className="grid gap-5 lg:grid-cols-[1fr_330px]">
+              <section className="rounded-2xl border bg-white p-5 shadow-sm">
+                <h2 className="font-black text-brand">الطلبات حسب النوع</h2>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <TypeCount label="أونلاين" value={data.orders_by_type.retail} />
+                  <TypeCount
+                    label="جملة"
+                    value={data.orders_by_type.wholesale}
+                  />
+                  <TypeCount
+                    label="بيع محل"
+                    value={data.orders_by_type.store_sale}
+                  />
+                </div>
+              </section>
+              <section className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-black text-brand">تنبيهات المخزون</h2>
+                  <button
+                    onClick={() => onNavigate("inventory")}
+                    className="text-xs font-black text-gold-dark"
                   >
-                    <td className="px-6 py-4 font-black text-brand group-hover:text-amber-600 transition-colors">
-                      #{o.number}
-                    </td>
-                    <td className="px-6 py-4 text-stone-700 font-semibold">{o.repName}</td>
-                    <td className="px-6 py-4 text-stone-700 font-medium">{o.customerName}</td>
-                    <td className="px-6 py-4 text-stone-400 text-xs font-medium">{formatDate(o.createdAt)}</td>
-                    <td className="px-6 py-4 font-black text-amber-600">{formatPrice(o.total)}</td>
-                    <td className="px-6 py-4">
-                      <span className={getStatusBadgeClass(o.status)}>{getStatusLabel(o.status)}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    عرض المخزون
+                  </button>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <AlertCount
+                    icon={Boxes}
+                    label="مخزون منخفض"
+                    value={data.stock_alerts.low_stock_variants}
+                  />
+                  <AlertCount
+                    icon={PackageX}
+                    label="نفد المخزون"
+                    value={data.stock_alerts.out_of_stock_variants}
+                  />
+                </div>
+                <form
+                  className="mt-4 rounded-xl border border-amber-200 bg-white p-3 shadow-sm"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    applyStockThreshold();
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <label
+                      htmlFor="dashboard-stock-threshold"
+                      className="min-w-0"
+                    >
+                      <span className="block text-xs font-black text-brand">
+                        حد التنبيه
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-stone-500">
+                        منخفض حتى {appliedStockThreshold} قطع
+                      </span>
+                    </label>
+                    <span className="flex shrink-0 items-stretch overflow-hidden rounded-lg border border-stone-200 bg-stone-50 focus-within:border-gold focus-within:ring-2 focus-within:ring-gold/15">
+                      <input
+                        id="dashboard-stock-threshold"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={stockThreshold}
+                        onChange={(event) => setStockThreshold(event.target.value)}
+                        className="w-16 appearance-none bg-transparent px-2 py-2 text-center text-base font-black text-brand outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        aria-label="حد المخزون المنخفض"
+                      />
+                      <button
+                        className="border-r border-stone-200 bg-brand px-3 text-xs font-black text-white transition hover:bg-brand-800"
+                      >
+                        تطبيق
+                      </button>
+                    </span>
+                  </div>
+                </form>
+              </section>
+            </div>
+            <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+              <div className="flex items-center justify-between border-b p-5">
+                <div>
+                  <h2 className="font-black text-brand">آخر الطلبات</h2>
+                  <p className="mt-1 text-xs text-stone-500">
+                    أحدث الطلبات المسجلة
+                  </p>
+                </div>
+                <button
+                  onClick={() => onNavigate("orders")}
+                  className="text-sm font-black text-gold-dark"
+                >
+                  عرض الكل
+                </button>
+              </div>
+              {data.recent_orders.length === 0 ? (
+                <EmptyState title="لا توجد طلبات حديثة" />
+              ) : (
+                <>
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full min-w-[860px] text-sm">
+                      <thead className="bg-stone-50 text-stone-500">
+                        <tr>
+                          {[
+                            "الطلب",
+                            "العميل",
+                            "النوع",
+                            "الحالة",
+                            "الدفع",
+                            "الإجمالي",
+                            "المتبقي",
+                            "التاريخ",
+                          ].map((label) => (
+                            <th key={label} className="px-4 py-3 text-right">
+                              {label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {data.recent_orders.map((order) => (
+                          <tr key={order.order_id}>
+                            <td className="px-4 py-4 font-black text-brand">
+                              #{order.order_id}
+                            </td>
+                            <td className="px-4 font-bold">
+                              {order.customer.name}
+                            </td>
+                            <td className="px-4">
+                              {orderTypeLabel(order.order_type)}
+                            </td>
+                            <td className="px-4">
+                              <OrderStatusBadge status={order.status} />
+                            </td>
+                            <td className="px-4">
+                              <PaymentStatusBadge
+                                status={order.payment_status}
+                              />
+                            </td>
+                            <td className="px-4 font-bold">
+                              {formatMoney(order.total_amount)}
+                            </td>
+                            <td className="px-4 text-red-700">
+                              {formatMoney(order.remaining_amount)}
+                            </td>
+                            <td className="whitespace-nowrap px-4 text-stone-500">
+                              {formatOrderDate(order.created_at)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="divide-y md:hidden">
+                    {data.recent_orders.map((order) => (
+                      <article key={order.order_id} className="space-y-3 p-4">
+                        <div className="flex justify-between gap-3">
+                          <strong className="text-brand">
+                            #{order.order_id} · {order.customer.name}
+                          </strong>
+                          <span className="text-xs text-stone-400">
+                            {formatOrderDate(order.created_at)}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <OrderStatusBadge status={order.status} />
+                          <PaymentStatusBadge status={order.payment_status} />
+                          <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-bold">
+                            {orderTypeLabel(order.order_type)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>
+                            الإجمالي: <b>{formatMoney(order.total_amount)}</b>
+                          </span>
+                          <span className="text-red-700">
+                            المتبقي:{" "}
+                            <b>{formatMoney(order.remaining_amount)}</b>
+                          </span>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </>
+              )}
+            </section>
+            <section className="rounded-2xl border bg-white shadow-sm">
+              <div className="border-b p-5">
+                <h2 className="font-black text-brand">ملخص المناديب</h2>
+                <p className="mt-1 text-xs text-stone-500">
+                  أداء طلبات الجملة المكتملة ضمن الفترة.
+                </p>
+              </div>
+              {data.representatives.length === 0 ? (
+                <EmptyState
+                  icon={<Users className="h-8 w-8" />}
+                  title="لا توجد بيانات مناديب ضمن الفترة"
+                />
+              ) : (
+                <div className="divide-y">
+                  {data.representatives.map((rep) => (
+                    <div
+                      key={rep.representative_id}
+                      className="grid gap-2 p-4 sm:grid-cols-[1fr_auto_auto] sm:items-center"
+                    >
+                      <strong>{rep.name}</strong>
+                      <span className="text-sm text-stone-500">
+                        {rep.completed_orders_count} طلب مكتمل
+                      </span>
+                      <strong className="text-gold-dark">
+                        {formatMoney(rep.completed_sales_total)}
+                      </strong>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )
+      )}
+    </div>
+  );
+}
+function Metric({
+  icon: Icon,
+  label,
+  value,
+  tone = "brand",
+}: {
+  icon: typeof TrendingUp;
+  label: string;
+  value: string | number;
+  tone?: "brand" | "green" | "amber" | "red";
+}) {
+  const colors = {
+    brand: "bg-brand-50 text-brand",
+    green: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    red: "bg-red-50 text-red-700",
+  };
+  return (
+    <article className="rounded-2xl border bg-white p-5 shadow-sm">
+      <span
+        className={`grid h-10 w-10 place-items-center rounded-xl ${colors[tone]}`}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      <strong className="mt-4 block text-2xl text-brand">{value}</strong>
+      <span className="mt-1 block text-sm font-bold text-stone-500">
+        {label}
+      </span>
+    </article>
+  );
+}
+function TypeCount({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl bg-stone-50 p-4">
+      <span className="text-sm font-bold text-stone-500">{label}</span>
+      <strong className="mt-2 block text-2xl text-brand">{value}</strong>
+    </div>
+  );
+}
+function AlertCount({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Boxes;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-xl bg-white p-3">
+      <Icon className="h-5 w-5 text-amber-700" />
+      <strong className="mt-2 block text-xl text-brand">{value}</strong>
+      <span className="text-xs font-bold text-stone-500">{label}</span>
+    </div>
+  );
+}
+function orderTypeLabel(type: string) {
+  return type === "Retail" ? "أونلاين" : type === "Wholesale" ? "جملة" : "بيع محل";
+}
+function DashboardLoading() {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {Array.from({ length: 5 }, (_, i) => (
+          <Skeleton key={i} className="h-32" />
+        ))}
       </div>
-
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Skeleton className="h-44" />
+        <Skeleton className="h-44" />
+      </div>
+      <Skeleton className="h-80" />
     </div>
   );
 }

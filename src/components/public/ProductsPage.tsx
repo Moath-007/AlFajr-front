@@ -17,7 +17,7 @@ interface ProductsPageProps {
   onNavigate: (page: string, params?: Record<string, string>) => void;
 }
 
-const DEFAULT_LIMIT = 9;
+const DEFAULT_LIMIT = 12;
 const emptyPagination: CatalogPaginationDto = { page: 1, limit: DEFAULT_LIMIT, total: 0, total_pages: 0 };
 
 export default function ProductsPage({ onNavigate }: ProductsPageProps) {
@@ -109,10 +109,10 @@ export default function ProductsPage({ onNavigate }: ProductsPageProps) {
         <aside className="hidden lg:block"><div className="sticky top-40 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"><div className="mb-5 flex items-center justify-between"><h2 className="font-black text-[#162E21]">تصفية النتائج</h2>{activeFilters > 0 && <button onClick={clearFilters} className="text-xs font-bold text-[#C2A66D]">مسح الكل</button>}</div>{filters}</div></aside>
         <section>
           <div className="mb-4 min-h-6 text-sm font-semibold text-stone-500">{status === 'ready' && pagination.total > 0 ? `${pagination.total} منتج` : status === 'ready' ? 'لا توجد نتائج' : ''}</div>
-          {status === 'loading' && <div className="grid grid-cols-2 gap-4 md:grid-cols-3">{Array.from({ length: 6 }, (_, index) => <ProductCardSkeleton key={index} />)}</div>}
+          {status === 'loading' && <div className="grid grid-cols-1 gap-4 min-[440px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">{Array.from({ length: 12 }, (_, index) => <ProductCardSkeleton key={index} />)}</div>}
           {status === 'error' && <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center text-red-900" role="alert"><p className="font-bold">{errors.join('، ')}</p><button onClick={() => setRequestVersion((version) => version + 1)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-black shadow-sm"><RefreshCw className="h-4 w-4" /> إعادة المحاولة</button></div>}
           {status === 'ready' && products.length === 0 && <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-10 text-center"><PackageSearch className="mx-auto h-10 w-10 text-stone-300" /><h2 className="mt-4 font-black text-[#162E21]">لا توجد منتجات مطابقة</h2><p className="mt-2 text-sm text-stone-500">جرّب تغيير البحث أو الفلاتر.</p>{(activeFilters > 0 || searchParam) && <button onClick={() => { setSearchInput(''); updateParams({ search: null, category_id: null, color_id: null, sort: null, page: null }); }} className="mt-5 rounded-xl border border-[#162E21]/20 px-4 py-2 text-sm font-bold text-[#162E21]">مسح البحث والفلاتر</button>}</div>}
-          {status === 'ready' && products.length > 0 && <div className="grid grid-cols-2 gap-4 md:grid-cols-3">{products.map((product) => <CatalogCard key={product.id} product={product} onOpen={() => onNavigate('product-details', { id: String(product.id) })} />)}</div>}
+          {status === 'ready' && products.length > 0 && <div className="grid grid-cols-1 gap-4 min-[440px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">{products.map((product) => <CatalogCard key={product.id} product={product} onOpen={() => onNavigate('product-details', { id: String(product.id) })} />)}</div>}
           {status === 'ready' && pagination.total_pages > 1 && <nav className="mt-9 flex flex-wrap items-center justify-center gap-2" aria-label="صفحات المنتجات"><PageButton disabled={pagination.page <= 1} onClick={() => updateParams({ page: pagination.page - 1 }, false)}><ChevronRight className="h-4 w-4" /> السابق</PageButton>{pageNumbers.map((item, index) => item === 'ellipsis' ? <span key={`ellipsis-${index}`} className="px-1 text-stone-400">…</span> : <button key={item} onClick={() => updateParams({ page: item }, false)} aria-current={item === pagination.page ? 'page' : undefined} className={`h-10 min-w-10 rounded-xl text-sm font-black transition ${item === pagination.page ? 'bg-[#162E21] text-white' : 'border border-stone-200 bg-white text-stone-600 hover:border-[#C2A66D]'}`}>{item}</button>)}<PageButton disabled={pagination.page >= pagination.total_pages} onClick={() => updateParams({ page: pagination.page + 1 }, false)}>التالي <ChevronLeft className="h-4 w-4" /></PageButton></nav>}
         </section>
       </div>

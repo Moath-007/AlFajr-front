@@ -13,7 +13,7 @@ export default function ContactPage() {
   return (
     <div className="min-h-screen bg-stone-50/70">
       <section className="relative overflow-hidden bg-[#162E21] text-white">
-        <img src={heroImage} alt="" decoding="async" fetchPriority="high" className="absolute inset-0 h-full w-full object-cover object-center" />
+        <img src={heroImage} alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover object-center" />
         <div className="absolute inset-0 bg-[#162E21]/60 lg:bg-gradient-to-l lg:from-[#162E21] lg:from-[28%] lg:via-[#162E21]/82 lg:via-[58%] lg:to-[#162E21]/5" />
         <div className="relative mx-auto flex min-h-72 max-w-7xl items-center px-4 py-12 sm:min-h-80 sm:px-6 lg:min-h-[360px] lg:px-8 lg:py-16">
           <div className="relative z-10 max-w-xl py-2">

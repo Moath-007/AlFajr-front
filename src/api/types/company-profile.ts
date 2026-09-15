@@ -1,12 +1,12 @@
-import type { IsoDateTimeString } from './common';
+import type { IsoDateTimeString } from "./common";
 
 export interface CompanyProfileDataDto {
   company_name: string;
-  email?: string | null;
-  address?: string | null;
-  city?: string | null;
-  working_hours?: string | null;
-  announcement_text?: string | null;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  working_hours: string | null;
+  announcement_text: string | null;
   announcement_enabled: boolean;
   created_at: IsoDateTimeString;
   phones: string[];
