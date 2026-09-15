@@ -6,7 +6,7 @@ import {
   resolveApiAssetUrl,
   type CatalogProductSummaryDto,
 } from '@/api';
-import { heroImage } from '@/data/mockData';
+import { heroImage } from '@/data/publicContent';
 import { usePublicCatalog } from '@/public/usePublicCatalog';
 import { usePublicCompany } from '@/public/usePublicCompany';
 

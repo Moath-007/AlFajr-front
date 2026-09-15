@@ -1,6 +1,6 @@
 import { AlertCircle, Building2, Clock, Mail, MapPin, Phone, RefreshCw } from 'lucide-react';
 import { getPublicCompanyDetails, usePublicCompany } from '@/public';
-import { heroImage } from '@/data/mockData';
+import { heroImage } from '@/data/publicContent';
 
 const iconBox = 'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#C2A66D]/10 text-[#C2A66D]';
 

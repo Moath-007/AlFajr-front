@@ -145,11 +145,6 @@ export interface OrderResponseDto {
   payments: OrderPaymentResponseDto[];
 }
 
-export interface OrdersListResponseDto {
-  message: string;
-  orders: OrderResponseDto[];
-}
-
 export interface OrdersQuery {
   page?: number;
   limit?: number;

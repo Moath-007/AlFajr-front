@@ -125,8 +125,10 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
           </div>
         </div>
         <div className="mt-10 border-t border-white/10 pb-5 pt-6 text-center text-xs text-stone-400 sm:pb-6">
-          © {new Date().getFullYear()} {companyName || "شركة الفجر"}. جميع
-          الحقوق محفوظة.
+          <span className="inline-flex flex-wrap items-center justify-center gap-1" dir="ltr">
+            <span>© 2026 HM Digital</span>
+            <span dir="rtl">جميع الحقوق محفوظة</span>
+          </span>
         </div>
       </div>
     </footer>

@@ -13,7 +13,3 @@ export interface ErrorResponseDto {
   error: string;
   message: string | string[];
 }
-
-export interface MessageResponse {
-  message: string;
-}
