@@ -84,20 +84,108 @@
   }
 }
 
-/* Scrollbar */
+/* Brand scrollbar */
+html,
+body {
+  scrollbar-width: thin;
+  scrollbar-color: #315442 #f4f1ea;
+}
+
+/* Opera/Chromium must use the WebKit rules below instead of overriding them. */
+@supports selector(::-webkit-scrollbar) {
+  html,
+  body,
+  * {
+    scrollbar-color: auto;
+  }
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
+
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f4f1ea;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #d4d4d4;
-  border-radius: 4px;
+  min-height: 42px;
+  border: 2px solid #f4f1ea;
+  border-radius: 999px;
+  background: #315442;
+  background-clip: padding-box;
+  transition: background-color 160ms ease;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #a3a3a3;
+  background: #c2a66d;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: #f4f1ea;
+}
+
+/* The viewport scrollbar is replaced to keep the same design in Edge and Opera. */
+html,
+body {
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.brand-scrollbar-track {
+  position: fixed;
+  z-index: 9999;
+  top: 6px;
+  right: 3px;
+  bottom: 6px;
+  width: 10px;
+  border-radius: 999px;
+  background: rgb(244 241 234 / 0.82);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.brand-scrollbar-track.brand-scrollbar-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.brand-scrollbar-thumb {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  touch-action: none;
+  cursor: grab;
+  border: 2px solid rgb(244 241 234 / 0.9);
+  border-radius: 999px;
+  background: #315442;
+  box-shadow: 0 2px 8px rgb(22 46 33 / 0.2);
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.brand-scrollbar-thumb:hover,
+.brand-scrollbar-thumb:active {
+  background: #c2a66d;
+  box-shadow: 0 3px 10px rgb(122 90 38 / 0.28);
+}
+
+.brand-scrollbar-thumb:active {
+  cursor: grabbing;
+}
+
+@media (pointer: coarse), print {
+  .brand-scrollbar-track {
+    display: none;
+  }
 }
 
 .print-only,

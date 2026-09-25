@@ -710,10 +710,10 @@ function PublicSiteContent({ onNavigate }: { onNavigate: NavigateHandler }) {
       <div className="flex-1">
         <PageTransition>
           <Routes>
-            <Route path="" element={<HomePage onNavigate={onNavigate} />} />
+            <Route path="" element={<HomePage />} />
             <Route
               path="products"
-              element={<ProductsPage onNavigate={onNavigate} />}
+              element={<ProductsPage />}
             />
             <Route
               path="products/:id"
@@ -721,7 +721,7 @@ function PublicSiteContent({ onNavigate }: { onNavigate: NavigateHandler }) {
             />
             <Route
               path="categories"
-              element={<CategoriesPage onNavigate={onNavigate} />}
+              element={<CategoriesPage />}
             />
             <Route path="about" element={<AboutPage />} />
             <Route path="contact" element={<ContactPage />} />
@@ -732,19 +732,18 @@ function PublicSiteContent({ onNavigate }: { onNavigate: NavigateHandler }) {
             />
             <Route
               path="*"
-              element={<PublicNotFoundPage onNavigate={onNavigate} />}
+              element={<PublicNotFoundPage />}
             />
           </Routes>
         </PageTransition>
       </div>
-      <PublicFooter onNavigate={onNavigate} />
+      <PublicFooter />
     </div>
   );
 }
 
 function PublicProductDetailsWrapper() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const location = useLocation();
   const productId = Number(id);
   const returnTo = getCatalogReturnPath(location.state);
@@ -757,7 +756,7 @@ function PublicProductDetailsWrapper() {
   return (
     <ProductDetailsPage
       productId={productId}
-      onBack={() => navigate(returnTo)}
+      backTo={returnTo}
     />
   );
 }

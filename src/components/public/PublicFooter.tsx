@@ -1,11 +1,8 @@
 import { Clock, Mail, MapPin, Phone } from "lucide-react";
+import { Link } from "react-router-dom";
 import { getPublicCompanyDetails, usePublicCompany } from "@/public";
 
-interface PublicFooterProps {
-  onNavigate: (page: string) => void;
-}
-
-export default function PublicFooter({ onNavigate }: PublicFooterProps) {
+export default function PublicFooter() {
   const { company, status } = usePublicCompany();
   const { companyName, phones, email, location, workingHours } =
     getPublicCompanyDetails(company);
@@ -18,8 +15,8 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
       <div className="mx-auto max-w-7xl px-4 pt-12 sm:px-6 sm:pt-14 lg:px-8">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.1fr_0.8fr_1.3fr]">
           <div>
-            <button
-              onClick={() => onNavigate("home")}
+            <Link
+              to="/"
               className="group flex items-center gap-3 text-right"
             >
               <span className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-xl bg-white transition-transform group-hover:-translate-y-0.5">
@@ -32,7 +29,7 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
               <span className="text-lg font-black text-white">
                 {companyName || "شركة الفجر"}
               </span>
-            </button>
+            </Link>
           </div>
           <div>
             <h2 className="mb-4 text-sm font-extrabold text-white">
@@ -41,20 +38,17 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
             <ul className="grid grid-cols-2 gap-x-5 gap-y-3 text-sm sm:grid-cols-1">
               {(
                 [
-                  ["home", "الرئيسية"],
-                  ["products", "المنتجات"],
-                  ["categories", "التصنيفات"],
-                  ["about", "من نحن"],
-                  ["contact", "اتصل بنا"],
+                  ["/", "الرئيسية"],
+                  ["/products", "المنتجات"],
+                  ["/categories", "التصنيفات"],
+                  ["/about", "من نحن"],
+                  ["/contact", "اتصل بنا"],
                 ] as const
-              ).map(([page, label]) => (
-                <li key={page}>
-                  <button
-                    onClick={() => onNavigate(page)}
-                    className="transition hover:text-[#E8DCC2]"
-                  >
+              ).map(([path, label]) => (
+                <li key={path}>
+                  <Link to={path} className="transition hover:text-[#E8DCC2]">
                     {label}
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>

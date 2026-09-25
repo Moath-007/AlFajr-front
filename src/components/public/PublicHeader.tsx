@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Link, NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   LogIn,
@@ -68,8 +69,8 @@ export default function PublicHeader({
     <header className="relative border-b border-stone-200/80 bg-white/95 shadow-[0_6px_24px_rgba(22,46,33,0.05)] backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-3 lg:h-[68px]">
-          <button
-            onClick={() => onNavigate("home")}
+          <Link
+            to="/"
             className="group flex min-w-0 shrink-0 items-center gap-3 text-right"
           >
             <span className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-stone-200 transition-transform group-hover:-translate-y-0.5">
@@ -89,16 +90,16 @@ export default function PublicHeader({
                   : "منتجات وتجهيزات الحمامات"}
               </span>
             </span>
-          </button>
+          </Link>
 
           <nav
             className="hidden items-center gap-1 lg:flex"
             aria-label="التنقل الرئيسي"
           >
             {navItems.map((item) => (
-              <button
+              <NavLink
                 key={item.id}
-                onClick={() => onNavigate(item.id)}
+                to={item.path}
                 aria-current={isActive(item.path) ? "page" : undefined}
                 className={`relative rounded-xl px-3.5 py-2.5 text-sm font-bold transition-colors ${isActive(item.path) ? "bg-[#162E21]/[0.07] text-[#162E21]" : "text-stone-600 hover:bg-stone-100 hover:text-[#162E21]"}`}
               >
@@ -106,7 +107,7 @@ export default function PublicHeader({
                 {isActive(item.path) && (
                   <span className="absolute inset-x-3 -bottom-[11px] h-0.5 rounded-full bg-[#C2A66D]" />
                 )}
-              </button>
+              </NavLink>
             ))}
           </nav>
 
@@ -187,16 +188,15 @@ export default function PublicHeader({
             aria-label="قائمة الهاتف"
           >
             {navItems.map((item) => (
-              <button
+              <NavLink
                 key={item.id}
-                onClick={() => {
-                  onNavigate(item.id);
-                  setMobileOpen(false);
-                }}
+                to={item.path}
+                onClick={() => setMobileOpen(false)}
+                aria-current={isActive(item.path) ? "page" : undefined}
                 className={`block w-full rounded-xl px-4 py-3 text-right text-sm font-bold transition ${isActive(item.path) ? "bg-[#162E21] text-white" : "text-stone-700 hover:bg-stone-50"}`}
               >
                 {item.label}
-              </button>
+              </NavLink>
             ))}
             <div className="mt-3 border-t border-stone-100 pt-3">
               {!isRestoringSession && (

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Check, PackageOpen, RefreshCw, ShoppingBag } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { ApiError, productsService, resolveApiAssetUrl, type CatalogProductDetailsDto, type CatalogVariantResponseDto } from '@/api';
 import { usePublicCart } from '@/public';
 import QuantityInput from '@/components/ui/QuantityInput';
@@ -7,10 +8,10 @@ import Seo, { SITE_NAME, SITE_URL } from '@/components/seo/Seo';
 
 interface ProductDetailsPageProps {
   productId: number;
-  onBack: () => void;
+  backTo: string;
 }
 
-export default function ProductDetailsPage({ productId, onBack }: ProductDetailsPageProps) {
+export default function ProductDetailsPage({ productId, backTo }: ProductDetailsPageProps) {
   const { addItem } = usePublicCart();
   const [product, setProduct] = useState<CatalogProductDetailsDto | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'missing'>('loading');
@@ -53,8 +54,8 @@ export default function ProductDetailsPage({ productId, onBack }: ProductDetails
   const selectedImage = useMemo(() => product?.images.find((image) => image.id === selectedImageId) ?? product?.images[0], [product, selectedImageId]);
 
   if (status === 'loading') return <DetailsSkeleton />;
-  if (status === 'missing') return <StatePage title="المنتج غير متوفر حاليًا" description="قد يكون المنتج غير موجود أو لم يعد متاحًا في الكتالوج." onBack={onBack} />;
-  if (status === 'error') return <StatePage title="تعذر تحميل المنتج" description={errors.join('، ')} onBack={onBack} onRetry={() => setRequestVersion((version) => version + 1)} />;
+  if (status === 'missing') return <StatePage title="المنتج غير متوفر حاليًا" description="قد يكون المنتج غير موجود أو لم يعد متاحًا في الكتالوج." backTo={backTo} />;
+  if (status === 'error') return <StatePage title="تعذر تحميل المنتج" description={errors.join('، ')} backTo={backTo} onRetry={() => setRequestVersion((version) => version + 1)} />;
   if (!product) return null;
 
   const imageUrl = resolveApiAssetUrl(selectedImage?.url);
@@ -117,7 +118,7 @@ export default function ProductDetailsPage({ productId, onBack }: ProductDetails
       }}
     />
     <main className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9 lg:px-8">
-      <button onClick={onBack} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-stone-500 transition hover:text-[#162E21]"><ArrowRight className="h-4 w-4" /> العودة إلى المنتجات</button>
+      <Link to={backTo} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-stone-500 transition hover:text-[#162E21]"><ArrowRight className="h-4 w-4" /> العودة إلى المنتجات</Link>
       <div className="grid gap-7 lg:grid-cols-2 lg:items-start">
         <section>
           <div className="mx-auto aspect-square w-full max-w-[520px] overflow-hidden rounded-2xl border border-stone-200 bg-stone-100">{imageUrl ? <img src={imageUrl} alt={product.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><PackageOpen className="h-14 w-14 text-stone-300" /></div>}</div>
@@ -149,6 +150,6 @@ export default function ProductDetailsPage({ productId, onBack }: ProductDetails
   );
 }
 
-function StatePage({ title, description, onBack, onRetry }: { title: string; description: string; onBack: () => void; onRetry?: () => void }) { return <main className="mx-auto grid min-h-[60vh] max-w-xl place-items-center px-4 py-16 text-center"><div><PackageOpen className="mx-auto h-12 w-12 text-stone-300" /><h1 className="mt-5 text-2xl font-black text-[#162E21]">{title}</h1><p className="mt-3 text-sm leading-7 text-stone-500">{description}</p><div className="mt-6 flex justify-center gap-3">{onRetry && <button onClick={onRetry} className="inline-flex items-center gap-2 rounded-xl bg-[#162E21] px-4 py-2.5 text-sm font-black text-white"><RefreshCw className="h-4 w-4" /> إعادة المحاولة</button>}<button onClick={onBack} className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-bold text-stone-600">العودة للمنتجات</button></div></div></main>; }
+function StatePage({ title, description, backTo, onRetry }: { title: string; description: string; backTo: string; onRetry?: () => void }) { return <main className="mx-auto grid min-h-[60vh] max-w-xl place-items-center px-4 py-16 text-center"><div><PackageOpen className="mx-auto h-12 w-12 text-stone-300" /><h1 className="mt-5 text-2xl font-black text-[#162E21]">{title}</h1><p className="mt-3 text-sm leading-7 text-stone-500">{description}</p><div className="mt-6 flex justify-center gap-3">{onRetry && <button onClick={onRetry} className="inline-flex items-center gap-2 rounded-xl bg-[#162E21] px-4 py-2.5 text-sm font-black text-white"><RefreshCw className="h-4 w-4" /> إعادة المحاولة</button>}<Link to={backTo} className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-bold text-stone-600">العودة للمنتجات</Link></div></div></main>; }
 function DetailsSkeleton() { return <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" aria-label="جاري تحميل المنتج"><div className="grid gap-10 lg:grid-cols-2"><div className="aspect-square animate-pulse rounded-3xl bg-stone-200" /><div className="space-y-5 pt-6"><div className="h-4 w-24 animate-pulse rounded bg-stone-200" /><div className="h-10 w-3/4 animate-pulse rounded bg-stone-200" /><div className="h-24 animate-pulse rounded bg-stone-100" /></div></div></main>; }
 function formatPrice(value: number) { return `${new Intl.NumberFormat('ar-EG-u-nu-latn', { maximumFractionDigits: 2 }).format(value)} ₪`; }
