@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /owner/
+Disallow: /rep/
+Disallow: /login
+Disallow: /cart
+Disallow: /checkout
+
+Sitemap: https://alfajr.com.ps/sitemap.xml

@@ -7,15 +7,11 @@ import {
   type OrderListItemResponseDto,
   type OrdersPaginationDto,
   type OrderType,
-  type PaymentStatus,
   type RepresentativeResponseDto,
 } from "@/api";
 import { Skeleton } from "@/components/ui/Skeleton";
 import EmptyState from "@/components/ui/EmptyState";
-import {
-  OrderStatusBadge,
-  PaymentStatusBadge,
-} from "@/components/rep/RepOrderUi";
+import { OrderStatusBadge } from "@/components/rep/RepOrderUi";
 import { RepDateInput, RepSelect } from "@/components/rep/RepFormControls";
 import {
   apiMessages,
@@ -24,7 +20,6 @@ import {
 } from "@/components/rep/repOrderUtils";
 import {
   orderTypeLabel,
-  paymentOptions,
   statusOptions,
   typeOptions,
 } from "./adminOrderOptions";
@@ -47,7 +42,6 @@ export default function AdminOrdersPage({
   const [submittedSearch, setSubmittedSearch] = useState("");
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
-  const [payment, setPayment] = useState("");
   const [rep, setRep] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -88,7 +82,6 @@ export default function AdminOrdersPage({
             search: submittedSearch || undefined,
             status: (status as ApiOrderStatus) || undefined,
             order_type: (type as OrderType) || undefined,
-            payment_status: (payment as PaymentStatus) || undefined,
             representative_id: rep ? Number(rep) : undefined,
             date_from: from || undefined,
             date_to: to || undefined,
@@ -109,7 +102,7 @@ export default function AdminOrdersPage({
           if (!signal?.aborted) setLoading(false);
         });
     },
-    [from, page, payment, rep, sort, status, submittedSearch, to, type],
+    [from, page, rep, sort, status, submittedSearch, to, type],
   );
   useEffect(() => {
     const c = new AbortController();
@@ -130,7 +123,6 @@ export default function AdminOrdersPage({
     submittedSearch ||
     status ||
     type ||
-    payment ||
     rep ||
     from ||
     to ||
@@ -141,7 +133,6 @@ export default function AdminOrdersPage({
     setSubmittedSearch("");
     setStatus("");
     setType("");
-    setPayment("");
     setRep("");
     setFrom("");
     setTo("");
@@ -185,12 +176,6 @@ export default function AdminOrdersPage({
             value={type}
             onChange={change(setType)}
             options={typeOptions}
-          />
-          <RepSelect
-            label="حالة الدفع"
-            value={payment}
-            onChange={change(setPayment)}
-            options={paymentOptions}
           />
           <RepSelect
             label="المندوب"
@@ -278,10 +263,7 @@ export default function AdminOrdersPage({
                     "المندوب",
                     "النوع",
                     "الحالة",
-                    "الدفع",
                     "الإجمالي",
-                    "المدفوع",
-                    "المتبقي",
                     "التاريخ",
                     "",
                   ].map((x, i) => (
@@ -307,16 +289,7 @@ export default function AdminOrdersPage({
                     <td className="px-3">
                       <OrderStatusBadge status={o.status} />
                     </td>
-                    <td className="px-3">
-                      <PaymentStatusBadge status={o.payment_status} />
-                    </td>
                     <td className="px-3">{formatMoney(o.total_amount)}</td>
-                    <td className="px-3 text-emerald-700">
-                      {formatMoney(o.paid_amount)}
-                    </td>
-                    <td className="px-3 font-black text-red-700">
-                      {formatMoney(o.remaining_amount)}
-                    </td>
                     <td className="whitespace-nowrap px-3">
                       {formatOrderDate(o.created_at)}
                     </td>
@@ -348,13 +321,11 @@ export default function AdminOrdersPage({
                   {o.representative?.name || "بدون مندوب"} ·{" "}
                   {formatOrderDate(o.created_at)}
                 </p>
-                <div className="mt-3 grid grid-cols-3 gap-2 border-y py-3 text-center text-xs">
+                <div className="mt-3 border-y py-3 text-center text-xs">
                   <Amount label="الإجمالي" value={o.total_amount} />
-                  <Amount label="المدفوع" value={o.paid_amount} />
-                  <Amount label="المتبقي" value={o.remaining_amount} />
                 </div>
                 <div className="mt-3 flex items-center justify-between">
-                  <PaymentStatusBadge status={o.payment_status} />
+                  <span />
                   <button
                     onClick={() => onNavigate(`/owner/orders/${o.id}`)}
                     className="font-black text-gold-dark"

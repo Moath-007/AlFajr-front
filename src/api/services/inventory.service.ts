@@ -2,8 +2,9 @@ import { apiClient } from "../client";
 import type {
   InventoryListResponseDto,
   InventoryQuery,
-  UpdateStockDto,
-  UpdateStockResponseDto,
+  InventoryAdjustmentDto,
+  InventoryAdjustmentResponseDto,
+  InventoryMovementsResponseDto,
 } from "../types";
 
 export const inventoryService = {
@@ -11,16 +12,18 @@ export const inventoryService = {
     apiClient.get<InventoryListResponseDto>(withQuery("/inventory", query), {
       signal,
     }),
-  updateStock: (
+  adjust: (
     variantId: number,
-    data: UpdateStockDto,
+    data: InventoryAdjustmentDto,
     signal?: AbortSignal,
   ) =>
-    apiClient.patch<UpdateStockResponseDto>(
-      `/inventory/${variantId}/stock`,
+    apiClient.post<InventoryAdjustmentResponseDto>(
+      `/inventory/${variantId}/adjustments`,
       data,
       { signal },
     ),
+  movements: (variantId: number, signal?: AbortSignal) =>
+    apiClient.get<InventoryMovementsResponseDto>(`/inventory/${variantId}/movements`, { signal }),
 };
 
 function withQuery(path: string, query: InventoryQuery) {

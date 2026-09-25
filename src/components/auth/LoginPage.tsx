@@ -61,7 +61,7 @@ export default function LoginPage({ onLogin, onBack }: LoginPageProps) {
           <div className="text-center mb-8">
             <div className="mx-auto mb-4 flex h-28 w-40 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-stone-200">
               <img
-                src="/assets/al-fajr-logo.png"
+                src="/assets/al-fajr-logo.webp"
                 alt="شعار شركة الفجر"
                 className="h-full w-full object-cover object-[center_45%]"
               />

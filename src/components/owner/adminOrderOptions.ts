@@ -14,13 +14,6 @@ export const typeOptions = [
   { value: "StoreSale", label: "بيع محل" },
 ];
 
-export const paymentOptions = [
-  { value: "", label: "كل حالات الدفع" },
-  { value: "Unpaid", label: "غير مدفوع" },
-  { value: "PartiallyPaid", label: "مدفوع جزئيًا" },
-  { value: "Paid", label: "مدفوع" },
-];
-
 export function orderTypeLabel(type: OrderType) {
   return type === "Retail"
     ? "طلب أونلاين"

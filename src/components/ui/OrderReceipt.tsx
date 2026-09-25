@@ -12,11 +12,6 @@ const labels = {
   Wholesale: "جملة",
   StoreSale: "بيع محل",
 } as const;
-const paymentLabels = {
-  Paid: "مدفوع",
-  PartiallyPaid: "مدفوع جزئيًا",
-  Unpaid: "غير مدفوع",
-} as const;
 const money = (value: string | number) =>
   `₪${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export default function OrderReceipt({
@@ -73,7 +68,7 @@ export default function OrderReceipt({
       {printError ? <p role="alert" className="text-sm font-bold text-red-700">{printError}</p> : null}
       <section ref={receiptRef} className="receipt-print-root receipt-print-source" dir="rtl" aria-hidden="true">
         <header className="receipt-header">
-          <img className="receipt-logo" src="/assets/al-fajr-logo.png" alt="" />
+          <img className="receipt-logo" src="/assets/al-fajr-logo.webp" alt="" />
           <h1>{company?.company_name || "شركة الفجر للصناعة والتجارة"}</h1>
           {company?.phones.length ? <p>{company.phones.join(" · ")}</p> : null}
           {(company?.address || company?.city) && (
@@ -97,10 +92,10 @@ export default function OrderReceipt({
           <h2>تفاصيل المنتجات</h2>
           {order.items.map((item) => {
             const discount = Number(item.product_discount);
-            const finalUnit = Math.max(0, Number(item.unit_price) - discount);
+            const finalUnit = item.is_bonus ? 0 : Number(item.unit_price);
             return (
               <article key={item.id} className="receipt-item">
-                <strong>{item.variant.product.name}</strong>
+                <strong>{item.variant.product.name}{item.is_bonus ? " — بونص" : ""}</strong>
                 <span className="receipt-variant">
                   {item.variant.size} · {item.variant.color.name}
                 </span>
@@ -110,9 +105,9 @@ export default function OrderReceipt({
                   </span>
                   <b>{money(item.line_total)}</b>
                 </div>
-                {discount > 0 && (
+                {item.is_bonus ? <small>بونص — القيمة المالية صفر والكمية محسوبة من المخزون</small> : Number(item.base_unit_price) !== Number(item.unit_price) ? <small>السعر الأساسي: {money(item.base_unit_price)} · السعر الفعلي: {money(item.unit_price)}</small> : discount > 0 && (
                   <small>
-                    السعر الأصلي: {money(item.unit_price)} · الخصم:{" "}
+                    الخصم: {" "}
                     {money(discount)}
                   </small>
                 )}
@@ -127,16 +122,6 @@ export default function OrderReceipt({
             label="الإجمالي النهائي"
             value={money(order.total_amount)}
             strong
-          />
-          <ReceiptRow label="المدفوع" value={money(order.paid_amount)} />
-          <ReceiptRow
-            label="المتبقي على الطلب"
-            value={money(order.remaining_amount)}
-            strong
-          />
-          <ReceiptRow
-            label="حالة الدفع"
-            value={paymentLabels[order.payment_status]}
           />
           {customerCurrentDebt != null && <ReceiptRow label="إجمالي الدين الحالي" value={money(customerCurrentDebt)} strong />}
         </div>

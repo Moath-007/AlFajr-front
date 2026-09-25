@@ -1,3 +1,5 @@
+import { toLatinDigits } from "./numerals";
+
 type A4Orientation = "portrait" | "landscape";
 
 interface PrintElementOptions {
@@ -33,7 +35,7 @@ export async function printA4Element({
       html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; color: #111 !important; }
       body { width: auto !important; min-height: 0 !important; font-family: "Tajawal", Arial, sans-serif; direction: rtl; }
       [data-print-ignore], .report-print-hide, .print\\:hidden { display: none !important; }
-      .print-document { width: 100% !important; max-width: none !important; margin: 0 !important; padding: 12mm !important; box-sizing: border-box !important; box-decoration-break: clone; -webkit-box-decoration-break: clone; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+      .print-document { position: static !important; inset: auto !important; opacity: 1 !important; visibility: visible !important; width: 100% !important; max-width: none !important; margin: 0 !important; padding: 12mm !important; box-sizing: border-box !important; box-decoration-break: clone; -webkit-box-decoration-break: clone; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
       .print-only { display: block !important; }
       .print-document .hidden { display: none !important; }
       .print-document .print-active { display: block !important; }
@@ -57,6 +59,10 @@ export async function printA4Element({
       .print-document th { background: #f0f0f0 !important; color: #111 !important; font-weight: 800; }
       .print-document tr { break-inside: avoid-page; page-break-inside: avoid; }
       .print-document h2, .print-document h3 { break-after: avoid-page; page-break-after: avoid; }
+      .print-document .statement-section { margin-top: 6mm !important; }
+      .print-document .statement-section > h2 { margin: 0 0 3mm !important; padding-bottom: 2mm !important; border-bottom: 1.5px solid #333 !important; font-size: 13pt !important; }
+      .print-document .statement-card { margin-bottom: 3mm !important; padding: 3mm !important; border: 1px solid #bbb !important; border-radius: 0 !important; break-inside: avoid-page; page-break-inside: avoid; }
+      .print-document .statement-card table { margin-top: 2mm !important; font-size: 8pt !important; }
       .print-document .print-summary { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3mm; margin-bottom: 5mm; }
       .print-document .print-summary > * { padding: 3mm !important; border: 1px solid #bbb !important; border-radius: 0 !important; break-inside: avoid-page; }
       .print-document .bg-brand { background: #fff !important; color: #162e21 !important; }
@@ -130,7 +136,7 @@ async function printInFrame({ body, title, width, css, head = "", prepare }: Fra
     const loaded = new Promise<void>((resolve) =>
       frame.addEventListener("load", () => resolve(), { once: true }),
     );
-    frame.srcdoc = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><base href="${escapeAttribute(document.baseURI)}"><title>${escapeHtml(title)}</title>${head}<style>${css}</style></head><body>${body}</body></html>`;
+    frame.srcdoc = toLatinDigits(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><base href="${escapeAttribute(document.baseURI)}"><title>${escapeHtml(title)}</title>${head}<style>${css}</style></head><body>${body}</body></html>`);
     await loaded;
 
     const printDocument = frame.contentDocument;

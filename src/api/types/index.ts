@@ -11,3 +11,5 @@ export * from "./inventory";
 export * from "./notifications";
 export * from "./representatives";
 export * from "./reports";
+export * from "./finance";
+export * from "./customer-purchases";

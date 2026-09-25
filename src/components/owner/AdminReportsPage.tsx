@@ -7,6 +7,7 @@ import {
   representativesService,
   type CategoryResponseDto,
   type CompanyProfileDataDto,
+  type DiscountsReportResponseDto,
   type OrderType,
   type OrdersReportResponseDto,
   type ProductReportRowDto,
@@ -14,6 +15,7 @@ import {
   type ReportPaginationDto,
   type RepresentativeReportRowDto,
   type RepresentativeResponseDto,
+  type ReturnsReportResponseDto,
   type SalesReportResponseDto,
 } from "@/api";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -23,11 +25,13 @@ import { apiMessages, formatMoney, formatOrderDate } from "@/components/rep/repO
 import PrintHeader, { type PrintFilter } from "@/components/printing/PrintHeader";
 import { printA4Element } from "@/utils/printDocument";
 
-type Tab = "sales" | "orders" | "receivables" | "products" | "representatives";
+type Tab = "sales" | "orders" | "receivables" | "returns" | "discounts" | "products" | "representatives";
 const tabs: { id: Tab; label: string }[] = [
   { id: "sales", label: "المبيعات" },
   { id: "orders", label: "الطلبات" },
-  { id: "receivables", label: "التحصيلات" },
+  { id: "receivables", label: "التحصيلات والذمم" },
+  { id: "returns", label: "المردودات" },
+  { id: "discounts", label: "الخصومات والمسامحات" },
   { id: "products", label: "المنتجات" },
   { id: "representatives", label: "المناديب" },
 ];
@@ -52,7 +56,7 @@ export default function AdminReportsPage() {
     await printA4Element({
       element: printableReport,
       title: tabs.find((item) => item.id === tab)?.label || "تقرير",
-      orientation: tab === "representatives" ? "landscape" : "portrait",
+      orientation: ["representatives", "returns", "discounts"].includes(tab) ? "landscape" : "portrait",
     });
   };
   return (
@@ -60,11 +64,11 @@ export default function AdminReportsPage() {
       <header className="report-print-hide flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-end">
         <div>
           <p className="text-xs font-black text-gold-dark">
-            بيانات مجمّعة من الخادم
+            نظرة شاملة
           </p>
           <h1 className="mt-1 text-3xl font-black text-brand">التقارير</h1>
           <p className="mt-2 text-sm text-stone-500">
-            تقارير تشغيلية للعرض فقط؛ جميع الحسابات والتجميعات ينفذها الباك.
+            تابع المبيعات والطلبات والمستحقات والخصومات خلال الفترة التي تختارها.
           </p>
         </div>
         <button
@@ -78,9 +82,9 @@ export default function AdminReportsPage() {
       <nav
         aria-label="أنواع التقارير"
         data-print-ignore
-        className="report-print-hide overflow-x-auto print:hidden"
+        className="report-print-hide print:hidden"
       >
-        <div className="inline-flex min-w-max rounded-xl border bg-white p-1">
+        <div className="grid grid-cols-2 gap-1 rounded-xl border bg-white p-1 sm:grid-cols-3 lg:grid-cols-7">
           {tabs.map((x) => (
             <button
               key={x.id}
@@ -100,6 +104,12 @@ export default function AdminReportsPage() {
       </div>
       <div className={tab === "receivables" ? "print-active" : "hidden"}>
         <ReceivablesReport company={company} />
+      </div>
+      <div className={tab === "returns" ? "print-active" : "hidden"}>
+        <ReturnsReport company={company} />
+      </div>
+      <div className={tab === "discounts" ? "print-active" : "hidden"}>
+        <DiscountsReport company={company} />
       </div>
       <div className={tab === "products" ? "print-active" : "hidden"}>
         <ProductsReport company={company} />
@@ -152,18 +162,23 @@ function SalesReport({ company }: { company: CompanyProfileDataDto | null }) {
     >
       {data && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Metric
-              label="إجمالي المبيعات"
+              label="صافي المبيعات"
               value={formatMoney(data.summary.sales_total)}
+              strong
+            />
+            <Metric
+              label="إجمالي المبيعات قبل المردود"
+              value={formatMoney(data.summary.gross_sales_total)}
+            />
+            <Metric
+              label="مردودات المبيعات"
+              value={formatMoney(data.summary.sales_returns_total)}
             />
             <Metric
               label="الطلبات المكتملة"
               value={data.summary.orders_count}
-            />
-            <Metric
-              label="متوسط قيمة الطلب"
-              value={formatMoney(data.summary.average_order_value)}
             />
           </div>
           <SalesByType data={data.by_type} />
@@ -174,8 +189,9 @@ function SalesReport({ company }: { company: CompanyProfileDataDto | null }) {
   );
 }
 function OrdersReport({ company }: { company: CompanyProfileDataDto | null }) {
-  const [draft, setDraft] = useState(initialDate);
-  const [query, setQuery] = useState(initialDate);
+  const ordersInitialDate: DateDraft = { from: "", to: "", group: "month" };
+  const [draft, setDraft] = useState(ordersInitialDate);
+  const [query, setQuery] = useState(ordersInitialDate);
   const [data, setData] = useState<OrdersReportResponseDto | null>(null);
   const state = useLoad(
     useCallback(
@@ -199,11 +215,10 @@ function OrdersReport({ company }: { company: CompanyProfileDataDto | null }) {
         <DateFilters
           value={draft}
           setValue={setDraft}
-          grouping
           apply={() => setQuery(draft)}
           reset={() => {
-            setDraft(initialDate);
-            setQuery(initialDate);
+            setDraft(ordersInitialDate);
+            setQuery(ordersInitialDate);
           }}
         />
       }
@@ -237,6 +252,7 @@ function OrdersReport({ company }: { company: CompanyProfileDataDto | null }) {
 function ReceivablesReport({ company }: { company: CompanyProfileDataDto | null }) {
   const [draft, setDraft] = useState({ from: "", to: "", type: "", rep: "" });
   const [query, setQuery] = useState(draft);
+  const [page, setPage] = useState(1);
   const [data, setData] = useState<Awaited<
     ReturnType<typeof reportsService.receivables>
   > | null>(null);
@@ -250,10 +266,12 @@ function ReceivablesReport({ company }: { company: CompanyProfileDataDto | null 
             date_to: query.to || undefined,
             order_type: (query.type as OrderType) || undefined,
             representative_id: query.rep ? Number(query.rep) : undefined,
+            page,
+            limit: 10,
           },
           signal,
         ),
-      [query],
+      [page, query],
     ),
   );
   const reset = { from: "", to: "", type: "", rep: "" };
@@ -277,6 +295,7 @@ function ReceivablesReport({ company }: { company: CompanyProfileDataDto | null 
         <form
           onSubmit={(e) => {
             e.preventDefault();
+            setPage(1);
             setQuery(draft);
           }}
           className="report-filters"
@@ -315,6 +334,7 @@ function ReceivablesReport({ company }: { company: CompanyProfileDataDto | null 
             reset={() => {
               setDraft(reset);
               setQuery(reset);
+              setPage(1);
             }}
           />
         </form>
@@ -322,32 +342,128 @@ function ReceivablesReport({ company }: { company: CompanyProfileDataDto | null 
       state={state}
       onData={setData}
     >
-      {data && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Metric
-            label="إجمالي المفوتر"
-            value={formatMoney(data.invoiced_amount)}
-          />
-          <Metric label="المدفوع" value={formatMoney(data.paid_amount)} />
-          <Metric
-            label="المتبقي"
-            value={formatMoney(data.remaining_amount)}
-            strong
-          />
-          <Metric
-            label="الطلبات المستحقة"
-            value={data.outstanding_orders_count}
-          />
-          <Metric label="غير مدفوعة" value={data.unpaid_orders_count} />
-          <Metric
-            label="مدفوعة جزئيًا"
-            value={data.partially_paid_orders_count}
-          />
-        </div>
-      )}
+      {data && <div className="space-y-5">
+        <section>
+          <h3 className="mb-3 font-black text-brand">التحصيلات خلال الفترة المحددة</h3>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Metric label="إجمالي المقبوض" value={formatMoney(data.collected_amount)} strong />
+            <Metric label="عدد سندات القبض" value={data.receipts_count} />
+            <Metric label="نقد" value={formatMoney(data.cash_amount)} />
+            <Metric label="شيكات" value={formatMoney(data.checks_amount)} />
+          </div>
+        </section>
+        <section>
+          <h3 className="mb-3 font-black text-brand">الذمم الحالية (لا تتأثر بفترة التحصيل)</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Metric label="إجمالي المطلوب من الزبائن" value={formatMoney(data.remaining_amount)} strong />
+            <Metric label="زبائن عليهم رصيد" value={data.outstanding_orders_count} />
+          </div>
+        </section>
+        <FixedReportRows
+          title="سندات القبض"
+          headers={["السند", "التاريخ", "الزبون", "الطريقة", "المبلغ", "المستخدم"]}
+          rows={data.collections.map((row) => [
+            `#${row.payment_id}`,
+            formatOrderDate(row.paid_at),
+            row.customer.name,
+            paymentMethodLabel(row.payment_method),
+            formatMoney(row.amount),
+            row.recorded_by || "النظام",
+          ])}
+        />
+        <Pagination page={page} pagination={data.pagination} setPage={setPage} />
+      </div>}
     </ReportShell>
   );
 }
+
+function ReturnsReport({ company }: { company: CompanyProfileDataDto | null }) {
+  const empty = { from: "", to: "", type: "" };
+  const [draft, setDraft] = useState(empty);
+  const [query, setQuery] = useState(empty);
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<ReturnsReportResponseDto | null>(null);
+  const state = useLoad(useCallback((signal) => reportsService.returns({
+    date_from: query.from || undefined,
+    date_to: query.to || undefined,
+    return_type: (query.type as "SalesReturn" | "PurchaseReturn") || undefined,
+    page,
+    limit: 10,
+  }, signal), [page, query]));
+  return <ReportShell
+    title="تقرير المردودات"
+    printHeader={<PrintHeader company={company} title="تقرير المردودات" filters={[
+      ...dateFilters(query),
+      { label: "نوع المردود", value: query.type === "SalesReturn" ? "مردود مبيعات" : query.type === "PurchaseReturn" ? "مردود مشتريات" : "كل المردودات" },
+    ]} />}
+    filters={<form className="report-filters" onSubmit={(e) => { e.preventDefault(); setPage(1); setQuery(draft); }}>
+      <RepDateInput label="من تاريخ" value={draft.from} onChange={(from) => setDraft({ ...draft, from })} max={draft.to || undefined} />
+      <RepDateInput label="إلى تاريخ" value={draft.to} onChange={(to) => setDraft({ ...draft, to })} min={draft.from || undefined} />
+      <RepSelect label="نوع المردود" value={draft.type} onChange={(type) => setDraft({ ...draft, type })} options={[
+        { value: "", label: "كل المردودات" },
+        { value: "SalesReturn", label: "مردود مبيعات" },
+        { value: "PurchaseReturn", label: "مردود مشتريات" },
+      ]} />
+      <FilterButtons reset={() => { setDraft(empty); setQuery(empty); setPage(1); }} />
+    </form>}
+    state={state}
+    onData={setData}
+  >
+    {data && <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="قيمة مردود المبيعات" value={formatMoney(data.summary.sales_returns_total)} />
+        <Metric label="عدد مردودات المبيعات" value={data.summary.sales_returns_count} />
+        <Metric label="قيمة مردود المشتريات" value={formatMoney(data.summary.purchase_returns_total)} />
+        <Metric label="عدد مردودات المشتريات" value={data.summary.purchase_returns_count} />
+      </div>
+      <FixedReportRows title="المردودات" headers={["المردود", "التاريخ", "النوع", "الزبون", "المصدر", "الأصناف", "القيمة", "المستخدم"]} rows={data.returns.map((row) => [
+        `#${row.customer_return_id}`,
+        formatOrderDate(row.created_at),
+        row.return_type === "SalesReturn" ? "مردود مبيعات" : "مردود مشتريات",
+        row.customer.name,
+        row.source_id ? `#${row.source_id}` : "مباشر",
+        row.items_count,
+        formatMoney(row.total_amount),
+        row.created_by,
+      ])} />
+      <Pagination page={page} pagination={data.pagination} setPage={setPage} />
+    </div>}
+  </ReportShell>;
+}
+function DiscountsReport({ company }: { company: CompanyProfileDataDto | null }) {
+  const [draft, setDraft] = useState({ from: "", to: "", group: "day" as ReportGroupBy });
+  const [query, setQuery] = useState(draft);
+  const [data, setData] = useState<DiscountsReportResponseDto | null>(null);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [writeOffsPage, setWriteOffsPage] = useState(1);
+  const state = useLoad(useCallback((signal) => reportsService.discounts({ date_from: query.from || undefined, date_to: query.to || undefined }, signal), [query]));
+  return <ReportShell
+    title="تقرير الخصومات والمسامحات"
+    printHeader={<PrintHeader company={company} title="تقرير الخصومات والمسامحات" filters={dateFilters(query)}/>}
+    filters={<DateFilters value={draft} setValue={setDraft} apply={() => { setOrdersPage(1); setWriteOffsPage(1); setQuery(draft); }} reset={() => { const empty = { from: "", to: "", group: "day" as ReportGroupBy }; setDraft(empty); setQuery(empty); setOrdersPage(1); setWriteOffsPage(1); }}/>} 
+    state={state}
+    onData={setData}
+  >
+    {data && <div className="space-y-6">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="خصومات الأصناف" value={formatMoney(data.summary.product_discounts_total)}/>
+        <Metric label="خصومات الطلبات" value={formatMoney(data.summary.order_discounts_total)}/>
+        <Metric label="المسامحات" value={formatMoney(data.summary.write_offs_total)}/>
+        <Metric label="إجمالي التنازلات" value={formatMoney(data.summary.total_concessions)} strong/>
+      </div>
+      <section><h3 className="mb-3 font-black text-brand">الطلبات التي عليها خصم ({data.summary.discounted_orders_count})</h3>{data.orders.length ? <><div className="report-desktop-table overflow-x-auto rounded-xl border"><table className="w-full min-w-[900px] text-sm"><thead className="bg-stone-50"><tr><th className="p-3 text-right">الطلب</th><th className="p-3 text-right">التاريخ</th><th className="p-3 text-right">الزبون</th><th className="p-3 text-right">نفّذها</th><th className="p-3 text-right">خصم الأصناف</th><th className="p-3 text-right">خصم الطلب</th><th className="p-3 text-right">إجمالي الخصم</th></tr></thead><tbody className="divide-y">{data.orders.slice((ordersPage - 1) * 10, ordersPage * 10).map((row) => <tr key={row.order_id}><td className="p-3 font-bold">#{row.order_id} · {reportOrderType(row.order_type)}</td><td className="p-3">{formatOrderDate(row.created_at)}</td><td className="p-3">{row.customer.name}</td><td className="p-3 font-bold text-brand">{row.performed_by?.name ?? (row.order_type === "Retail" ? "الموقع الإلكتروني" : "غير مسجّل")}</td><td className="p-3">{formatMoney(row.product_discount)}</td><td className="p-3">{formatMoney(row.order_discount)}</td><td className="p-3 font-black">{formatMoney(row.total_discount)}</td></tr>)}</tbody></table></div><Pagination page={ordersPage} pagination={localPagination(ordersPage, data.orders.length)} setPage={setOrdersPage} /></> : <EmptyState title="لا توجد طلبات عليها خصومات ضمن الفترة"/>}</section>
+      <section><h3 className="mb-3 font-black text-brand">المسامحات الفعالة ({data.summary.write_offs_count})</h3>{data.write_offs.length ? <><div className="report-desktop-table overflow-x-auto rounded-xl border"><table className="w-full min-w-[760px] text-sm"><thead className="bg-stone-50"><tr><th className="p-3 text-right">المسامحة</th><th className="p-3 text-right">التاريخ</th><th className="p-3 text-right">الزبون</th><th className="p-3 text-right">التخصيص</th><th className="p-3 text-right">نفّذها</th><th className="p-3 text-right">القيمة</th></tr></thead><tbody className="divide-y">{data.write_offs.slice((writeOffsPage - 1) * 10, writeOffsPage * 10).map((row) => <tr key={row.write_off_id}><td className="p-3"><b>#{row.write_off_id}</b>{row.notes && <small className="block text-stone-500">{row.notes}</small>}</td><td className="p-3">{formatOrderDate(row.created_at)}</td><td className="p-3">{row.customer.name}</td><td className="p-3 text-xs">{[...row.order_allocations.map((item) => `طلب #${item.order_id}: ${formatMoney(item.amount)}`), ...row.debt_allocations.map((item) => `دين #${item.customer_debt_id}: ${formatMoney(item.amount)}`)].join(" · ") || "—"}</td><td className="p-3 font-bold text-brand">{row.created_by?.name ?? "النظام"}</td><td className="p-3 font-black">{formatMoney(row.amount)}</td></tr>)}</tbody></table></div><Pagination page={writeOffsPage} pagination={localPagination(writeOffsPage, data.write_offs.length)} setPage={setWriteOffsPage} /></> : <EmptyState title="لا توجد مسامحات فعالة ضمن الفترة"/>}</section>
+    </div>}
+  </ReportShell>;
+}
+function reportOrderType(type: OrderType) { return type === "Retail" ? "أونلاين" : type === "Wholesale" ? "جملة" : "بيع محل"; }
+function paymentMethodLabel(method: string) {
+  if (method === "Cash") return "نقد";
+  if (method === "Check") return "شيك";
+  if (method === "BankTransfer") return "تحويل بنكي";
+  return method || "—";
+}
+
 function ProductsReport({ company }: { company: CompanyProfileDataDto | null }) {
   const [draft, setDraft] = useState({
     from: "",
@@ -372,7 +488,7 @@ function ProductsReport({ company }: { company: CompanyProfileDataDto | null }) 
             rank_by: query.rank as "quantity" | "revenue",
             category_id: query.category ? Number(query.category) : undefined,
             page,
-            limit: 20,
+            limit: 10,
           },
           signal,
         ),
@@ -491,7 +607,7 @@ function RepresentativesReport({ company }: { company: CompanyProfileDataDto | n
             date_to: query.to || undefined,
             representative_id: query.rep ? Number(query.rep) : undefined,
             page,
-            limit: 20,
+            limit: 10,
             sort_by,
             sort_order,
           },
@@ -760,7 +876,7 @@ function SalesByType({ data }: { data: SalesReportResponseDto["by_type"] }) {
             <b className="mt-1 block text-lg text-brand">
               {formatMoney(value.sales_total)}
             </b>
-            <small className="text-stone-500">{value.orders_count} طلب</small>
+            <small className="text-stone-500">{value.orders_count} طلب · مردود {formatMoney(value.returns_total)}</small>
           </div>
         ))}
       </div>
@@ -797,7 +913,9 @@ function SalesSeries({ rows }: { rows: SalesReportResponseDto["series"] }) {
       headers={["الفترة", "المبيعات", "عدد الطلبات"]}
       rows={rows.map((x) => [
         formatOrderDate(x.period),
-        formatMoney(x.sales_total),
+        Number(x.sales_total) < 0
+          ? `مردود ${formatMoney(Math.abs(Number(x.sales_total)))}`
+          : formatMoney(x.sales_total),
         x.orders_count,
       ])}
     />
@@ -809,9 +927,20 @@ function OrdersSeries({ rows }: { rows: OrdersReportResponseDto["series"] }) {
     <FixedReportRows
       title="الفترات"
       headers={["الفترة", "عدد الطلبات"]}
-      rows={rows.map((x) => [formatOrderDate(x.period), x.orders_count])}
+      rows={rows.map((x) => [formatReportMonth(x.period), x.orders_count])}
     />
   );
+}
+
+function formatReportMonth(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : new Intl.DateTimeFormat("ar", {
+        month: "long",
+        year: "numeric",
+        timeZone: "Asia/Jerusalem",
+      }).format(date);
 }
 
 function ProductRows({ rows }: { rows: ProductReportRowDto[] }) {
@@ -838,16 +967,12 @@ function RepresentativeRows({ rows }: { rows: RepresentativeReportRowDto[] }) {
         "المكتملة",
         "المعلقة",
         "المبيعات المكتملة",
-        "المدفوع",
-        "المتبقي",
       ]}
       rows={rows.map((x) => [
         x.name,
         x.completed_orders_count,
         x.pending_orders_count,
         formatMoney(x.completed_sales_total),
-        formatMoney(x.paid_amount),
-        formatMoney(x.remaining_amount),
       ])}
     />
   );
@@ -963,6 +1088,9 @@ function Pagination({
     </div>
   ) : null;
 }
+function localPagination(page: number, total: number): ReportPaginationDto {
+  return { page, limit: 10, total, total_pages: Math.ceil(total / 10) };
+}
 function ErrorBox({ errors, retry }: { errors: string[]; retry: () => void }) {
   return (
     <div className="rep-error text-center">
@@ -982,8 +1110,9 @@ const typeOptions = [
 ];
 
 function dateFilters(query: { from: string; to: string; group?: ReportGroupBy }, grouping = false): PrintFilter[] {
+  const usesDefaultMonth = !query.from && !query.to;
   const filters: PrintFilter[] = [
-    { label: "من تاريخ", value: query.from ? formatOrderDate(query.from) : "بداية السجلات" },
+    { label: "من تاريخ", value: query.from ? formatOrderDate(query.from) : usesDefaultMonth ? "بداية الشهر الحالي" : "حسب الفترة" },
     { label: "إلى تاريخ", value: query.to ? formatOrderDate(query.to) : "حتى اليوم" },
   ];
   if (grouping) {

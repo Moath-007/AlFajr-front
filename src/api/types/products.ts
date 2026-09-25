@@ -111,7 +111,7 @@ export interface CatalogProductSummaryDto {
   total_stock_quantity?: number;
 }
 
-export type CatalogSort = "default" | "price_asc" | "price_desc";
+export type CatalogSort = "default" | "price_asc" | "price_desc" | "random";
 
 export interface CatalogProductsQuery {
   page?: number;
@@ -157,7 +157,6 @@ export interface ProductVariantWriteDto {
   retail_discount: number;
   wholesale_price: number;
   wholesale_discount: number;
-  stock_quantity: number;
 }
 
 export interface UpdateProductVariantDto extends ProductVariantWriteDto {

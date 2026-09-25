@@ -39,10 +39,7 @@ export interface InventoryListResponseDto {
   items: InventoryItemDto[];
   pagination: PaginationResponseDto;
 }
-export interface UpdateStockDto {
-  stock_quantity: number;
-}
-export interface UpdateStockResponseDto {
-  message: string;
-  item: InventoryItemDto;
-}
+export interface InventoryMovementDto { inventory_movement_id: NumericId; product_variant_id: NumericId; quantity_change: number; source_type: string; order_id?: NumericId | null; customer_purchase_id?: NumericId | null; notes?: string | null; created_at: string; users?: { user_id: NumericId; name: string } | null; }
+export type InventoryMovementsResponseDto = InventoryMovementDto[] | { message?: string; items?: InventoryMovementDto[]; movements?: InventoryMovementDto[]; };
+export interface InventoryAdjustmentDto { quantity_change: number; notes?: string; }
+export interface InventoryAdjustmentResponseDto { message: string; quantity_change: number; item: InventoryItemDto; }

@@ -9,6 +9,7 @@ export interface ApiRequestOptions {
   body?: unknown;
   headers?: HeadersInit;
   signal?: AbortSignal;
+  timeoutMs?: number;
   suppressUnauthorizedNotification?: boolean | ((payload: unknown) => boolean);
 }
 
@@ -25,12 +26,39 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
   if (token) headers.set('Authorization', `Bearer ${token}`);
   if (options.body !== undefined && !isFormData) headers.set('Content-Type', 'application/json');
 
-  const response = await fetch(`${API_BASE_URL}${normalizePath(path)}`, {
-    method: options.method ?? 'GET',
-    headers,
-    body: requestBody,
-    signal: options.signal,
-  });
+  const timeoutController = new AbortController();
+  const timeoutMs = options.timeoutMs ?? ((options.method ?? 'GET') === 'GET' ? 15_000 : 30_000);
+  let didTimeout = false;
+  const abortFromCaller = () => timeoutController.abort(options.signal?.reason);
+  const timeoutId = window.setTimeout(() => {
+    didTimeout = true;
+    timeoutController.abort();
+  }, timeoutMs);
+
+  if (options.signal?.aborted) abortFromCaller();
+  else options.signal?.addEventListener('abort', abortFromCaller, { once: true });
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${normalizePath(path)}`, {
+      method: options.method ?? 'GET',
+      headers,
+      body: requestBody,
+      signal: timeoutController.signal,
+    });
+  } catch (error) {
+    if (didTimeout) {
+      throw new ApiError({
+        statusCode: 408,
+        error: 'Request Timeout',
+        message: 'الخادم لم يستجب خلال الوقت المحدد. تأكد من تشغيل الخادم ثم أعد المحاولة.',
+      });
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+    options.signal?.removeEventListener('abort', abortFromCaller);
+  }
 
   const payload = await parseResponse(response);
 

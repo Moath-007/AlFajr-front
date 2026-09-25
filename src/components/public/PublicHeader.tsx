@@ -74,7 +74,7 @@ export default function PublicHeader({
           >
             <span className="flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-stone-200 transition-transform group-hover:-translate-y-0.5">
               <img
-                src="/assets/al-fajr-logo.png"
+                src="/assets/al-fajr-logo.webp"
                 alt="شعار شركة الفجر"
                 className="h-full w-full object-cover object-[center_45%]"
               />

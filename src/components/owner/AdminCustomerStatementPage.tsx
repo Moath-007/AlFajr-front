@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Printer, RefreshCw, Search } from "lucide-react";
+import { Printer, Search } from "lucide-react";
 import {
   companyProfileService,
   customersService,
@@ -12,209 +12,129 @@ import {
   formatMoney,
   formatOrderDate,
 } from "@/components/rep/repOrderUtils";
+import PrintHeader from "@/components/printing/PrintHeader";
 import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
-import PrintHeader from "@/components/printing/PrintHeader";
 import { printA4Element } from "@/utils/printDocument";
 
 export default function AdminCustomerStatementPage() {
-  const [search, setSearch] = useState("");
-  const [customers, setCustomers] = useState<CustomerSelectionDto[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string[]>([]);
-  const [searchRetry, setSearchRetry] = useState(0);
-  const [selected, setSelected] = useState<CustomerSelectionDto | null>(null);
-  const [allPeriod, setAllPeriod] = useState(true);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [applied, setApplied] = useState({ all: true, from: "", to: "" });
+  const [search, setSearch] = useState(""),
+    [results, setResults] = useState<CustomerSelectionDto[]>([]),
+    [selected, setSelected] = useState<CustomerSelectionDto | null>(null);
+  const [allPeriod, setAllPeriod] = useState(true),
+    [from, setFrom] = useState(""),
+    [to, setTo] = useState(""),
+    [query, setQuery] = useState({ all: true, from: "", to: "" });
   const [statement, setStatement] =
-    useState<CustomerStatementResponseDto | null>(null);
-  const [company, setCompany] = useState<CompanyProfileDataDto | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [retry, setRetry] = useState(0);
-  const searchBox = useRef<HTMLDivElement>(null);
-
+      useState<CustomerStatementResponseDto | null>(null),
+    [company, setCompany] = useState<CompanyProfileDataDto | null>(null),
+    [loading, setLoading] = useState(false),
+    [error, setError] = useState("");
   useEffect(() => {
-    const controller = new AbortController();
+    const c = new AbortController();
     companyProfileService
-      .get(controller.signal)
-      .then((result) => setCompany(result.company))
+      .get(c.signal)
+      .then((r) => setCompany(r.company))
       .catch(() => undefined);
-    return () => controller.abort();
+    return () => c.abort();
   }, []);
   useEffect(() => {
-    if (selected && search === `${selected.name} — ${selected.phone}`) return;
-    if (!search.trim()) {
-      setCustomers([]);
-      setSearchError([]);
+    if (!search.trim() || selected) {
+      setResults([]);
       return;
     }
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
-      setSearching(true);
-      setSearchError([]);
-      customersService
-        .list({ search: search.trim(), page: 1, limit: 20 }, controller.signal)
-        .then((result) => setCustomers(result.customers))
-        .catch((error) => {
-          if (!controller.signal.aborted)
-            setSearchError(apiMessages(error, "تعذر البحث عن الزبائن."));
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) setSearching(false);
-        });
-    }, 300);
+    const c = new AbortController(),
+      timer = window.setTimeout(() => {
+        customersService
+          .list({ search: search.trim(), page: 1, limit: 20 }, c.signal)
+          .then((r) => setResults(r.customers))
+          .catch(() => setResults([]));
+      }, 250);
     return () => {
       window.clearTimeout(timer);
-      controller.abort();
+      c.abort();
     };
-  }, [search, searchRetry, selected]);
-  useEffect(() => {
-    const outside = (event: MouseEvent) => {
-      if (!searchBox.current?.contains(event.target as Node)) setCustomers([]);
-    };
-    document.addEventListener("mousedown", outside);
-    return () => document.removeEventListener("mousedown", outside);
-  }, []);
+  }, [search, selected]);
   useEffect(() => {
     if (!selected) {
       setStatement(null);
       return;
     }
-    const controller = new AbortController();
+    const c = new AbortController();
     setLoading(true);
-    setErrors([]);
+    setError("");
     customersService
       .statement(
         selected.customer_id,
-        applied.all
+        query.all
           ? {}
           : {
-              date_from: applied.from || undefined,
-              date_to: applied.to || undefined,
+              date_from: query.from || undefined,
+              date_to: query.to || undefined,
             },
-        controller.signal,
+        c.signal,
       )
       .then(setStatement)
-      .catch((error) => {
-        if (!controller.signal.aborted)
-          setErrors(apiMessages(error, "تعذر تحميل كشف الحساب."));
+      .catch((e) => {
+        if (!c.signal.aborted)
+          setError(apiMessages(e, "تعذر تحميل كشف الحساب.").join("، "));
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!c.signal.aborted) setLoading(false);
       });
-    return () => controller.abort();
-  }, [applied, retry, selected]);
+    return () => c.abort();
+  }, [query, selected]);
   const apply = (event: FormEvent) => {
     event.preventDefault();
-    if (from && to && from > to) {
-      setErrors(["تاريخ البداية يجب أن يسبق تاريخ النهاية."]);
-      return;
-    }
-    setApplied({ all: allPeriod, from, to });
-  };
-  const selectCustomer = (customer: CustomerSelectionDto) => {
-    setSelected(customer);
-    setSearch(`${customer.name} — ${customer.phone}`);
-    setCustomers([]);
-    setApplied({ all: true, from: "", to: "" });
-    setAllPeriod(true);
-    setFrom("");
-    setTo("");
+    if (from && to && from > to)
+      return setError("تاريخ البداية يجب أن يسبق تاريخ النهاية.");
+    setQuery({ all: allPeriod, from, to });
   };
   return (
     <div className="space-y-6">
-      <header className="border-b pb-5 print:hidden">
-        <p className="text-xs font-black text-gold-dark">
-          وثيقة مالية من الخادم
-        </p>
+      <header className="border-b pb-5">
+        <p className="text-xs font-black text-gold-dark">وثيقة مالية كاملة</p>
         <h1 className="mt-1 text-3xl font-black text-brand">كشف حساب الزبون</h1>
+        <p className="mt-2 text-sm text-stone-500">
+          اختر الزبون والفترة لعرض الكشف الكامل وطباعته أو حفظه PDF.
+        </p>
       </header>
-      <section className="rounded-2xl border bg-white p-5 print:hidden">
+      <section className="rounded-2xl border bg-white p-5">
         <form
           onSubmit={apply}
           className="grid items-end gap-4 lg:grid-cols-[minmax(260px,1fr)_180px_180px_auto]"
         >
-          <div ref={searchBox} className="relative">
-            <label htmlFor="customer-statement-search" className="rep-label">
-              الزبون
-            </label>
+          <div className="relative">
+            <label className="rep-label">الزبون</label>
             <span className="relative block">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
               <input
-                id="customer-statement-search"
-                role="combobox"
-                aria-expanded={customers.length > 0}
-                aria-controls="customer-search-results"
-                autoComplete="off"
+                className="rep-control pr-10"
                 value={search}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    setCustomers([]);
-                    event.currentTarget.focus();
-                  } else if (event.key === "ArrowDown") {
-                    event.preventDefault();
-                    document
-                      .querySelector<HTMLElement>(
-                        "#customer-search-results [role='option']",
-                      )
-                      ?.focus();
-                  }
-                }}
-                onChange={(event) => {
-                  setSearch(event.target.value);
+                onChange={(e) => {
+                  setSearch(e.target.value);
                   setSelected(null);
                 }}
                 placeholder="ابحث بالاسم أو رقم الهاتف"
-                className="rep-control pr-10"
               />
             </span>
-            {(customers.length > 0 || searching || searchError.length > 0) && (
-              <div
-                id="customer-search-results"
-                role="listbox"
-                className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border bg-white p-1 shadow-xl"
-              >
-                {searching ? (
-                  <p className="p-3 text-sm text-stone-500">جاري البحث…</p>
-                ) : searchError.length ? (
-                  <div
-                    role="alert"
-                    className="p-3 text-sm font-bold text-red-700"
+            {results.length > 0 && (
+              <div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border bg-white p-1 shadow-xl">
+                {results.map((customer) => (
+                  <button
+                    key={customer.customer_id}
+                    type="button"
+                    className="block w-full rounded-lg px-3 py-2 text-right hover:bg-stone-50"
+                    onClick={() => {
+                      setSelected(customer);
+                      setSearch(`${customer.name} — ${customer.phone}`);
+                      setResults([]);
+                    }}
                   >
-                    <p>{searchError.join("، ")}</p>
-                    <button
-                      type="button"
-                      onClick={() => setSearchRetry((value) => value + 1)}
-                      className="mt-2 inline-flex items-center gap-1 underline"
-                    >
-                      <RefreshCw className="h-4 w-4" /> إعادة المحاولة
-                    </button>
-                  </div>
-                ) : (
-                  customers.map((customer) => (
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={
-                        selected?.customer_id === customer.customer_id
-                      }
-                      key={customer.customer_id}
-                      onClick={() => selectCustomer(customer)}
-                      className="block min-h-12 w-full rounded-lg px-3 py-2 text-right hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
-                    >
-                      <b className="block text-sm text-brand">
-                        {customer.name}
-                      </b>
-                      <span className="text-xs text-stone-500">
-                        {customer.phone}
-                        {customer.email ? ` · ${customer.email}` : ""}
-                      </span>
-                    </button>
-                  ))
-                )}
+                    <b className="block text-brand">{customer.name}</b>
+                    <small>{customer.phone}</small>
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -222,34 +142,34 @@ export default function AdminCustomerStatementPage() {
             <span className="rep-label">من تاريخ</span>
             <input
               type="date"
+              className="rep-control"
               disabled={allPeriod}
               value={from}
               max={to || undefined}
-              onChange={(event) => setFrom(event.target.value)}
-              className="rep-control"
+              onChange={(e) => setFrom(e.target.value)}
             />
           </label>
           <label>
             <span className="rep-label">إلى تاريخ</span>
             <input
               type="date"
+              className="rep-control"
               disabled={allPeriod}
               value={to}
               min={from || undefined}
-              onChange={(event) => setTo(event.target.value)}
-              className="rep-control"
+              onChange={(e) => setTo(e.target.value)}
             />
           </label>
-          <button disabled={!selected} className="btn-primary min-h-11">
+          <button className="btn-primary min-h-11" disabled={!selected}>
             عرض الكشف
           </button>
           <label
-            className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border px-4 py-2.5 transition lg:col-span-full ${allPeriod ? "border-brand/30 bg-brand-50" : "border-stone-200 bg-white hover:border-brand-200"}`}
+            className={`flex min-h-11 w-fit cursor-pointer items-center gap-3 rounded-xl border px-4 py-2.5 transition lg:col-span-full ${allPeriod ? "border-brand/30 bg-brand-50 text-brand" : "border-stone-200 bg-white text-stone-600 hover:border-brand/30"}`}
           >
             <input
               type="checkbox"
               checked={allPeriod}
-              onChange={(event) => setAllPeriod(event.target.checked)}
+              onChange={(e) => setAllPeriod(e.target.checked)}
               className="peer sr-only"
             />
             <span
@@ -258,22 +178,11 @@ export default function AdminCustomerStatementPage() {
             >
               ✓
             </span>
-            <span className="font-bold text-brand">كل الفترة</span>
+            <b className="text-sm">كل الفترة</b>
           </label>
         </form>
       </section>
-      {errors.length > 0 && (
-        <div role="alert" className="rep-error print:hidden">
-          <p>{errors.join("، ")}</p>
-          <button
-            type="button"
-            onClick={() => setRetry((value) => value + 1)}
-            className="mt-2 inline-flex items-center gap-2 underline"
-          >
-            <RefreshCw className="h-4 w-4" /> إعادة المحاولة
-          </button>
-        </div>
-      )}
+      {error && <div className="rep-error">{error}</div>}
       {!selected ? (
         <EmptyState title="اختر زبونًا لعرض كشف الحساب" />
       ) : loading ? (
@@ -292,22 +201,14 @@ function StatementDocument({
   statement: CustomerStatementResponseDto;
   company: CompanyProfileDataDto | null;
 }) {
-  const printRef = useRef<HTMLElement>(null);
-  const period = statement.period.date_from
-    ? `${formatOrderDate(statement.period.date_from)} — ${formatOrderDate(statement.period.date_to)}`
-    : `كل الفترة حتى ${formatOrderDate(statement.period.date_to)}`;
-  const printStatement = async () => {
-    if (!printRef.current) return;
-    await printA4Element({
-      element: printRef.current,
-      title: `كشف حساب ${statement.customer.name}`,
-    });
-  };
+  const printRef = useRef<HTMLElement>(null),
+    period = statement.period.date_from
+      ? `${formatOrderDate(statement.period.date_from)} — ${formatOrderDate(statement.period.date_to)}`
+      : `كل الفترة حتى ${formatOrderDate(statement.period.date_to)}`;
   return (
     <article
       ref={printRef}
-      id="customer-statement-document"
-      className="statement-document print-document rounded-2xl border bg-white p-5 sm:p-8"
+      className="print-document rounded-2xl border bg-white p-5 sm:p-8"
       dir="rtl"
     >
       <PrintHeader
@@ -317,41 +218,23 @@ function StatementDocument({
       />
       <div className="mb-5 flex justify-end" data-print-ignore>
         <button
-          type="button"
-          onClick={() => void printStatement()}
           className="btn-primary"
+          onClick={() =>
+            printRef.current &&
+            void printA4Element({
+              element: printRef.current,
+              title: `كشف حساب ${statement.customer.name}`,
+              orientation: "portrait",
+            })
+          }
         >
-          <Printer className="h-4 w-4" /> طباعة / حفظ PDF
+          <Printer className="h-4 w-4" />
+          طباعة / حفظ PDF
         </button>
       </div>
-      <header className="report-print-hide grid gap-5 border-b pb-5 sm:grid-cols-2">
-        <div>
-          <div className="flex items-center gap-3">
-            <img
-              src="/assets/al-fajr-logo.png"
-              alt="شعار الشركة"
-              className="h-24 w-36 object-cover object-[center_45%]"
-            />
-            <h2 className="text-2xl font-black text-brand">
-              {company?.company_name || "—"}
-            </h2>
-          </div>
-          <p className="mt-2 text-sm text-stone-600">
-            {company?.phones.join(" · ")}
-          </p>
-          <p className="text-sm text-stone-600">
-            {[company?.address, company?.city, company?.email]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-        </div>
-        <div className="sm:text-left">
-          <h1 className="text-2xl font-black text-brand">كشف حساب الزبون</h1>
-          <p className="mt-2 text-sm">الفترة: {period}</p>
-          <p className="text-xs text-stone-500">
-            سيتم تثبيت تاريخ الإنشاء عند فتح نافذة الطباعة.
-          </p>
-        </div>
+      <header className="report-print-hide border-b pb-5">
+        <h2 className="text-2xl font-black text-brand">كشف حساب الزبون</h2>
+        <p>الفترة: {period}</p>
       </header>
       <section className="my-5 rounded-xl bg-stone-50 p-4">
         <b className="text-brand">{statement.customer.name}</b>
@@ -364,82 +247,357 @@ function StatementDocument({
         <Summary
           label="رصيد أول المدة"
           value={statement.summary.opening_balance}
+          balance
         />
         <Summary
-          label="إجمالي الطلبات"
+          label="المبيعات والطلبات"
           value={statement.summary.orders_total}
         />
         <Summary
-          label="إجمالي الدفعات"
+          label="القبض من الزبون"
           value={statement.summary.payments_total}
         />
         <Summary
+          label="مشتريات من الزبون"
+          value={statement.summary.customer_purchases_total}
+        />
+        <Summary
+          label="مردودات المبيعات"
+          value={statement.summary.sales_returns_total}
+        />
+        <Summary
+          label="مردودات المشتريات"
+          value={statement.summary.purchase_returns_total}
+        />
+        <Summary label="المسامحات" value={statement.summary.write_offs_total} />
+        <Summary
           label="رصيد آخر المدة"
           value={statement.summary.closing_balance}
+          balance
         />
       </section>
-      {statement.entries.length === 0 ? (
-        <p className="py-12 text-center text-stone-500">
-          لا توجد حركات ضمن الفترة المحددة.
-        </p>
-      ) : (
-        <div className="mt-6 overflow-x-auto">
-          <table className="statement-table w-full min-w-[760px] border-collapse text-sm">
-            <thead>
-              <tr className="bg-stone-100">
-                {[
-                  "التاريخ",
-                  "البيان",
-                  "رقم الطلب",
-                  "مدين",
-                  "دائن",
-                  "الرصيد",
-                ].map((label) => (
-                  <th key={label} className="border p-3 text-right">
-                    {label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {statement.entries.map((entry) => (
-                <tr
-                  key={`${entry.type}-${entry.payment_id ?? entry.order_id}-${entry.date}`}
+      {statement.entries.length > 0 && (
+        <section className="report-print-hide mt-6 rounded-xl border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-black text-brand">ملخص الحركات</h2>
+            <span className="text-xs text-stone-500">
+              {statement.orders.length} طلب · {statement.entries.length} حركة
+              مالية
+            </span>
+          </div>
+          <div className="mt-3 divide-y">
+            {statement.entries
+              .slice(-10)
+              .reverse()
+              .map((entry, index) => (
+                <div
+                  key={`web-${entry.type}-${entry.date}-${index}`}
+                  className="flex items-center justify-between gap-3 py-3 text-sm"
                 >
-                  <td className="whitespace-nowrap border p-3">
-                    {formatOrderDate(entry.date)}
-                  </td>
-                  <td className="border p-3">
-                    {entry.type === "Payment"
-                      ? `${entry.payment_method === "Cash" ? "دفعة نقدية" : "دفعة شيك"}${entry.check_number ? ` - رقم ${entry.check_number}` : ""}`
-                      : entry.order_type === "Retail"
-                        ? "طلب تجزئة"
-                        : entry.order_type === "Wholesale"
-                          ? "طلب جملة"
-                          : entry.order_type === "StoreSale"
-                            ? "بيع من المحل"
-                            : entry.description}
-                  </td>
-                  <td className="border p-3">#{entry.order_id}</td>
-                  <td className="border p-3">{formatMoney(entry.debit)}</td>
-                  <td className="border p-3">{formatMoney(entry.credit)}</td>
-                  <td className="border p-3 font-black">
-                    {formatMoney(entry.balance)}
-                  </td>
-                </tr>
+                  <div>
+                    <b>{entryTitle(entry)}</b>
+                    <p className="text-xs text-stone-500">
+                      {formatOrderDate(entry.date)}
+                    </p>
+                  </div>
+                  <b>
+                    {Number(entry.debit) > 0
+                      ? `مدين ${formatMoney(entry.debit)}`
+                      : `دائن ${formatMoney(entry.credit)}`}
+                  </b>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
+          </div>
+          {statement.entries.length > 10 && (
+            <p className="mt-3 text-center text-xs text-stone-500">
+              باقي التفاصيل تظهر كاملة عند الطباعة أو حفظ PDF.
+            </p>
+          )}
+        </section>
+      )}
+      {statement.entries.length ? (
+        <>
+          {statement.orders.length > 0 && (
+            <section className="statement-section hidden print-active mt-8">
+              <h2 className="border-b-2 border-brand pb-2 text-xl font-black text-brand">
+                الطلبات والمبيعات
+              </h2>
+              <div className="mt-4 space-y-5">
+                {statement.orders.map((order) => (
+                  <OrderCard key={order.order_id} order={order} />
+                ))}
+              </div>
+            </section>
+          )}
+          <MovementSection
+            title="الدفعات والشيكات"
+            entries={statement.entries.filter((entry) =>
+              [
+                "Payment",
+                "Disbursement",
+                "ReturnedCheck",
+                "PaymentCancelled",
+              ].includes(entry.type),
+            )}
+          />
+          <MovementSection
+            title="المردودات"
+            entries={statement.entries.filter((entry) =>
+              ["SalesReturn", "PurchaseReturn", "ReturnCancelled"].includes(
+                entry.type,
+              ),
+            )}
+          />
+          <MovementSection
+            title="مشتريات الزبون"
+            entries={statement.entries.filter((entry) =>
+              ["CustomerPurchase", "CustomerPurchaseCancelled"].includes(
+                entry.type,
+              ),
+            )}
+          />
+          <MovementSection
+            title="الأرصدة والديون الافتتاحية"
+            entries={statement.entries.filter((entry) =>
+              [
+                "OpeningBalance",
+                "OpeningBalanceCancelled",
+                "CustomerDebt",
+                "CustomerDebtCancelled",
+              ].includes(entry.type),
+            )}
+          />
+          <MovementSection
+            title="المسامحات"
+            entries={statement.entries.filter((entry) =>
+              ["WriteOff", "WriteOffCancelled"].includes(entry.type),
+            )}
+          />
+          <section className="statement-section hidden print-active mt-8">
+            <h2 className="border-b-2 border-brand pb-2 text-xl font-black text-brand">
+              سجل الحساب
+            </h2>
+            <div className="mt-4 overflow-x-auto">
+              <table className="statement-table w-full min-w-[760px] border-collapse text-sm">
+                <thead>
+                  <tr className="bg-stone-100">
+                    {[
+                      "التاريخ",
+                      "البيان",
+                      "مدين",
+                      "دائن",
+                      "الرصيد",
+                      "الطريقة / المستخدم",
+                    ].map((label) => (
+                      <th key={label} className="border p-3 text-right">
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {statement.entries.map((entry, index) => (
+                    <tr key={`${entry.type}-${entry.date}-${index}`}>
+                      <td className="whitespace-nowrap border p-3">
+                        {formatOrderDate(entry.date)}
+                      </td>
+                      <td className="border p-3">{entry.description}</td>
+                      <td className="border p-3">{formatMoney(entry.debit)}</td>
+                      <td className="border p-3">
+                        {formatMoney(entry.credit)}
+                      </td>
+                      <td className="border p-3 font-black">
+                        {balanceText(entry.balance)}
+                      </td>
+                      <td className="border p-3 text-xs">
+                        {entry.payment_method === "Cash"
+                          ? "نقد"
+                          : entry.payment_method === "Check"
+                            ? `شيك${entry.check_number ? ` #${entry.check_number}` : ""}`
+                            : "—"}
+                        {entry.actor?.name ? ` · ${entry.actor.name}` : ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      ) : (
+        <EmptyState title="لا توجد حركات ضمن الفترة المحددة" />
       )}
     </article>
   );
 }
-function Summary({ label, value }: { label: string; value: string }) {
+function Summary({
+  label,
+  value,
+  balance = false,
+}: {
+  label: string;
+  value: string;
+  balance?: boolean;
+}) {
   return (
     <div className="rounded-xl border p-4">
       <span className="text-xs font-bold text-stone-500">{label}</span>
-      <b className="mt-2 block text-lg text-brand">{formatMoney(value)}</b>
+      <b className="mt-2 block text-lg text-brand">
+        {balance ? balanceText(value) : formatMoney(value)}
+      </b>
     </div>
   );
+}
+
+function OrderCard({
+  order,
+}: {
+  order: CustomerStatementResponseDto["orders"][number];
+}) {
+  return (
+    <article className="statement-card rounded-xl border p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <b className="text-lg text-brand">
+            طلب #{order.order_id} · {orderTypeLabel(order.order_type)}
+          </b>
+          <p className="text-xs text-stone-500">
+            {formatOrderDate(order.created_at)}
+            {order.representative_name
+              ? ` · المندوب: ${order.representative_name}`
+              : ""}
+            {order.cancelled_at ? " · ملغى" : ""}
+          </p>
+        </div>
+        <b className="text-lg text-brand">{formatMoney(order.total_amount)}</b>
+      </div>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full min-w-[640px] border-collapse text-xs">
+          <thead>
+            <tr className="bg-stone-100">
+              {["الصنف", "الكمية", "سعر الوحدة", "خصم الصنف", "الإجمالي"].map(
+                (label) => (
+                  <th key={label} className="border p-2 text-right">
+                    {label}
+                  </th>
+                ),
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {order.items.map((item, index) => (
+              <tr key={`${item.product_code}-${index}`}>
+                <td className="border p-2">
+                  {item.product_name} · {item.product_code} · {item.size} ·{" "}
+                  {item.color}
+                  {item.is_bonus ? " · بونص" : ""}
+                </td>
+                <td className="border p-2">{item.quantity}</td>
+                <td className="border p-2">{formatMoney(item.unit_price)}</td>
+                <td className="border p-2">
+                  {formatMoney(item.product_discount)}
+                </td>
+                <td className="border p-2 font-bold">
+                  {formatMoney(item.total)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3 flex justify-end border-b pb-3 text-xs">
+        <span>
+          خصم الطلب
+          <br />
+          <b>{formatMoney(order.order_discount)}</b>
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function MovementSection({
+  title,
+  entries,
+}: {
+  title: string;
+  entries: CustomerStatementResponseDto["entries"];
+}) {
+  if (!entries.length) return null;
+  return (
+    <section className="statement-section hidden print-active mt-8">
+      <h2 className="border-b-2 border-brand pb-2 text-xl font-black text-brand">
+        {title}
+      </h2>
+      <div className="mt-4 space-y-2">
+        {entries.map((entry, index) => (
+          <div
+            key={`${title}-${entry.type}-${entry.date}-${index}`}
+            className="statement-card flex flex-wrap items-start justify-between gap-3 rounded-xl border p-4"
+          >
+            <div>
+              <b className="text-brand">{entryTitle(entry)}</b>
+              <p className="mt-1 text-xs text-stone-500">
+                {formatOrderDate(entry.date)}
+                {entry.actor?.name ? ` · سجلها: ${entry.actor.name}` : ""}
+              </p>
+            </div>
+            <div className="text-left">
+              <b>
+                {Number(entry.debit) > 0
+                  ? `مدين ${formatMoney(entry.debit)}`
+                  : `دائن ${formatMoney(entry.credit)}`}
+              </b>
+              {entry.payment_method && (
+                <p className="text-xs text-stone-500">
+                  {entry.payment_method === "Cash"
+                    ? "نقد"
+                    : `شيك${entry.check_number ? ` #${entry.check_number}` : ""}`}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function orderTypeLabel(type: string) {
+  return type === "Wholesale"
+    ? "جملة"
+    : type === "StoreSale"
+      ? "بيع محل"
+      : "أونلاين";
+}
+
+function balanceText(value: string) {
+  const amount = Number(value);
+  if (amount > 0) return `عليه ${formatMoney(amount)}`;
+  if (amount < 0) return `له ${formatMoney(Math.abs(amount))}`;
+  return "متوازن — ₪0.00";
+}
+
+function entryTitle(entry: CustomerStatementResponseDto["entries"][number]) {
+  const labels: Partial<Record<typeof entry.type, string>> = {
+    Order: entry.description,
+    OrderCancelled: "إلغاء طلب",
+    Payment: entry.payment_method === "Check" ? "قبض بشيك" : "قبض نقدي",
+    Disbursement:
+      entry.payment_method === "Check" ? "دفع للزبون بشيك" : "دفع نقدي للزبون",
+    ReturnedCheck: "شيك راجع",
+    PaymentCancelled: "إلغاء حركة قبض أو دفع",
+    WriteOff: "مسامحة للزبون",
+    WriteOffCancelled: "إلغاء مسامحة",
+    CustomerDebt: "دين يدوي سابق",
+    CustomerDebtCancelled: "إلغاء دين يدوي سابق",
+    CustomerPurchase: "شراء من الزبون",
+    CustomerPurchaseCancelled: "إلغاء شراء من الزبون",
+    OpeningBalance: entry.description,
+    OpeningBalanceCancelled: "إلغاء رصيد أو دين افتتاحي",
+    SalesReturn: "مردود مبيعات",
+    PurchaseReturn: "مردود مشتريات",
+    ReturnCancelled: "إلغاء مردود",
+  };
+  return labels[entry.type] ?? entry.description;
 }

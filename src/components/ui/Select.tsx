@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { Check, ChevronDown } from "lucide-react";
 
 export interface Option<T extends string | number = string | number> {
   value: T;
@@ -198,12 +199,7 @@ export default function Select<T extends string | number>({
         <span className="min-w-0 truncate">
           {selected?.label || placeholder}
         </span>
-        <span
-          aria-hidden
-          className={`shrink-0 transition ${open ? "rotate-180" : ""}`}
-        >
-          ⌄
-        </span>
+        <ChevronDown aria-hidden className={`h-4 w-4 shrink-0 text-brand transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open &&
         createPortal(
@@ -215,7 +211,7 @@ export default function Select<T extends string | number>({
               left: position.left,
               width: position.width,
             }}
-            className="z-[1000] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xl"
+            className="z-[1000] overflow-hidden rounded-xl border border-brand/20 bg-white shadow-2xl ring-1 ring-black/5"
             onKeyDown={onKeyDown}
           >
             {searchable && (
@@ -249,9 +245,9 @@ export default function Select<T extends string | number>({
                       key={option.value}
                       onMouseEnter={() => setActive(index)}
                       onClick={() => choose(option.value)}
-                      className={`block min-h-11 w-full truncate rounded-lg px-3 py-2 text-right text-sm ${active === index ? "bg-stone-100" : ""} ${option.value === value ? "font-black text-brand" : "text-stone-700"}`}
+                      className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-right text-sm transition ${active === index ? "bg-brand-50" : ""} ${option.value === value ? "font-black text-brand" : "text-stone-700"}`}
                     >
-                      {option.label}
+                      <span className="truncate">{option.label}</span>{option.value === value && <Check className="h-4 w-4 shrink-0 text-gold-dark" />}
                     </button>
                   ))}
                   {canCreate && (

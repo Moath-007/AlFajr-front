@@ -7,10 +7,7 @@ import {
 } from "@/api";
 import { Skeleton } from "@/components/ui/Skeleton";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import {
-  OrderStatusBadge,
-  PaymentStatusBadge,
-} from "@/components/rep/RepOrderUi";
+import { OrderStatusBadge } from "@/components/rep/RepOrderUi";
 import {
   apiMessages,
   formatMoney,
@@ -19,6 +16,7 @@ import {
 import { orderTypeLabel } from "./adminOrderOptions";
 import OrderReceipt from "@/components/ui/OrderReceipt";
 import { useCustomerCurrentDebt } from "@/components/orders/useCustomerCurrentDebt";
+import CreateReturnModal from "@/components/finance/CreateReturnModal";
 export default function AdminOrderDetailsPage({
   orderId,
   onNavigate,
@@ -36,6 +34,7 @@ export default function AdminOrderDetailsPage({
   const [submitting, setSubmitting] = useState(false);
   const [retry, setRetry] = useState(0);
   const [success, setSuccess] = useState("");
+  const [returnOpen, setReturnOpen] = useState(false);
   const customerDebt = useCustomerCurrentDebt(order?.customer.phone);
   const load = useCallback(
     (signal?: AbortSignal) => {
@@ -64,9 +63,9 @@ export default function AdminOrderDetailsPage({
     setSubmitting(true);
     setErrors([]);
     try {
-      const response = await ordersService.updateStatus(orderId, {
-        status: action,
-      });
+      const response = action === "Cancelled"
+        ? await ordersService.cancel(orderId)
+        : await ordersService.updateStatus(orderId, { status: action });
       setAction(null);
       setSuccess(response.message);
       await load();
@@ -97,8 +96,6 @@ export default function AdminOrderDetailsPage({
       <div className="mt-4 space-y-3">
         <Summary label="خصم الطلب" value={order.order_discount} />
         <Summary label="الإجمالي" value={order.total_amount} />
-        <Summary label="المدفوع" value={order.paid_amount} />
-        <Summary label="المتبقي" value={order.remaining_amount} strong />
       </div>
     </section>
   );
@@ -135,7 +132,7 @@ export default function AdminOrderDetailsPage({
           </p>
         </div>
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-stone-500"><span>حالة الطلب:</span><OrderStatusBadge status={order.status} /><span className="mr-2">حالة الدفع:</span><PaymentStatusBadge status={order.payment_status} /></div>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-stone-500"><span>حالة الطلب:</span><OrderStatusBadge status={order.status} /></div>
           <div className="flex flex-wrap gap-2"><OrderReceipt order={order} customerCurrentDebt={customerDebt.debt} customerDebtLoading={customerDebt.loading} customerDebtFailed={customerDebt.failed} />
           {order.status === "Pending" && (
             <>
@@ -161,7 +158,10 @@ export default function AdminOrderDetailsPage({
                 إلغاء الطلب
               </button>
             </>
-          )}</div>
+          )}
+          {order.status === "Completed" && order.order_type !== "Retail" && <button onClick={() => onNavigate(`/owner/orders/${order.id}/edit`)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-black text-white"><Pencil className="h-4 w-4"/> تعديل الطلب المكتمل</button>}
+          {order.status === "Completed" && <button onClick={() => setReturnOpen(true)} className="btn-outline">إنشاء مردود مبيعات</button>}
+          {order.status === "Completed" && <button onClick={() => setAction("Cancelled")} className="rounded-xl bg-red-50 px-4 py-2 text-sm font-black text-red-700">إلغاء الطلب</button>}</div>
         </div>
       </header>
       <div className="lg:hidden">{summary}</div>
@@ -182,6 +182,7 @@ export default function AdminOrderDetailsPage({
               )}{" "}
               {order.notes && <Info label="ملاحظات" value={order.notes} />}
             </dl>
+            <button className="btn-outline mt-4" onClick={() => onNavigate(`/owner/customers/${order.customer.id}`)}>فتح حساب الزبون</button>
           </section>
           <section className="overflow-hidden rounded-2xl border bg-white">
             <h2 className="p-5 font-black text-brand">عناصر الطلب</h2>
@@ -199,8 +200,8 @@ export default function AdminOrderDetailsPage({
                     {i.variant.color.name}
                   </p>
                   <p className="mt-2 text-xs">
-                    الكمية: {i.quantity} · الوحدة: {formatMoney(i.unit_price)} ·
-                    الخصم: {formatMoney(i.product_discount)}
+                    الكمية: {i.quantity} · الوحدة الفعلية: {formatMoney(i.unit_price)}
+                    {i.is_bonus ? " · بونص (القيمة صفر)" : Number(i.base_unit_price) !== Number(i.unit_price) ? ` · الأساسي: ${formatMoney(i.base_unit_price)}` : ` · الخصم: ${formatMoney(i.product_discount)}`}
                   </p>
                 </article>
               ))}
@@ -236,7 +237,7 @@ export default function AdminOrderDetailsPage({
                         {i.variant.size} — {i.variant.color.name}
                       </td>
                       <td className="px-4">{i.quantity}</td>
-                      <td className="px-4">{formatMoney(i.unit_price)}</td>
+                      <td className="px-4">{i.is_bonus ? <span className="rounded-full bg-gold/20 px-2 py-1 text-xs font-black">بونص · 0 ₪</span> : <>{formatMoney(i.unit_price)}{Number(i.base_unit_price) !== Number(i.unit_price) && <small className="block text-stone-400">الأساسي {formatMoney(i.base_unit_price)}</small>}</>}</td>
                       <td className="px-4">
                         {formatMoney(i.product_discount)}
                       </td>
@@ -248,23 +249,6 @@ export default function AdminOrderDetailsPage({
                 </tbody>
               </table>
             </div>
-          </section>
-          <section className="rounded-2xl border bg-white p-5">
-            <h2 className="font-black text-brand">سجل الدفعات</h2>
-            {order.payments.length === 0 ? (
-              <p className="mt-3 text-sm text-stone-500">لا توجد دفعات.</p>
-            ) : (
-              <div className="mt-3 divide-y">
-                {order.payments.map((p) => (
-                  <div key={p.id} className="grid gap-1 py-3 sm:grid-cols-4">
-                    <b className="text-gold-dark">{formatMoney(p.amount)}</b>
-                    <span>{p.payment_method === "Cash" ? "نقدًا" : "شيك"}</span>
-                    <span>{p.check_number || p.notes || "—"}</span>
-                    <small>{formatOrderDate(p.paid_at)}</small>
-                  </div>
-                ))}
-              </div>
-            )}
           </section>
         </div>
         <aside className="hidden lg:block lg:sticky lg:top-5 lg:h-fit">
@@ -280,11 +264,12 @@ export default function AdminOrderDetailsPage({
         title={action === "Cancelled" ? "إلغاء الطلب" : "إكمال الطلب"}
         message={
           action === "Cancelled"
-            ? "هل أنت متأكد من إلغاء الطلب؟ سيتولى النظام إعادة المخزون حسب قواعد الباك."
+            ? "سيتم إلغاء الطلب وعكس أثره على المخزون والحساب. سندات القبض والصرف المستقلة ستبقى كما هي."
             : "هل أنت متأكد من إكمال الطلب؟"
         }
         confirmLabel={action === "Cancelled" ? "إلغاء الطلب" : "إكمال الطلب"}
       />
+      <CreateReturnModal open={returnOpen} sourceType="SalesReturn" sourceId={order.id} items={order.items.map((item) => ({ productVariantId: Number(item.variant.id), quantity: item.quantity, label: `${item.variant.product.name} — ${item.variant.size} — ${item.variant.color.name}` }))} onClose={() => setReturnOpen(false)} onSaved={(message) => { setReturnOpen(false); setSuccess(message); setRetry((value) => value + 1); }}/>
     </div>
   );
 }

@@ -7,7 +7,7 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "wide" | "return";
   footer?: React.ReactNode;
   mobileFullscreen?: boolean;
 }
@@ -16,7 +16,9 @@ const sizeClasses = {
   sm: "max-w-md",
   md: "max-w-lg",
   lg: "max-w-2xl",
-  xl: "max-w-4xl",
+  xl: "max-w-[min(94vw,1500px)]",
+  wide: "max-w-[min(96vw,1500px)]",
+  return: "max-w-5xl",
 };
 const openDialogs: HTMLDivElement[] = [];
 let scrollLockCount = 0;

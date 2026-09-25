@@ -3,8 +3,12 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '@/auth';
 import App from './App.tsx';
 import './index.css';
+import { enforceLatinDigits } from './utils/numerals';
 
-createRoot(document.getElementById('root')!).render(
+const rootElement = document.getElementById('root')!;
+enforceLatinDigits(rootElement);
+
+createRoot(rootElement).render(
     <BrowserRouter>
         <AuthProvider>
             <App />

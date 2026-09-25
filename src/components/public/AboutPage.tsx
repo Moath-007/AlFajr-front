@@ -27,7 +27,7 @@ export default function AboutPage() {
           <p className="text-sm font-extrabold text-[#E8DCC2]">تعرف علينا عن قرب</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">من نحن</h1>
           <p className="mt-5 max-w-2xl text-base leading-8 text-stone-300 sm:text-lg">
-            {companyName ? `${companyName} متخصصة` : 'نتخصص'} في منتجات وتجهيزات الحمامات، ونقدم خيارات متنوعة تناسب احتياجات المساحات المختلفة.
+            {companyName ? `${companyName} تقدم` : 'نقدم'} حلولًا متكاملة من منتجات وتجهيزات المنزل بتصاميم عصرية وخيارات متنوعة تلائم مختلف المساحات والاحتياجات.
           </p>
         </div>
       </section>
@@ -37,11 +37,12 @@ export default function AboutPage() {
           <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-start lg:px-8">
             <div>
               <p className="text-sm font-extrabold text-[#C2A66D]">عن الفجر</p>
-              <h2 className="mt-3 text-3xl font-black leading-tight text-[#162E21] sm:text-4xl">منتجات عملية لمساحات أكثر اكتمالًا</h2>
+              <h2 className="mt-3 text-3xl font-black leading-tight text-[#162E21] sm:text-4xl">تعرف إلى شركة الفجر للصناعة والتجارة</h2>
             </div>
             <div className="space-y-5 text-base leading-8 text-stone-600">
-              <p>نعمل على تقديم تشكيلة من منتجات وتجهيزات الحمامات تشمل خيارات متنوعة من حيث الاستخدام والتصميم والمقاس واللون.</p>
-              <p>نسعى إلى جعل استكشاف المنتجات ومواصفاتها أكثر وضوحًا، حتى يتمكن العميل من مقارنة الخيارات والوصول إلى المنتج المناسب لاحتياجه.</p>
+              <p>نقدم لكم تشكيلة متكاملة من منتجات وتجهيزات المنزل، تشمل المغاسل والأحواض، مرايا المغاسل والديكور، مغاسل البورسلان، مغاسل الخشب، أحواض المطابخ، المراحيض، السيلكون، الإنارة المنزلية والأثاث.</p>
+              <p>نسعى لتوفير منتجات تجمع بين الجودة العالية، التصاميم العصرية والتنوع، لتلبية احتياجاتكم ومنح كل مساحة لمسة مميزة وأنيقة.</p>
+              <p className="font-black text-[#162E21]">اكتشف مجموعتنا واختر ما يناسب منزلك.</p>
             </div>
           </div>
         </section>

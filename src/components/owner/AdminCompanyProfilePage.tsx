@@ -10,6 +10,7 @@ import { Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { companyProfileService, type CompanyProfileDataDto } from "@/api";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { apiMessages } from "@/components/rep/repOrderUtils";
+import CurrencySettings from "./CurrencySettings";
 
 type Fields = {
   company_name: string;
@@ -159,6 +160,7 @@ export default function AdminCompanyProfilePage({
           {errors.join("، ")}
         </div>
       )}
+      <CurrencySettings onNotify={onNotify} />
       <form onSubmit={save} className="space-y-6">
         <Section title="البيانات الأساسية">
           <Field

@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Pencil } from "lucide-react";
 import { ordersService, type OrderResponseDto } from "@/api";
-import { OrderStatusBadge, PaymentStatusBadge } from "./RepOrderUi";
+import { OrderStatusBadge } from "./RepOrderUi";
 import { apiMessages, formatMoney, formatOrderDate } from "./repOrderUtils";
 import { Skeleton } from "@/components/ui/Skeleton";
 import OrderReceipt from "@/components/ui/OrderReceipt";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useCustomerCurrentDebt } from "@/components/orders/useCustomerCurrentDebt";
+import { useAuth } from "@/auth";
+import CreateReturnModal from "@/components/finance/CreateReturnModal";
 export default function RepOrderDetailsPage({
   orderId,
   onNavigate,
@@ -13,9 +16,13 @@ export default function RepOrderDetailsPage({
   orderId: number;
   onNavigate: (path: string) => void;
 }) {
+  const { user } = useAuth();
   const [order, setOrder] = useState<OrderResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
   const customerDebt = useCustomerCurrentDebt(order?.customer.phone);
   useEffect(() => {
     const c = new AbortController();
@@ -53,8 +60,6 @@ export default function RepOrderDetailsPage({
       <div className="mt-5 space-y-3">
         <Summary label="خصم الطلب" value={order.order_discount} />
         <Summary label="الإجمالي" value={order.total_amount} />
-        <Summary label="المدفوع" value={order.paid_amount} />
-        <Summary label="المتبقي" value={order.remaining_amount} strong />
       </div>
     </section>
   );
@@ -64,7 +69,7 @@ export default function RepOrderDetailsPage({
         onClick={() => onNavigate("/rep/orders")}
         className="inline-flex items-center gap-2 text-sm font-bold text-stone-600"
       >
-        <ArrowRight className="h-4 w-4" /> العودة إلى طلباتي
+        <ArrowRight className="h-4 w-4" /> العودة إلى الطلبات
       </button>
       <header className="flex flex-col justify-between gap-4 rounded-2xl border bg-white p-6 shadow-sm sm:flex-row sm:items-center">
         <div>
@@ -77,9 +82,9 @@ export default function RepOrderDetailsPage({
           </p>
         </div>
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-stone-500"><span>حالة الطلب:</span><OrderStatusBadge status={order.status} /><span className="mr-2">حالة الدفع:</span><PaymentStatusBadge status={order.payment_status} /></div>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-stone-500"><span>حالة الطلب:</span><OrderStatusBadge status={order.status} /></div>
           <div className="flex flex-wrap items-center gap-2"><OrderReceipt order={order} customerCurrentDebt={customerDebt.debt} customerDebtLoading={customerDebt.loading} customerDebtFailed={customerDebt.failed} />
-          {order.status === "Pending" && (
+          {order.status !== "Cancelled" && order.order_type === "Wholesale" && (
             <button
               onClick={() => onNavigate(`/rep/orders/${order.id}/edit`)}
               className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-black text-white"
@@ -87,6 +92,8 @@ export default function RepOrderDetailsPage({
               <Pencil className="h-4 w-4" /> تعديل الطلب
             </button>
           )}
+          {order.status !== "Cancelled" && order.representative?.id === user?.id && <button onClick={() => setCancelOpen(true)} className="rounded-xl bg-red-50 px-4 py-2.5 text-sm font-black text-red-700">إلغاء الطلب</button>}
+          {order.status === "Completed" && order.representative?.id === user?.id && <button onClick={() => setReturnOpen(true)} className="btn-outline">إنشاء مردود مبيعات</button>}
           </div>
         </div>
       </header>
@@ -102,6 +109,7 @@ export default function RepOrderDetailsPage({
               <Info label="العنوان" value={order.delivery_address || "—"} />
               {order.notes && <Info label="ملاحظات" value={order.notes} />}
             </dl>
+            <button className="btn-outline mt-4" onClick={() => onNavigate(`/rep/customers/${order.customer.id}`)}>فتح حساب الزبون</button>
           </section>
           <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
             <h2 className="p-5 text-lg font-black text-brand">عناصر الطلب</h2>
@@ -129,7 +137,7 @@ export default function RepOrderDetailsPage({
                     <Mini label="الكمية" value={String(i.quantity)} />
                     <Mini
                       label="سعر الوحدة"
-                      value={formatMoney(i.unit_price)}
+                      value={i.is_bonus ? "بونص · 0 ₪" : formatMoney(i.unit_price)}
                     />
                     <Mini
                       label="الخصم"
@@ -173,7 +181,7 @@ export default function RepOrderDetailsPage({
                         {i.variant.size} — {i.variant.color.name}
                       </td>
                       <td className="px-4">{i.quantity}</td>
-                      <td className="px-4">{formatMoney(i.unit_price)}</td>
+                      <td className="px-4">{i.is_bonus ? <span className="rounded-full bg-gold/20 px-2 py-1 text-xs font-black">بونص · 0 ₪</span> : <>{formatMoney(i.unit_price)}{Number(i.base_unit_price) !== Number(i.unit_price) && <small className="block text-stone-400">الأساسي {formatMoney(i.base_unit_price)}</small>}</>}</td>
                       <td className="px-4">
                         {formatMoney(i.product_discount)}
                       </td>
@@ -186,32 +194,11 @@ export default function RepOrderDetailsPage({
               </table>
             </div>
           </section>
-          <section className="rounded-2xl border bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-black text-brand">سجل الدفعات</h2>
-            {order.payments.length === 0 ? (
-              <p className="mt-4 rounded-xl bg-stone-50 p-4 text-sm text-stone-500">
-                لا توجد دفعات مسجلة.
-              </p>
-            ) : (
-              <div className="mt-4 divide-y">
-                {order.payments.map((p) => (
-                  <div key={p.id} className="grid gap-2 py-3 sm:grid-cols-4">
-                    <strong className="text-gold-dark">
-                      {formatMoney(p.amount)}
-                    </strong>
-                    <span>{p.payment_method === "Cash" ? "نقدًا" : "شيك"}</span>
-                    <span>{p.check_number || "—"}</span>
-                    <span className="text-sm text-stone-400">
-                      {formatOrderDate(p.paid_at)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
         </div>
         <aside className="hidden lg:block lg:sticky lg:top-6">{summary}</aside>
       </div>
+      <ConfirmDialog open={cancelOpen} onClose={() => setCancelOpen(false)} onConfirm={async () => { setCancelling(true); try { await ordersService.cancel(order.id); onNavigate("/rep/orders"); } catch (error) { setErrors(apiMessages(error, "تعذر إلغاء الطلب.")); setCancelOpen(false); } finally { setCancelling(false); } }} loading={cancelling} severity="destructive" title="إلغاء الطلب" message="سيتم إلغاء الطلب وعكس أثره على المخزون والحساب. سندات القبض والصرف المستقلة ستبقى كما هي." confirmLabel="إلغاء الطلب" />
+      <CreateReturnModal open={returnOpen} sourceType="SalesReturn" sourceId={order.id} items={order.items.map((item) => ({ productVariantId: Number(item.variant.id), quantity: item.quantity, label: `${item.variant.product.name} — ${item.variant.size} — ${item.variant.color.name}` }))} onClose={() => setReturnOpen(false)} onSaved={() => { setReturnOpen(false); window.location.reload(); }}/>
     </div>
   );
 }

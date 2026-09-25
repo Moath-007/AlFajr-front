@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent,
   type FormEvent,
 } from "react";
 import { ArrowRight, ImagePlus, Plus, RefreshCw, Trash2 } from "lucide-react";
@@ -32,7 +33,6 @@ type VariantDraft = {
   retail_discount: string;
   wholesale_price: string;
   wholesale_discount: string;
-  stock_quantity: string;
 };
 const blankVariant = (): VariantDraft => ({
   key: crypto.randomUUID(),
@@ -42,7 +42,6 @@ const blankVariant = (): VariantDraft => ({
   retail_discount: "0",
   wholesale_price: "",
   wholesale_discount: "0",
-  stock_quantity: "0",
 });
 const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 export default function AdminProductFormPage({
@@ -182,7 +181,6 @@ export default function AdminProductFormPage({
       retail_discount: v.retail_discount,
       wholesale_price: v.wholesale_price,
       wholesale_discount: v.wholesale_discount,
-      stock_quantity: String(v.stock_quantity),
     }));
     const ids = p.images.map((x) => x.id);
     const primary =
@@ -280,14 +278,12 @@ export default function AdminProductFormPage({
         v.retail_discount,
         v.wholesale_price,
         v.wholesale_discount,
-        v.stock_quantity,
       ].map(Number);
       if (
-        nums.some((x) => !Number.isFinite(x) || x < 0) ||
-        !Number.isInteger(nums[4])
+        nums.some((x) => !Number.isFinite(x) || x < 0)
       )
         messages.push(
-          `الأسعار والخصومات يجب أن تكون موجبة والمخزون عددًا صحيحًا في الخيار ${i + 1}.`,
+          `الأسعار والخصومات يجب ألا تكون سالبة في الخيار ${i + 1}.`,
         );
     });
     const keys = variants.map(
@@ -321,7 +317,6 @@ export default function AdminProductFormPage({
       retail_discount: Number(v.retail_discount),
       wholesale_price: Number(v.wholesale_price),
       wholesale_discount: Number(v.wholesale_discount),
-      stock_quantity: Number(v.stock_quantity),
     }));
   const imagesChanged = () =>
     editing &&
@@ -337,7 +332,6 @@ export default function AdminProductFormPage({
     setSaving(true);
     setErrors([]);
     try {
-      let savedId = productId;
       let successMessage = "تم حفظ المنتج بنجاح";
       if (editing && productId) {
         const updateResult = await productsService.update(productId, {
@@ -373,16 +367,13 @@ export default function AdminProductFormPage({
           primary_image: primaryCreate,
           additional_images: newImages,
         });
-        savedId = result.product.product_id;
         successMessage = result.message;
       }
       setConfirmSave(false);
       initialSnapshot.current = "";
       onDirtyChange(false);
       onNotify(successMessage, "success");
-      onNavigate(
-        editing ? "/owner/products" : `/owner/products/${savedId}/edit`,
-      );
+      onNavigate("/owner/products");
     } catch (e) {
       setConfirmSave(false);
       setErrors(apiMessages(e, "تعذر حفظ المنتج."));
@@ -693,12 +684,6 @@ function VariantEditor({
               })),
             ]}
           />
-          <Field
-            type="number"
-            label="المخزون"
-            value={value.stock_quantity}
-            onChange={(v) => onChange("stock_quantity", v)}
-          />
         </div>
         <div className="rounded-xl border border-stone-200 bg-white p-3">
           <h3 className="mb-3 text-xs font-black text-brand">سعر الأونلاين</h3>
@@ -767,6 +752,23 @@ function ImageEditor({
   setPrimaryNewIndex: (v: number | null) => void;
   previews: { file: File; url: string }[];
 }) {
+  const [dragTarget, setDragTarget] = useState<"primary" | "additional" | null>(
+    null,
+  );
+  const droppedFiles = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    return Array.from(event.dataTransfer.files);
+  };
+  const dropPrimary = (event: DragEvent<HTMLLabelElement>) => {
+    const [file] = droppedFiles(event);
+    setDragTarget(null);
+    if (file) setPrimaryCreate(file);
+  };
+  const dropAdditional = (event: DragEvent<HTMLLabelElement>) => {
+    const files = droppedFiles(event);
+    setDragTarget(null);
+    if (files.length) setNewImages(files);
+  };
   return (
     <section className="rounded-2xl border bg-white p-5">
       <h2 className="font-black text-brand">الصور</h2>
@@ -823,7 +825,7 @@ function ImageEditor({
       )}
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         {!editing && (
-          <div className="rounded-xl border border-dashed p-4">
+          <div className="rounded-xl">
             <span className="rep-label">الصورة الرئيسية *</span>
             <input
               id="product-primary-image"
@@ -834,9 +836,20 @@ function ImageEditor({
             />
             <label
               htmlFor="product-primary-image"
-              className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-brand px-4 py-2 text-sm font-black text-white peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2"
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setDragTarget("primary");
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDragLeave={() => setDragTarget(null)}
+              onDrop={dropPrimary}
+              className={`flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-5 text-center shadow-sm transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 ${dragTarget === "primary" ? "scale-[1.01] border-gold bg-gold/15 shadow-lg ring-4 ring-gold/15" : "border-stone-300 bg-stone-50 hover:-translate-y-0.5 hover:border-gold hover:bg-gold/5 hover:shadow-md"}`}
             >
-              اختيار الصورة الرئيسية
+              <ImagePlus className="h-7 w-7 text-gold-dark" />
+              <strong className="text-sm text-brand">
+                اسحب الصورة الرئيسية وأفلتها هنا
+              </strong>
+              <span className="text-xs text-stone-500">أو اضغط للاختيار</span>
             </label>
             <p
               className="mt-2 truncate text-xs text-stone-500"
@@ -846,7 +859,7 @@ function ImageEditor({
             </p>
           </div>
         )}
-        <div className="rounded-xl border border-dashed p-4">
+        <div className="rounded-xl">
           <span className="rep-label">
             {editing ? "صور جديدة" : "صور إضافية"}
           </span>
@@ -860,9 +873,22 @@ function ImageEditor({
           />
           <label
             htmlFor="product-additional-images"
-            className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl border border-brand px-4 py-2 text-sm font-black text-brand peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2"
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setDragTarget("additional");
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={() => setDragTarget(null)}
+            onDrop={dropAdditional}
+            className={`flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-5 text-center shadow-sm transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 ${dragTarget === "additional" ? "scale-[1.01] border-gold bg-gold/15 shadow-lg ring-4 ring-gold/15" : "border-stone-300 bg-stone-50 hover:-translate-y-0.5 hover:border-gold hover:bg-gold/5 hover:shadow-md"}`}
           >
-            إضافة صور
+            <ImagePlus className="h-7 w-7 text-gold-dark" />
+            <strong className="text-sm text-brand">
+              اسحب الصور وأفلتها هنا
+            </strong>
+            <span className="text-xs text-stone-500">
+              أو اضغط لاختيار عدة صور
+            </span>
           </label>
           <p className="mt-2 text-xs text-stone-500" aria-live="polite">
             {previews.length - (primaryCreate ? 1 : 0) > 0

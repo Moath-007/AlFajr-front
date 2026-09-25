@@ -24,7 +24,7 @@ export default function PublicFooter({ onNavigate }: PublicFooterProps) {
             >
               <span className="flex h-16 w-24 items-center justify-center overflow-hidden rounded-xl bg-white transition-transform group-hover:-translate-y-0.5">
                 <img
-                  src="/assets/al-fajr-logo.png"
+                  src="/assets/al-fajr-logo.webp"
                   alt="شعار شركة الفجر"
                   className="h-full w-full object-cover object-[center_45%]"
                 />

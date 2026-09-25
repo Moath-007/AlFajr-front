@@ -10,10 +10,12 @@ import {
 import { useStore } from "@/store/useStore";
 import { useAuth } from "@/auth";
 import Toast from "@/components/ui/Toast";
+import ScrollToError from "@/components/ui/ScrollToError";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import PageTransition, {
   PageRouteFallback,
 } from "@/components/ui/PageTransition";
+import RouteSeo from "@/components/seo/RouteSeo";
 
 import PublicHeader from "@/components/public/PublicHeader";
 import PublicFooter from "@/components/public/PublicFooter";
@@ -31,7 +33,12 @@ import PublicNotFoundPage from "@/components/public/PublicNotFoundPage";
 import { PublicCatalogProvider } from "@/public/PublicCatalogProvider";
 import { PublicCompanyProvider } from "@/public/PublicCompanyProvider";
 import { PublicCartProvider } from "@/public/PublicCartProvider";
-import { WholesaleCartProvider, WholesaleStockVisibilityProvider, useWholesaleCart, useWholesaleStockVisibility } from "@/rep";
+import {
+  WholesaleCartProvider,
+  WholesaleStockVisibilityProvider,
+  useWholesaleCart,
+  useWholesaleStockVisibility,
+} from "@/rep";
 
 import LoginPage from "@/components/auth/LoginPage";
 import RequireRole from "@/components/auth/RequireRole";
@@ -59,23 +66,30 @@ const AdminOrdersPage = lazy(
 const AdminOrderDetailsPage = lazy(
   () => import("@/components/owner/AdminOrderDetailsPage"),
 );
-const AdminReceivablesPage = lazy(
-  () => import("@/components/owner/AdminReceivablesPage"),
-);
 const AdminStoreSalePage = lazy(
   () => import("@/components/owner/AdminStoreSalePage"),
 );
 const AdminReportsPage = lazy(
   () => import("@/components/owner/AdminReportsPage"),
 );
+const CustomerStatementPage = lazy(
+  () => import("@/components/owner/AdminCustomerStatementPage"),
+);
 const AdminCompanyProfilePage = lazy(
   () => import("@/components/owner/AdminCompanyProfilePage"),
 );
-const AdminCustomerStatementPage = lazy(
-  () => import("@/components/owner/AdminCustomerStatementPage"),
-);
 const AdminNotificationBell = lazy(
   () => import("@/components/owner/AdminNotificationBell"),
+);
+const ChecksPage = lazy(() => import("@/components/finance/ChecksPage"));
+const CustomerPurchasesPage = lazy(
+  () => import("@/components/customer-purchases/CustomerPurchasesPage"),
+);
+const CustomersPage = lazy(
+  () => import("@/components/customers/CustomersPage"),
+);
+const CustomerProfilePage = lazy(
+  () => import("@/components/customers/CustomerProfilePage"),
 );
 
 const RepSidebar = lazy(() => import("@/components/rep/RepSidebar"));
@@ -96,9 +110,6 @@ const RepOrderDetailsPage = lazy(
 const EditRepOrderPage = lazy(
   () => import("@/components/rep/EditRepOrderPage"),
 );
-const RepReceivablesPage = lazy(
-  () => import("@/components/rep/RepReceivablesPage"),
-);
 
 type AppStore = ReturnType<typeof useStore>;
 type NavigateHandler = (page: string, params?: Record<string, string>) => void;
@@ -106,6 +117,7 @@ type NavigateHandler = (page: string, params?: Record<string, string>) => void;
 export default function App() {
   const store = useStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleNavigate = useCallback(
     (page: string, params: Record<string, string> = {}) => {
@@ -138,17 +150,26 @@ export default function App() {
       else if (page === "rep-my-orders" || page === "my-orders")
         path = "/rep/orders";
 
-      const queryString = new URLSearchParams(params).toString();
+      const queryParams = { ...params };
+      if (page === "product-details") delete queryParams.id;
+      const queryString = new URLSearchParams(queryParams).toString();
       const finalPath =
         queryString && !path.includes(":") ? `${path}?${queryString}` : path;
 
-      navigate(finalPath);
+      navigate(finalPath, {
+        state:
+          page === "product-details"
+            ? { catalogReturnTo: `${location.pathname}${location.search}` }
+            : undefined,
+      });
     },
-    [navigate],
+    [location.pathname, location.search, navigate],
   );
 
   return (
     <>
+      <ScrollToError />
+      <RouteSeo />
       <Suspense
         fallback={
           <div className="grid min-h-screen place-items-center bg-stone-50 text-sm font-bold text-stone-500">
@@ -175,7 +196,9 @@ export default function App() {
             element={
               <RequireRole role="Representative">
                 <WholesaleCartProvider>
-                  <WholesaleStockVisibilityProvider><RepLayout /></WholesaleStockVisibilityProvider>
+                  <WholesaleStockVisibilityProvider>
+                    <RepLayout />
+                  </WholesaleStockVisibilityProvider>
                 </WholesaleCartProvider>
               </RequireRole>
             }
@@ -238,30 +261,12 @@ function OwnerLayout({ store }: { store: AppStore }) {
     (path: string) => runOrConfirm(() => navigate(path)),
     [navigate, runOrConfirm],
   );
-  const ownerSection = location.pathname.startsWith("/owner/products")
-    ? "products"
-    : location.pathname.startsWith("/owner/orders")
-      ? "orders"
-      : location.pathname === "/owner/categories"
-        ? "product-settings"
-        : location.pathname === "/owner/settings"
-          ? "company"
-          : location.pathname.replace("/owner", "").replace("/", "") ||
-            "dashboard";
   return (
     <div className="min-h-screen bg-stone-50 flex" dir="rtl">
       <Suspense fallback={<div className="hidden w-72 shrink-0 lg:block" />}>
         <OwnerSidebar
-          currentPage={ownerSection}
-          onNavigate={(p) =>
-            ownerNavigate(
-              p === "dashboard"
-                ? "/owner"
-                : p === "public-home"
-                  ? "/"
-                  : `/owner/${p}`,
-            )
-          }
+          currentPath={location.pathname}
+          onNavigate={ownerNavigate}
           onLogout={() =>
             runOrConfirm(() => {
               logout();
@@ -274,106 +279,133 @@ function OwnerLayout({ store }: { store: AppStore }) {
       <Suspense fallback={null}>
         <AdminNotificationBell onNavigate={ownerNavigate} />
       </Suspense>
-      <main className="flex-1 min-w-0 p-4 lg:p-8">
+      <main className="min-w-0 flex-1 overflow-x-hidden p-3 pt-20 sm:p-4 sm:pt-20 lg:p-8">
         <div className="mx-auto max-w-6xl">
           <Suspense fallback={<PageRouteFallback />}>
             <PageTransition>
               <Routes>
-            <Route
-              path=""
-              element={
-                <OwnerDashboard
-                  onNavigate={(p) => ownerNavigate(`/owner/${p}`)}
+                <Route
+                  path=""
+                  element={
+                    <OwnerDashboard
+                      onNavigate={(p) => ownerNavigate(`/owner/${p}`)}
+                    />
+                  }
                 />
-              }
-            />
-            <Route
-              path="products"
-              element={<AdminProductsPage onNavigate={ownerNavigate} />}
-            />
-            <Route
-              path="products/new"
-              element={
-                <AdminProductFormPage
-                  onNavigate={ownerNavigate}
-                  onDirtyChange={handleOwnerEditDirtyChange}
-                  onNotify={store.notify}
+                <Route
+                  path="products"
+                  element={<AdminProductsPage onNavigate={ownerNavigate} />}
                 />
-              }
-            />
-            <Route
-              path="products/:id"
-              element={
-                <AdminProductFormWrapper
-                  onNavigate={ownerNavigate}
-                  onDirtyChange={handleOwnerEditDirtyChange}
-                  onNotify={store.notify}
+                <Route
+                  path="products/new"
+                  element={
+                    <AdminProductFormPage
+                      onNavigate={ownerNavigate}
+                      onDirtyChange={handleOwnerEditDirtyChange}
+                      onNotify={store.notify}
+                    />
+                  }
                 />
-              }
-            />
-            <Route
-              path="products/:id/edit"
-              element={
-                <AdminProductFormWrapper
-                  onNavigate={ownerNavigate}
-                  onDirtyChange={handleOwnerEditDirtyChange}
-                  onNotify={store.notify}
+                <Route
+                  path="products/:id"
+                  element={
+                    <AdminProductFormWrapper
+                      onNavigate={ownerNavigate}
+                      onDirtyChange={handleOwnerEditDirtyChange}
+                      onNotify={store.notify}
+                    />
+                  }
                 />
-              }
-            />
-            <Route
-              path="categories"
-              element={<AdminProductSettingsPage onNotify={store.notify} />}
-            />
-            <Route path="inventory" element={<AdminInventoryPage />} />
-            <Route
-              path="reps"
-              element={<AdminRepresentativesPage onNotify={store.notify} />}
-            />
-            <Route
-              path="orders"
-              element={<AdminOrdersPage onNavigate={ownerNavigate} />}
-            />
-            <Route
-              path="orders/:id/edit"
-              element={
-                <AdminOrderEditWrapper
-                  onNavigate={ownerNavigate}
-                  onDirtyChange={handleOwnerEditDirtyChange}
+                <Route
+                  path="products/:id/edit"
+                  element={
+                    <AdminProductFormWrapper
+                      onNavigate={ownerNavigate}
+                      onDirtyChange={handleOwnerEditDirtyChange}
+                      onNotify={store.notify}
+                    />
+                  }
                 />
-              }
-            />
-            <Route
-              path="orders/:id"
-              element={<AdminOrderDetailsWrapper onNavigate={ownerNavigate} />}
-            />
-            <Route path="reports" element={<AdminReportsPage />} />
-            <Route
-              path="customer-statements"
-              element={<AdminCustomerStatementPage />}
-            />
-            <Route
-              path="settings"
-              element={
-                <AdminCompanyProfilePage
-                  onDirtyChange={handleOwnerEditDirtyChange}
-                  onNotify={store.notify}
+                <Route
+                  path="categories"
+                  element={<AdminProductSettingsPage onNotify={store.notify} />}
                 />
-              }
-            />
-            <Route
-              path="product-settings"
-              element={<Navigate to="/owner/categories" replace />}
-            />
-            <Route
-              path="company"
-              element={<Navigate to="/owner/settings" replace />}
-            />
-            <Route
-              path="store-sale"
-              element={<AdminStoreSalePage onNavigate={ownerNavigate} />}
-            />
-            <Route path="receivables" element={<AdminReceivablesPage />} />
+                <Route path="inventory" element={<AdminInventoryPage />} />
+                <Route
+                  path="reps"
+                  element={<AdminRepresentativesPage onNotify={store.notify} />}
+                />
+                <Route
+                  path="orders"
+                  element={<AdminOrdersPage onNavigate={ownerNavigate} />}
+                />
+                <Route
+                  path="orders/:id/edit"
+                  element={
+                    <AdminOrderEditWrapper
+                      onNavigate={ownerNavigate}
+                      onDirtyChange={handleOwnerEditDirtyChange}
+                    />
+                  }
+                />
+                <Route
+                  path="orders/:id"
+                  element={
+                    <AdminOrderDetailsWrapper onNavigate={ownerNavigate} />
+                  }
+                />
+                <Route path="reports" element={<AdminReportsPage />} />
+                <Route
+                  path="customer-statements"
+                  element={<CustomerStatementPage />}
+                />
+                <Route
+                  path="settings"
+                  element={
+                    <AdminCompanyProfilePage
+                      onDirtyChange={handleOwnerEditDirtyChange}
+                      onNotify={store.notify}
+                    />
+                  }
+                />
+                <Route
+                  path="product-settings"
+                  element={<Navigate to="/owner/categories" replace />}
+                />
+                <Route
+                  path="company"
+                  element={<Navigate to="/owner/settings" replace />}
+                />
+                <Route
+                  path="store-sale"
+                  element={<AdminStoreSalePage onNavigate={ownerNavigate} />}
+                />
+                <Route
+                  path="receivables"
+                  element={<Navigate to="/owner/customers" replace />}
+                />
+                <Route path="checks" element={<ChecksPage />} />
+                <Route
+                  path="returns"
+                  element={<Navigate to="/owner/customers" replace />}
+                />
+                <Route
+                  path="customer-purchases"
+                  element={<CustomerPurchasesPage />}
+                />
+                <Route
+                  path="customers"
+                  element={
+                    <CustomersPage
+                      onNavigate={ownerNavigate}
+                      basePath="/owner"
+                    />
+                  }
+                />
+                <Route
+                  path="customers/:id"
+                  element={<CustomerProfileWrapper />}
+                />
               </Routes>
             </PageTransition>
           </Suspense>
@@ -500,39 +532,73 @@ function RepLayout() {
           <Suspense fallback={<PageRouteFallback />}>
             <PageTransition>
               <Routes>
-            <Route
-              path=""
-              element={<RepDashboard onNavigate={repNavigate} />}
-            />
-            <Route
-              path="products"
-              element={<WholesaleProductsPage onNavigate={repNavigate} />}
-            />
-            <Route path="products/:id" element={<RepProductDetailsWrapper />} />
-            <Route
-              path="create-order"
-              element={<Navigate to="/rep/orders/new" replace />}
-            />
-            <Route
-              path="orders/new"
-              element={<CreateWholesaleOrderPage onNavigate={repNavigate} />}
-            />
-            <Route
-              path="orders"
-              element={<RepOrders onNavigate={repNavigate} />}
-            />
-            <Route
-              path="orders/:id/edit"
-              element={
-                <RepOrderEditWrapper
-                  onNavigate={repNavigate}
-                  onDirtyChange={handleEditDirtyChange}
+                <Route
+                  path=""
+                  element={<RepDashboard onNavigate={repNavigate} />}
                 />
-              }
-            />
-            <Route path="orders/:id" element={<RepOrderDetailsWrapper />} />
-            <Route path="receivables" element={<RepReceivablesPage />} />
-            <Route path="*" element={<Navigate to="/rep" replace />} />
+                <Route
+                  path="products"
+                  element={<WholesaleProductsPage onNavigate={repNavigate} />}
+                />
+                <Route
+                  path="products/:id"
+                  element={<RepProductDetailsWrapper />}
+                />
+                <Route
+                  path="create-order"
+                  element={<Navigate to="/rep/orders/new" replace />}
+                />
+                <Route
+                  path="orders/new"
+                  element={
+                    <CreateWholesaleOrderPage onNavigate={repNavigate} />
+                  }
+                />
+                <Route
+                  path="orders"
+                  element={<RepOrders onNavigate={repNavigate} />}
+                />
+                <Route
+                  path="orders/:id/edit"
+                  element={
+                    <RepOrderEditWrapper
+                      onNavigate={repNavigate}
+                      onDirtyChange={handleEditDirtyChange}
+                    />
+                  }
+                />
+                <Route path="orders/:id" element={<RepOrderDetailsWrapper />} />
+                <Route
+                  path="receivables"
+                  element={<Navigate to="/rep/customers" replace />}
+                />
+                <Route
+                  path="customer-statement"
+                  element={<CustomerStatementPage />}
+                />
+                <Route
+                  path="customer-statement/:id"
+                  element={<Navigate to="/rep/customers" replace />}
+                />
+                <Route
+                  path="checks"
+                  element={<Navigate to="/rep/customers" replace />}
+                />
+                <Route
+                  path="customer-purchases"
+                  element={<Navigate to="/rep/customers" replace />}
+                />
+                <Route
+                  path="customers"
+                  element={
+                    <CustomersPage onNavigate={repNavigate} basePath="/rep" />
+                  }
+                />
+                <Route
+                  path="customers/:id"
+                  element={<CustomerProfileWrapper />}
+                />
+                <Route path="*" element={<Navigate to="/rep" replace />} />
               </Routes>
             </PageTransition>
           </Suspense>
@@ -553,6 +619,16 @@ function RepLayout() {
         cancelLabel="متابعة التعديل"
       />
     </div>
+  );
+}
+
+function CustomerProfileWrapper() {
+  const { id } = useParams();
+  const customerId = Number(id);
+  return Number.isInteger(customerId) && customerId > 0 ? (
+    <CustomerProfilePage customerId={customerId} />
+  ) : (
+    <Navigate to=".." replace />
   );
 }
 
@@ -634,30 +710,30 @@ function PublicSiteContent({ onNavigate }: { onNavigate: NavigateHandler }) {
       <div className="flex-1">
         <PageTransition>
           <Routes>
-          <Route path="" element={<HomePage onNavigate={onNavigate} />} />
-          <Route
-            path="products"
-            element={<ProductsPage onNavigate={onNavigate} />}
-          />
-          <Route
-            path="products/:id"
-            element={<PublicProductDetailsWrapper />}
-          />
-          <Route
-            path="categories"
-            element={<CategoriesPage onNavigate={onNavigate} />}
-          />
-          <Route path="about" element={<AboutPage />} />
-          <Route path="contact" element={<ContactPage />} />
-          <Route path="cart" element={<CartPage onNavigate={onNavigate} />} />
-          <Route
-            path="checkout"
-            element={<CheckoutPage onNavigate={onNavigate} />}
-          />
-          <Route
-            path="*"
-            element={<PublicNotFoundPage onNavigate={onNavigate} />}
-          />
+            <Route path="" element={<HomePage onNavigate={onNavigate} />} />
+            <Route
+              path="products"
+              element={<ProductsPage onNavigate={onNavigate} />}
+            />
+            <Route
+              path="products/:id"
+              element={<PublicProductDetailsWrapper />}
+            />
+            <Route
+              path="categories"
+              element={<CategoriesPage onNavigate={onNavigate} />}
+            />
+            <Route path="about" element={<AboutPage />} />
+            <Route path="contact" element={<ContactPage />} />
+            <Route path="cart" element={<CartPage onNavigate={onNavigate} />} />
+            <Route
+              path="checkout"
+              element={<CheckoutPage onNavigate={onNavigate} />}
+            />
+            <Route
+              path="*"
+              element={<PublicNotFoundPage onNavigate={onNavigate} />}
+            />
           </Routes>
         </PageTransition>
       </div>
@@ -669,7 +745,9 @@ function PublicSiteContent({ onNavigate }: { onNavigate: NavigateHandler }) {
 function PublicProductDetailsWrapper() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const productId = Number(id);
+  const returnTo = getCatalogReturnPath(location.state);
   if (!Number.isInteger(productId) || productId <= 0)
     return (
       <div className="mx-auto max-w-7xl px-4 py-16 text-center font-bold text-stone-500">
@@ -679,7 +757,18 @@ function PublicProductDetailsWrapper() {
   return (
     <ProductDetailsPage
       productId={productId}
-      onBack={() => navigate("/products")}
+      onBack={() => navigate(returnTo)}
     />
   );
+}
+
+function getCatalogReturnPath(state: unknown): string {
+  if (!state || typeof state !== "object" || !("catalogReturnTo" in state)) {
+    return "/products";
+  }
+
+  const value = (state as { catalogReturnTo?: unknown }).catalogReturnTo;
+  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//")
+    ? value
+    : "/products";
 }

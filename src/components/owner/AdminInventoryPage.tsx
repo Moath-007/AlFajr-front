@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Boxes, RefreshCw, Search } from "lucide-react";
+import { Boxes, History, RefreshCw, Search } from "lucide-react";
 import {
   categoriesService,
   colorsService,
@@ -7,6 +7,7 @@ import {
   type CategoryResponseDto,
   type ColorResponseDto,
   type InventoryItemDto,
+  type InventoryMovementDto,
   type PaginationResponseDto,
   type StockStatus,
 } from "@/api";
@@ -44,6 +45,10 @@ export default function AdminInventoryPage() {
   const [selected, setSelected] = useState<InventoryItemDto | null>(null);
   const [pendingUpdate, setPendingUpdate] = useState<InventoryItemDto | null>(null);
   const [addedQuantity, setAddedQuantity] = useState("");
+  const [adjustmentNotes, setAdjustmentNotes] = useState("");
+  const [movementItem, setMovementItem] = useState<InventoryItemDto | null>(null);
+  const [movements, setMovements] = useState<InventoryMovementDto[]>([]);
+  const [movementsLoading, setMovementsLoading] = useState(false);
   const [stockErrors, setStockErrors] = useState<string[]>([]);
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -136,15 +141,14 @@ export default function AdminInventoryPage() {
     setSelected(item);
     setPendingUpdate(null);
     setAddedQuantity("");
+    setAdjustmentNotes("");
     setStockErrors([]);
   };
   const prepare = (e: FormEvent) => {
     e.preventDefault();
     const n = Number(addedQuantity);
-    if (!Number.isInteger(n) || n <= 0) {
-      setStockErrors([
-        "الكمية المضافة يجب أن تكون عددًا صحيحًا أكبر من صفر.",
-      ]);
+    if (!Number.isInteger(n) || n === 0) {
+      setStockErrors(["التغيير يجب أن يكون عددًا صحيحًا موجبًا أو سالبًا، ولا يمكن أن يكون صفرًا."]);
       return;
     }
     setPendingUpdate(selected);
@@ -156,9 +160,9 @@ export default function AdminInventoryPage() {
     setSaving(true);
     setStockErrors([]);
     try {
-      const r = await inventoryService.updateStock(
+      const r = await inventoryService.adjust(
         pendingUpdate.product_variant_id,
-        { stock_quantity: pendingUpdate.stock_quantity + Number(addedQuantity) },
+        { quantity_change: Number(addedQuantity), notes: adjustmentNotes.trim() || undefined },
       );
       setConfirm(false);
       setPendingUpdate(null);
@@ -173,13 +177,24 @@ export default function AdminInventoryPage() {
       setSaving(false);
     }
   };
+  const openMovements = async (item: InventoryItemDto) => {
+    setMovementItem(item);
+    setMovements([]);
+    setMovementsLoading(true);
+    try {
+      const response = await inventoryService.movements(item.product_variant_id);
+      setMovements(Array.isArray(response) ? response : response.items ?? response.movements ?? []);
+    } catch (error) {
+      setStockErrors(apiMessages(error, "تعذر تحميل حركات المخزون."));
+    } finally { setMovementsLoading(false); }
+  };
   return (
     <div className="space-y-6">
       <header className="border-b pb-5">
         <p className="text-xs font-black text-gold-dark">المخزون الحالي</p>
         <h1 className="mt-1 text-3xl font-black text-brand">إدارة المخزون</h1>
         <p className="mt-2 text-sm text-stone-500">
-          أضف كميات جديدة إلى الرصيد الحالي لكل خيار.
+          راقب الحركات وسجّل إضافة أو خصمًا يدويًا موثقًا لكل خيار.
         </p>
       </header>
       {notice && (
@@ -355,12 +370,12 @@ export default function AdminInventoryPage() {
                       />
                     </td>
                     <td className="px-4">
-                      <button
+                      <div className="flex gap-2"><button
                         onClick={() => open(x)}
                         className="rounded-lg bg-brand px-3 py-2 text-xs font-black text-white"
                       >
-                        إضافة مخزون
-                      </button>
+                        تعديل يدوي
+                      </button><button onClick={() => void openMovements(x)} className="rounded-lg border px-3 py-2 text-xs font-black"><History className="inline h-4 w-4" /> الحركات</button></div>
                     </td>
                   </tr>
                 ))}
@@ -395,8 +410,9 @@ export default function AdminInventoryPage() {
                   onClick={() => open(x)}
                   className="mt-4 min-h-11 w-full rounded-xl bg-brand font-black text-white"
                 >
-                  إضافة مخزون
+                  تعديل يدوي
                 </button>
+                <button onClick={() => void openMovements(x)} className="mt-2 min-h-11 w-full rounded-xl border font-black">حركات المخزون</button>
               </article>
             ))}
           </div>
@@ -426,7 +442,7 @@ export default function AdminInventoryPage() {
       <Modal
         open={selected !== null}
         onClose={() => setSelected(null)}
-        title="إضافة كمية إلى المخزون"
+        title="تعديل يدوي للمخزون"
       >
         <form onSubmit={prepare} className="space-y-4">
           {selected && (
@@ -446,28 +462,28 @@ export default function AdminInventoryPage() {
             </div>
           )}
           <label>
-            <span className="rep-label">الكمية المضافة</span>
+            <span className="rep-label">التغيير (موجب للإضافة، سالب للخصم)</span>
             <input
               autoFocus
               type="number"
-              min="1"
               step="1"
               className="rep-control"
               value={addedQuantity}
               onChange={(e) => setAddedQuantity(e.target.value)}
-              placeholder="مثال: 10"
+              placeholder="مثال: 10 أو -3"
             />
           </label>
-          {selected && Number.isInteger(Number(addedQuantity)) && Number(addedQuantity) > 0 && (
+          {selected && Number.isInteger(Number(addedQuantity)) && Number(addedQuantity) !== 0 && (
             <p className="rounded-xl bg-brand-50 p-3 text-sm font-bold text-brand">
-              الرصيد بعد الإضافة: {selected.stock_quantity + Number(addedQuantity)}
+              الرصيد المتوقع: {selected.stock_quantity + Number(addedQuantity)}
             </p>
           )}
+          <label><span className="rep-label">ملاحظات (اختياري)</span><textarea className="rep-control" value={adjustmentNotes} onChange={(e) => setAdjustmentNotes(e.target.value)} /></label>
           <button
             disabled={saving}
             className="min-h-11 w-full rounded-xl bg-brand font-black text-white"
           >
-            إضافة الكمية
+            متابعة
           </button>
         </form>
       </Modal>
@@ -480,14 +496,18 @@ export default function AdminInventoryPage() {
         }}
         onConfirm={() => void update()}
         loading={saving}
-        severity="normal"
-        title="تأكيد إضافة المخزون"
-        message={`إضافة ${addedQuantity} إلى الرصيد الحالي (${pendingUpdate?.stock_quantity ?? ""}) ليصبح ${pendingUpdate ? pendingUpdate.stock_quantity + Number(addedQuantity) : ""}؟`}
-        confirmLabel="إضافة الكمية"
+        severity={Number(addedQuantity) < 0 ? "destructive" : "normal"}
+        title="تأكيد تعديل المخزون"
+        message={`تغيير الرصيد بمقدار ${addedQuantity} من (${pendingUpdate?.stock_quantity ?? ""}) إلى ${pendingUpdate ? pendingUpdate.stock_quantity + Number(addedQuantity) : ""}؟`}
+        confirmLabel="تأكيد التعديل"
       />
+      <Modal open={movementItem !== null} onClose={() => setMovementItem(null)} title="حركات المخزون" size="lg">
+        {movementsLoading ? <Skeleton className="h-48" /> : movements.length === 0 ? <EmptyState title="لا توجد حركات مسجلة" /> : <div className="space-y-3">{movements.map((m) => <article key={m.inventory_movement_id} className="rounded-xl border p-3"><div className="flex justify-between"><b className={m.quantity_change > 0 ? "text-emerald-700" : "text-red-700"}>{m.quantity_change > 0 ? "+" : ""}{m.quantity_change}</b><span className="text-xs text-stone-500">{new Date(m.created_at).toLocaleString("ar-EG")}</span></div><p className="text-sm">{movementLabel(m.source_type)}{m.order_id ? ` · طلب #${m.order_id}` : ""}{m.customer_purchase_id ? ` · مشتريات زبون #${m.customer_purchase_id}` : ""}</p><p className="text-xs text-stone-500">{m.users?.name ?? "النظام"}{m.notes ? ` · ${m.notes}` : ""}</p></article>)}</div>}
+      </Modal>
     </div>
   );
 }
+function movementLabel(source: string) { return ({ Order: "طلب", CustomerPurchase: "مشتريات زبون", ManualAdjustment: "تعديل يدوي", Cancellation: "إلغاء" } as Record<string, string>)[source] ?? source; }
 function StockBadge({
   quantity,
   threshold,

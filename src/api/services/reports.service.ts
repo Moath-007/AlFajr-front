@@ -11,6 +11,10 @@ import type {
   RepresentativesReportQuery,
   RepresentativesReportResponseDto,
   SalesReportResponseDto,
+  DiscountsReportResponseDto,
+  DateReportQuery,
+  ReturnsReportQuery,
+  ReturnsReportResponseDto,
 } from "../types";
 
 export const reportsService = {
@@ -28,6 +32,10 @@ export const reportsService = {
       withQuery("/reports/receivables", query),
       { signal },
     ),
+  returns: (query: ReturnsReportQuery = {}, signal?: AbortSignal) =>
+    apiClient.get<ReturnsReportResponseDto>(withQuery("/reports/returns", query), { signal }),
+  discounts: (query: DateReportQuery = {}, signal?: AbortSignal) =>
+    apiClient.get<DiscountsReportResponseDto>(withQuery("/reports/discounts", query), { signal }),
   products: (query: ProductsReportQuery = {}, signal?: AbortSignal) =>
     apiClient.get<ProductsReportResponseDto>(
       withQuery("/reports/products", query),

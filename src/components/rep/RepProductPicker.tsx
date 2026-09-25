@@ -47,12 +47,14 @@ export default function RepProductPicker({
   onClose,
   onAdd,
   priceMode = "wholesale",
+  allowOutOfStock = false,
 }: {
   open: boolean;
   existing: Array<{ product_variant_id: number; quantity: number }>;
   onClose: () => void;
   onAdd: (item: PickedOrderItem) => void;
   priceMode?: "retail" | "wholesale";
+  allowOutOfStock?: boolean;
 }) {
   const stockVisibility = useOptionalWholesaleStockVisibility();
   const showWholesaleStock = stockVisibility?.showWholesaleStock ?? true;
@@ -148,7 +150,7 @@ export default function RepProductPicker({
       const product = (await getProduct(id)).product;
       setDetails(product);
       const available = product.variants.find(
-        (variant) => variant.stock_quantity > 0,
+        (variant) => allowOutOfStock || variant.stock_quantity > 0,
       );
       setVariantId(available?.id ?? null);
       setQuantity(1);
@@ -163,7 +165,7 @@ export default function RepProductPicker({
     ? existing.find((item) => item.product_variant_id === variant.id)
     : undefined;
   const availableToAdd = variant
-    ? Math.max(0, variant.stock_quantity - (current?.quantity ?? 0))
+    ? allowOutOfStock ? Number.MAX_SAFE_INTEGER : Math.max(0, variant.stock_quantity - (current?.quantity ?? 0))
     : 0;
   const closePicker = () => {
     setDetails(null);
@@ -177,7 +179,7 @@ export default function RepProductPicker({
     onAdd({
       product_variant_id: variant.id,
       quantity,
-      stock: variant.stock_quantity,
+      stock: allowOutOfStock ? Number.MAX_SAFE_INTEGER : variant.stock_quantity,
       original_price: variant.price,
       display_discount: variant.discount,
       display_price: String(
@@ -247,7 +249,7 @@ export default function RepProductPicker({
                     const exists = existing.find(
                       (entry) => entry.product_variant_id === item.id,
                     );
-                    const unavailable =
+                    const unavailable = !allowOutOfStock &&
                       item.stock_quantity <= (exists?.quantity ?? 0);
                     return (
                       <button
@@ -299,7 +301,7 @@ export default function RepProductPicker({
                     {variant.size} — {variant.color.name}
                   </strong>
                   <p className="text-xs text-stone-500">
-                    متاح للإضافة: {availableToAdd}
+                    {allowOutOfStock ? "الكمية ستضاف إلى المخزون" : `متاح للإضافة: ${availableToAdd}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">

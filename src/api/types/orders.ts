@@ -7,12 +7,13 @@ import type {
 
 export type OrderType = "Retail" | "Wholesale" | "StoreSale";
 export type ApiOrderStatus = "Pending" | "Completed" | "Cancelled";
-export type PaymentStatus = "Unpaid" | "PartiallyPaid" | "Paid";
 export type PaymentMethod = "Cash" | "Check";
 
 export interface OrderItemDto {
   product_variant_id: NumericId;
   quantity: number;
+  unit_price?: number;
+  is_bonus?: boolean;
 }
 
 export type RetailOrderItemDto = OrderItemDto;
@@ -32,6 +33,10 @@ export interface WholesalePaymentDto {
   amount: number;
   payment_method: PaymentMethod;
   check_number?: string;
+  account_number?: string;
+  bank_number?: string;
+  branch_number?: string;
+  due_date?: string;
   notes?: string;
 }
 
@@ -113,28 +118,18 @@ export interface OrderItemResponseDto {
   id: NumericId;
   quantity: number;
   unit_price: DecimalString;
+  base_unit_price: DecimalString;
   product_discount: DecimalString;
   line_total: DecimalString;
+  is_bonus: boolean;
   variant: OrderVariantResponseDto;
-}
-
-export interface OrderPaymentResponseDto {
-  id: NumericId;
-  amount: DecimalString;
-  payment_method: PaymentMethod;
-  check_number?: string | null;
-  notes?: string | null;
-  paid_at: IsoDateTimeString;
 }
 
 export interface OrderResponseDto {
   id: NumericId;
   order_type: OrderType;
   status: ApiOrderStatus;
-  payment_status: PaymentStatus;
   total_amount: DecimalString;
-  paid_amount: DecimalString;
-  remaining_amount: DecimalString;
   order_discount: DecimalString;
   delivery_address?: string | null;
   notes?: string | null;
@@ -142,7 +137,6 @@ export interface OrderResponseDto {
   customer: OrderCustomerResponseDto;
   representative?: OrderRepresentativeResponseDto | null;
   items: OrderItemResponseDto[];
-  payments: OrderPaymentResponseDto[];
 }
 
 export interface OrdersQuery {
@@ -151,7 +145,6 @@ export interface OrdersQuery {
   search?: string;
   status?: ApiOrderStatus;
   order_type?: OrderType;
-  payment_status?: PaymentStatus;
   customer_id?: NumericId;
   representative_id?: NumericId;
   date_from?: string;
@@ -178,12 +171,9 @@ export interface OrderListItemResponseDto {
   id: NumericId;
   order_type: OrderType;
   status: ApiOrderStatus;
-  payment_status: PaymentStatus;
   customer: OrderListCustomerDto;
   representative?: OrderListRepresentativeDto | null;
   total_amount: DecimalString;
-  paid_amount: DecimalString;
-  remaining_amount: DecimalString;
   created_at: IsoDateTimeString;
 }
 
@@ -205,16 +195,6 @@ export interface RepresentativeOrderStatsResponseDto {
   message: string;
   stats: RepresentativeOrderStatsDto;
 }
-export type ReceivablesResponseDto = OrdersSummaryListResponseDto;
-
-export interface OrderPaymentInfoDataDto extends OrderListItemResponseDto {
-  payments: OrderPaymentResponseDto[];
-}
-
-export interface OrderPaymentInfoResponseDto {
-  message: string;
-  order: OrderPaymentInfoDataDto;
-}
 
 export interface UpdateOrderPaymentDto {
   payment_id?: NumericId;
@@ -232,12 +212,13 @@ export interface UpdateOrderDto {
   notes?: string;
   order_discount?: number;
   items: UpdateOrderItemDto[];
-  payments?: UpdateOrderPaymentDto[];
 }
 
 export interface UpdateOrderItemDto {
   product_variant_id: NumericId;
   quantity: number;
+  unit_price?: number;
+  is_bonus?: boolean;
 }
 
 export interface OrderDetailsResponseDto {
@@ -245,24 +226,3 @@ export interface OrderDetailsResponseDto {
   order: OrderResponseDto;
 }
 
-export interface AddOrderPaymentDto {
-  amount: number;
-  payment_method: PaymentMethod;
-  check_number?: string;
-  notes?: string;
-}
-
-export type AddedPaymentResponseDto = OrderPaymentResponseDto;
-
-export interface PaymentSummaryResponseDto {
-  total_amount: DecimalString;
-  paid_amount: DecimalString;
-  remaining_amount: DecimalString;
-  payment_status: PaymentStatus;
-}
-
-export interface AddPaymentResponseDto {
-  message: string;
-  payment: AddedPaymentResponseDto;
-  payment_summary: PaymentSummaryResponseDto;
-}

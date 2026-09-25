@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { categoriesService, type CategoryResponseDto } from "@/api";
+import { ImagePlus, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { categoriesService, resolveApiAssetUrl, type CategoryResponseDto } from "@/api";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import EmptyState from "@/components/ui/EmptyState";
@@ -19,6 +19,8 @@ export default function AdminProductSettingsPage({
   const [form, setForm] = useState<{
     item: CategoryResponseDto | null;
     name: string;
+    image: File | null;
+    removeImage: boolean;
   } | null>(null);
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -53,9 +55,9 @@ export default function AdminProductSettingsPage({
     try {
       if (form.item)
         await categoriesService.update(form.item.category_id, {
-          name: form.name.trim(),
+          name: form.name.trim(), image: form.image ?? undefined, remove_image: form.removeImage,
         });
-      else await categoriesService.create({ name: form.name.trim() });
+      else await categoriesService.create({ name: form.name.trim(), image: form.image ?? undefined });
       onNotify(form.item ? "تم تحديث التصنيف" : "تم إنشاء التصنيف", "success");
       setForm(null);
       await load();
@@ -103,7 +105,7 @@ export default function AdminProductSettingsPage({
         <div><p className="text-xs font-black text-gold-dark">تنظيم الكتالوج</p>
         <h1 className="mt-1 text-3xl font-black text-brand">إدارة التصنيفات</h1>
         <p className="mt-2 text-sm text-stone-500">إدارة تصنيفات المنتجات وتنظيم ظهورها في الكتالوج.</p></div>
-        <button type="button" onClick={() => { setFormErrors([]); setForm({ item: null, name: "" }); }} className="btn-primary shrink-0"><Plus className="h-4 w-4" /> إضافة تصنيف</button>
+        <button type="button" onClick={() => { setFormErrors([]); setForm({ item: null, name: "", image: null, removeImage: false }); }} className="btn-primary shrink-0"><Plus className="h-4 w-4" /> إضافة تصنيف</button>
       </header>
       <section className="space-y-4">
         {errors.length > 0 && (
@@ -128,7 +130,7 @@ export default function AdminProductSettingsPage({
               <table className="w-full text-sm">
                 <thead className="bg-stone-50">
                   <tr>
-                    {["التصنيف", "عدد المنتجات", "الحالة", "الإجراءات"].map(
+                    {["الصورة", "التصنيف", "عدد المنتجات", "الحالة", "الإجراءات"].map(
                       (label) => (
                         <th key={label} className="px-4 py-3 text-right">
                           {label}
@@ -140,6 +142,7 @@ export default function AdminProductSettingsPage({
                 <tbody className="divide-y">
                   {categories.map((item) => (
                     <tr key={item.category_id}>
+                      <td className="px-4 py-3"><div className="h-12 w-16 overflow-hidden rounded-lg bg-stone-100">{item.image_url ? <img src={resolveApiAssetUrl(item.image_url) ?? undefined} alt="" className="h-full w-full object-cover"/> : <span className="grid h-full place-items-center text-stone-300"><ImagePlus className="h-5 w-5"/></span>}</div></td>
                       <td className="px-4 py-4 font-black text-brand">
                         {item.name}
                       </td>
@@ -152,7 +155,7 @@ export default function AdminProductSettingsPage({
                           item={item}
                           edit={() => {
                             setFormErrors([]);
-                            setForm({ item, name: item.name });
+                            setForm({ item, name: item.name, image: null, removeImage: false });
                           }}
                           status={() => setStatusTarget(item)}
                           remove={() => setDeleteTarget(item)}
@@ -170,7 +173,7 @@ export default function AdminProductSettingsPage({
                   className="rounded-2xl border bg-white p-4"
                 >
                   <div className="flex justify-between gap-3">
-                    <b className="text-brand">{item.name}</b>
+                    <div className="flex items-center gap-3">{item.image_url && <img src={resolveApiAssetUrl(item.image_url) ?? undefined} alt="" className="h-12 w-14 rounded-lg object-cover"/>}<b className="text-brand">{item.name}</b></div>
                     <Status active={item.is_active} />
                   </div>
                   <p className="mt-2 text-sm text-stone-500">
@@ -181,7 +184,7 @@ export default function AdminProductSettingsPage({
                       item={item}
                       edit={() => {
                         setFormErrors([]);
-                        setForm({ item, name: item.name });
+                        setForm({ item, name: item.name, image: null, removeImage: false });
                       }}
                       status={() => setStatusTarget(item)}
                       remove={() => setDeleteTarget(item)}
@@ -234,6 +237,14 @@ export default function AdminProductSettingsPage({
               }
             />
           </label>
+          <div>
+            <span className="rep-label">صورة التصنيف <small className="font-normal text-stone-400">(اختيارية)</small></span>
+            {(form?.image || (form?.item?.image_url && !form.removeImage)) && <div className="mb-3 overflow-hidden rounded-xl border bg-stone-50"><img src={form.image ? URL.createObjectURL(form.image) : resolveApiAssetUrl(form?.item?.image_url) ?? undefined} alt="معاينة صورة التصنيف" className="h-40 w-full object-cover" /></div>}
+            <div className="flex flex-wrap gap-2">
+              <label className="btn-outline cursor-pointer"><ImagePlus className="h-4 w-4"/> اختيار صورة<input type="file" className="sr-only" accept="image/jpeg,image/png,image/webp" onChange={(event) => { const image = event.target.files?.[0] ?? null; if (image && image.size > 5 * 1024 * 1024) return setFormErrors(["حجم الصورة يجب ألا يتجاوز 5 ميجابايت."]); if (form) setForm({ ...form, image, removeImage: false }); }}/></label>
+              {(form?.image || form?.item?.image_url) && <button type="button" className="text-sm font-bold text-red-700" onClick={() => form && setForm({ ...form, image: null, removeImage: Boolean(form.item?.image_url) })}>إزالة الصورة</button>}
+            </div>
+          </div>
         </form>
       </Modal>
       <ConfirmDialog

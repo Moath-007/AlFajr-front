@@ -372,5 +372,5 @@ function SuccessState({
   );
 }
 function formatPrice(value: number) {
-  return `${new Intl.NumberFormat("ar", { maximumFractionDigits: 2 }).format(value)} ₪`;
+  return `${new Intl.NumberFormat("ar-EG-u-nu-latn", { maximumFractionDigits: 2 }).format(value)} ₪`;
 }

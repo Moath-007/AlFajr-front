@@ -23,7 +23,7 @@ export default function PrintHeader({
         <div>
           <div className="print-header-company">
             <img
-              src="/assets/al-fajr-logo.png"
+              src="/assets/al-fajr-logo.webp"
               alt=""
               className="print-header-logo"
             />
