@@ -4,7 +4,6 @@ import type {
   NumericId,
   PaginationResponseDto,
 } from "./common";
-import type { OrderType, PaymentMethod } from "./orders";
 
 export interface CustomerBalanceDataDto {
   id: NumericId;
@@ -49,7 +48,6 @@ export interface CustomersListResponseDto {
 export interface CustomerDebtDto {
   id: NumericId;
   amount: DecimalString;
-  /** @deprecated لا يُعرض؛ الدين جزء من الحساب الموحّد */ remaining_amount: DecimalString;
   debt_date: IsoDateTimeString;
   reason: string;
   notes?: string | null;
@@ -80,45 +78,37 @@ export interface StatementPeriodDto {
 }
 export interface StatementSummaryDto {
   opening_balance: DecimalString;
-  orders_total: DecimalString;
-  payments_total: DecimalString;
   debits_total: DecimalString;
   credits_total: DecimalString;
-  customer_purchases_total: DecimalString;
-  sales_returns_total: DecimalString;
-  purchase_returns_total: DecimalString;
-  disbursements_total: DecimalString;
-  write_offs_total: DecimalString;
-  opening_adjustments_total: DecimalString;
-  pending_checks_total: DecimalString;
   closing_balance: DecimalString;
+  movements_count: number;
 }
 export interface StatementEntryDto {
   date: IsoDateTimeString;
-  type:
-    | "Order"
-    | "OrderCancelled"
-    | "Payment"
-    | "Disbursement"
-    | "ReturnedCheck"
-    | "PaymentCancelled"
-    | "WriteOff"
-    | "WriteOffCancelled"
-    | "CustomerDebt"
-    | "CustomerDebtCancelled"
-    | "CustomerPurchase"
-    | "CustomerPurchaseCancelled"
-    | "OpeningBalance"
-    | "OpeningBalanceCancelled"
-    | "SalesReturn"
-    | "PurchaseReturn"
-    | "ReturnCancelled";
+  type: string;
+  journal_entry_id: NumericId;
+  journal_line_id: NumericId;
+  source_type: string | null;
+  source_id: NumericId | null;
+  reversal_of: NumericId | null;
   description: string;
-  order_id: NumericId | null;
   payment_id: NumericId | null;
-  order_type: OrderType | null;
-  payment_method: PaymentMethod | null;
-  check_number: string | null;
+  source_details: import('./ledger').StatementSourceDetails | null;
+  counterpart_lines: import('./ledger').StatementCounterpartLine[];
+  payment_details: {
+    method: "Cash" | "Check";
+    amount: DecimalString;
+    exchange_rate: DecimalString | null;
+    base_amount: DecimalString | null;
+    notes: string | null;
+    currency: { code: string; name: string; symbol: string } | null;
+    check: {
+      number: string;
+      bank_name: string | null;
+      due_date: IsoDateTimeString;
+      current_location: string;
+    } | null;
+  } | null;
   debit: DecimalString;
   credit: DecimalString;
   balance: DecimalString;
@@ -128,30 +118,7 @@ export interface CustomerStatementResponseDto {
   customer: StatementCustomerDto;
   period: StatementPeriodDto;
   summary: StatementSummaryDto;
-  orders: StatementOrderDto[];
   entries: StatementEntryDto[];
-}
-export interface StatementOrderDto {
-  order_id: NumericId;
-  order_type: OrderType;
-  status: string;
-  total_amount: DecimalString;
-  order_discount: DecimalString;
-  created_at: IsoDateTimeString;
-  cancelled_at: IsoDateTimeString | null;
-  representative_name: string | null;
-  items: Array<{
-    product_name: string;
-    product_code: string;
-    size: string;
-    color: string;
-    quantity: number;
-    unit_price: DecimalString;
-    base_unit_price: DecimalString;
-    product_discount: DecimalString;
-    is_bonus: boolean;
-    total: DecimalString;
-  }>;
 }
 export interface CustomerAccountDto extends CustomerSelectionDto {
   balance: DecimalString;

@@ -22,6 +22,7 @@ export interface InventoryItemDto {
   size: string;
   color: InventoryColorDto;
   stock_quantity: number;
+  average_purchase_price: string | null;
 }
 export interface InventoryQuery {
   page?: number;
@@ -39,7 +40,8 @@ export interface InventoryListResponseDto {
   items: InventoryItemDto[];
   pagination: PaginationResponseDto;
 }
-export interface InventoryMovementDto { inventory_movement_id: NumericId; product_variant_id: NumericId; quantity_change: number; source_type: string; order_id?: NumericId | null; customer_purchase_id?: NumericId | null; notes?: string | null; created_at: string; users?: { user_id: NumericId; name: string } | null; }
-export type InventoryMovementsResponseDto = InventoryMovementDto[] | { message?: string; items?: InventoryMovementDto[]; movements?: InventoryMovementDto[]; };
-export interface InventoryAdjustmentDto { quantity_change: number; notes?: string; }
-export interface InventoryAdjustmentResponseDto { message: string; quantity_change: number; item: InventoryItemDto; }
+export interface InventoryMovementDto { inventory_movement_id: NumericId; product_variant_id: NumericId; quantity_change: number; before_quantity: number; after_quantity: number; source_type: string; order_id?: NumericId | null; customer_purchase_id?: NumericId | null; customer_return_id?: NumericId | null; notes?: string | null; created_at: string; users?: { user_id: NumericId; name: string } | null; }
+export interface InventoryMovementsQuery { page?: number; limit?: number; search?: string; source_type?: string; }
+export interface InventoryMovementsResponseDto { items: InventoryMovementDto[]; pagination: PaginationResponseDto; }
+export interface OpeningStockInputDto { quantity: number; unit_cost: number; }
+export interface OpeningStockResponseDto { message: string; quantity_change: number; }

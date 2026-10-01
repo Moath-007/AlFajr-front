@@ -102,7 +102,7 @@ export default function AdminNotificationBell({
     }
   };
   return (
-    <div ref={rootRef} className="fixed left-4 top-4 z-40 print:hidden">
+    <div ref={rootRef} className="relative z-50 print:hidden">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}

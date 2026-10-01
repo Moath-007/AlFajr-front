@@ -19,10 +19,11 @@ import {
   formatOrderDate,
 } from "@/components/rep/repOrderUtils";
 import {
-  orderTypeLabel,
   statusOptions,
   typeOptions,
 } from "./adminOrderOptions";
+import { orderSourceLabel } from "@/components/orders/orderDisplay";
+import { takeOrderDeletedMessage } from "@/components/orders/orderDeleteFeedback";
 const emptyPagination: OrdersPaginationDto = {
   page: 1,
   limit: 20,
@@ -36,6 +37,7 @@ export default function AdminOrdersPage({
   onNavigate: (path: string) => void;
 }) {
   const [orders, setOrders] = useState<OrderListItemResponseDto[]>([]);
+  const [deleteMessage] = useState(() => takeOrderDeletedMessage("admin"));
   const [pagination, setPagination] = useState(emptyPagination);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -95,8 +97,11 @@ export default function AdminOrdersPage({
           setPagination(r.pagination);
         })
         .catch((e) => {
-          if (!signal?.aborted)
+          if (!signal?.aborted) {
+            setOrders([]);
+            setPagination(emptyPagination);
             setErrors(apiMessages(e, "تعذر تحميل الطلبات."));
+          }
         })
         .finally(() => {
           if (!signal?.aborted) setLoading(false);
@@ -148,6 +153,7 @@ export default function AdminOrdersPage({
           متابعة طلبات الأونلاين والجملة وبيع المحل.
         </p>
       </header>
+      {deleteMessage && <div className="rounded-xl bg-emerald-50 p-3 font-bold text-emerald-800" role="status">{deleteMessage}</div>}
       <section className="rounded-2xl border bg-white p-4">
         <form
           onSubmit={submit}
@@ -172,10 +178,13 @@ export default function AdminOrdersPage({
             options={statusOptions}
           />
           <RepSelect
-            label="نوع الطلب"
+            label="المصدر"
             value={type}
             onChange={change(setType)}
-            options={typeOptions}
+            options={typeOptions.map((option) => ({
+              value: option.value,
+              label: option.value ? orderSourceLabel(option.value as OrderType) : "كل المصادر",
+            }))}
           />
           <RepSelect
             label="المندوب"
@@ -247,9 +256,12 @@ export default function AdminOrdersPage({
           </button>
         </div>
       )}
+      {!loading && errors.length === 0 && (
+        <p className="text-sm text-stone-500">عدد الطلبات المطابقة: {pagination.total}</p>
+      )}
       {loading ? (
         <Skeleton className="h-96" />
-      ) : orders.length === 0 ? (
+      ) : errors.length > 0 ? null : orders.length === 0 ? (
         <EmptyState title="لا توجد طلبات مطابقة" />
       ) : (
         <>
@@ -259,12 +271,12 @@ export default function AdminOrdersPage({
                 <tr>
                   {[
                     "الطلب",
-                    "العميل",
+                    "الحساب / العميل",
                     "المندوب",
-                    "النوع",
+                    "المصدر",
                     "الحالة",
                     "الإجمالي",
-                    "التاريخ",
+                    "تاريخ الإنشاء",
                     "",
                   ].map((x, i) => (
                     <th
@@ -281,11 +293,11 @@ export default function AdminOrdersPage({
                   <tr key={o.id}>
                     <td className="px-3 py-4 font-black text-brand">#{o.id}</td>
                     <td className="px-3">
-                      <b className="block">{o.customer.name}</b>
-                      <small>{o.customer.phone}</small>
+                      <b className="block">{orderContactName(o)}</b>
+                      {orderContactPhone(o) && <small>{orderContactPhone(o)}</small>}
                     </td>
                     <td className="px-3">{o.representative?.name || "—"}</td>
-                    <td className="px-3">{orderTypeLabel(o.order_type)}</td>
+                    <td className="px-3">{orderSourceLabel(o.order_type)}</td>
                     <td className="px-3">
                       <OrderStatusBadge status={o.status} />
                     </td>
@@ -312,12 +324,12 @@ export default function AdminOrdersPage({
               <article key={o.id} className="rounded-2xl border bg-white p-4">
                 <div className="flex justify-between">
                   <b className="text-brand">
-                    #{o.id} · {o.customer.name}
+                    #{o.id} · {orderContactName(o)}
                   </b>
                   <OrderStatusBadge status={o.status} />
                 </div>
                 <p className="mt-1 text-xs text-stone-400">
-                  {orderTypeLabel(o.order_type)} ·{" "}
+                  المصدر: {orderSourceLabel(o.order_type)} ·{" "}
                   {o.representative?.name || "بدون مندوب"} ·{" "}
                   {formatOrderDate(o.created_at)}
                 </p>
@@ -369,4 +381,14 @@ function Amount({ label, value }: { label: string; value: string }) {
       <b className="mt-1 block text-brand">{formatMoney(value)}</b>
     </div>
   );
+}
+
+function orderContactName(order: OrderListItemResponseDto) {
+  return order.customer?.name ?? order.sale_account?.name
+    ?? order.notes?.match(/^الاسم:\s*(.+)$/m)?.[1]?.trim() ?? "—";
+}
+
+function orderContactPhone(order: OrderListItemResponseDto) {
+  return order.customer?.phone
+    ?? order.notes?.match(/^(?:•\s*)?رقم الهاتف:\s*(.+)$/m)?.[1]?.trim() ?? null;
 }

@@ -87,7 +87,7 @@ export default function PublicHeader({
               <span className="mt-1 block text-[11px] font-bold tracking-wide text-stone-400">
                 {status === "loading"
                   ? "جاري تحميل بيانات الشركة…"
-                  : "منتجات وتجهيزات الحمامات"}
+                  : "حلول متكاملة لمنزلك"}
               </span>
             </span>
           </Link>

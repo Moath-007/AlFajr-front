@@ -13,7 +13,41 @@ export interface ApiRequestOptions {
   suppressUnauthorizedNotification?: boolean | ((payload: unknown) => boolean);
 }
 
+const retryKeys = new Map<string, string>();
+const pendingCreates = new Map<string, Promise<unknown>>();
+const idempotentCreate = (path: string) => [
+  /^\/orders\/(retail|wholesale|store-sale)$/,
+  /^\/orders\/\d+\/(payments|returns)$/,
+  /^\/customer-purchases(?:\/\d+\/(?:payments|returns))?$/,
+  /^\/customers\/\d+\/(payments|disbursements|returns)$/,
+  /^\/ledger\/vouchers$/,
+  /^\/managed-checks\/\d+\/movements\/(DEPOSITED|SENT_TO_COLLECTION|RETURNED_FROM_BANK|ENDORSED|ENDORSEMENT_RETURNED|RETURNED_TO_SOURCE|RETRIEVED_FROM_SOURCE|CASHED)$/,
+    /^\/managed-checks\/\d+\/events\/\d+\/cancel$/,
+    /^\/managed-checks\/\d+\/(clear-outgoing|return-outgoing)$/,
+].some((pattern) => pattern.test(normalizePath(path)));
+
 async function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+  if (options.method !== 'POST' || !idempotentCreate(path)) return performRequest<T>(path, options);
+  const intent = `${normalizePath(path)}|${JSON.stringify(options.body ?? null)}`;
+  const active = pendingCreates.get(intent);
+  if (active) return active as Promise<T>;
+  const key = retryKeys.get(intent) ?? crypto.randomUUID();
+  retryKeys.set(intent, key);
+  const headers = new Headers(options.headers);
+  headers.set('Idempotency-Key', key);
+  const operation = performRequest<T>(path, { ...options, headers }).then((response) => {
+    retryKeys.delete(intent);
+    return response;
+  }).catch((error: unknown) => {
+    // A timeout, lost connection or server failure has an uncertain outcome. Keep the key for the retry.
+    if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 408) retryKeys.delete(intent);
+    throw error;
+  }).finally(() => pendingCreates.delete(intent));
+  pendingCreates.set(intent, operation);
+  return operation;
+}
+
+async function performRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   const token = getAccessToken();
   const headers = new Headers(options.headers);
   const isFormData = options.body instanceof FormData;
@@ -45,6 +79,7 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
       headers,
       body: requestBody,
       signal: timeoutController.signal,
+      cache: (options.method ?? 'GET') === 'GET' ? 'no-store' : undefined,
     });
   } catch (error) {
     if (didTimeout) {
@@ -54,7 +89,8 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
         message: 'الخادم لم يستجب خلال الوقت المحدد. تأكد من تشغيل الخادم ثم أعد المحاولة.',
       });
     }
-    throw error;
+    if (options.signal?.aborted) throw error;
+    throw new ApiError({ statusCode: 503, error: 'Network Error', message: 'تعذر التأكد من نتيجة العملية بسبب انقطاع الاتصال. أعد المحاولة بنفس البيانات.' });
   } finally {
     window.clearTimeout(timeoutId);
     options.signal?.removeEventListener('abort', abortFromCaller);

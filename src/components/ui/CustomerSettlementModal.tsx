@@ -73,7 +73,7 @@ export default function CustomerSettlementModal({ customer, onClose, onChanged, 
 
   const requestSubmit = () => {
     const validation: string[] = [];
-    if (!payments.length) validation.push("أضف سند قبض واحدًا على الأقل.");
+    if (!payments.length) validation.push(`أضف سند ${direction === "Receipt" ? "قبض" : "صرف"} واحدًا على الأقل.`);
     payments.forEach((payment, index) => {
       const currency = currencies.find((item) => item.currency_id === Number(payment.currencyId));
       const amount = Number(payment.amount);
@@ -83,7 +83,6 @@ export default function CustomerSettlementModal({ customer, onClose, onChanged, 
       if (!Number.isFinite(rate) || rate <= 0) validation.push(`أدخل سعر صرف صحيحًا للسند ${index + 1}.`);
       if (payment.method === "Check" && !payment.checkNumber.trim()) validation.push(`رقم الشيك مطلوب للسند ${index + 1}.`);
     });
-    if (direction === "Disbursement" && baseTotal > debt + 0.001) validation.push("مجموع سندات الصرف لا يمكن أن يتجاوز الرصيد المستحق للزبون.");
     if (validation.length) return setErrors(validation);
     setErrors([]);
     setConfirming(true);
@@ -115,13 +114,13 @@ export default function CustomerSettlementModal({ customer, onClose, onChanged, 
     } finally { setLoading(false); }
   };
 
-  return <Modal open onClose={onClose} title={title ?? (direction === "Receipt" ? "سند قبض من الزبون" : "سند صرف للزبون")} size="wide" mobileFullscreen><div className="space-y-4">
+  return <Modal open onClose={onClose} title={title ?? (direction === "Receipt" ? "سند قبض" : "سند صرف")} size="wide" mobileFullscreen><div className="space-y-4">
     <div className="rounded-xl bg-stone-50 p-4"><b className="block text-brand">{customer.name}</b><span dir="ltr" className="text-sm text-stone-500">{customer.phone}</span><p className="mt-3 text-lg font-black text-red-700">{direction === "Receipt" ? "المبلغ عليه حاليًا" : "المبلغ المستحق له"}: {formatMoney(debt)}</p></div>
     {errors.length > 0 && <div role="alert" className="rep-error"><ul className="list-inside list-disc">{errors.map((error) => <li key={error}>{error}</li>)}</ul></div>}
     <PaymentDraftTable rows={payments} currencies={currencies} onChange={update} onRemove={(index) => setPayments((current) => current.filter((_, itemIndex) => itemIndex !== index))}/>
     <div className="flex flex-wrap items-center gap-2"><div className="flex items-center overflow-hidden rounded-lg border border-brand/15 bg-white"><input aria-label="عدد الشيكات المراد إضافتها" className="h-10 w-16 border-0 px-2 text-center text-sm font-bold outline-none" type="number" min="1" max="60" value={checksToAdd} onChange={(event)=>setChecksToAdd(event.target.value)}/><button type="button" className="inline-flex h-10 items-center gap-2 bg-brand-50 px-3 text-xs font-black text-brand hover:bg-brand-100" onClick={addChecks}><CopyPlus className="h-4 w-4"/> إضافة شيكات</button></div><span className="text-xs text-stone-500">يمكن إضافة حتى 60 شيكاً دفعة واحدة</span></div>
     <div className="rounded-xl bg-gold/10 p-3 font-black text-brand">الإجمالي بالعملة الأساسية: {formatMoney(baseTotal)}</div>
-    <div className="flex justify-end gap-2"><button type="button" className="btn-outline" onClick={onClose}>إلغاء</button><button type="button" disabled={loading || (direction === "Disbursement" && debt <= 0)} className="btn-primary disabled:opacity-50" onClick={requestSubmit}>{direction === "Receipt" ? "إصدار سند القبض" : "إصدار سند الصرف"}</button></div>
+    <div className="flex justify-end gap-2"><button type="button" className="btn-outline" onClick={onClose}>إلغاء</button><button type="button" disabled={loading} className="btn-primary disabled:opacity-50" onClick={requestSubmit}>{direction === "Receipt" ? "إصدار سند القبض" : "إصدار سند الصرف"}</button></div>
     <ConfirmDialog open={confirming} onClose={()=>setConfirming(false)} onConfirm={()=>void submit()} loading={loading} severity="normal" title={direction === "Receipt" ? "تأكيد إصدار سند القبض" : "تأكيد إصدار سند الصرف"} message={direction === "Receipt" && baseTotal > debt + 0.001 ? `المبلغ أكبر من المطلوب بمقدار ${formatMoney(baseTotal-debt)}، وستتحول الزيادة إلى رصيد مستحق للزبون. هل تريد المتابعة؟` : `راجع تفاصيل السندات قبل اعتمادها على حساب ${customer.name}.`} confirmLabel={direction === "Receipt" ? "تأكيد القبض" : "تأكيد الصرف"} details={<div className="grid grid-cols-2 gap-2"><span>عدد السندات: <b>{payments.length}</b></span><span>عدد الشيكات: <b>{payments.filter((payment)=>payment.method==="Check").length}</b></span><span className="col-span-2">الإجمالي: <b className="text-brand">{formatMoney(baseTotal)}</b></span></div>}/>
   </div></Modal>;
 }

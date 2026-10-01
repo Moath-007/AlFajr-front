@@ -43,7 +43,7 @@ import {
 import LoginPage from "@/components/auth/LoginPage";
 import RequireRole from "@/components/auth/RequireRole";
 
-const OwnerSidebar = lazy(() => import("@/components/owner/OwnerSidebar"));
+const DashboardHeader = lazy(() => import("@/components/navigation/DashboardHeader"));
 const OwnerDashboard = lazy(() => import("@/components/owner/OwnerDashboard"));
 const AdminProductsPage = lazy(
   () => import("@/components/owner/AdminProductsPage"),
@@ -72,9 +72,33 @@ const AdminStoreSalePage = lazy(
 const AdminReportsPage = lazy(
   () => import("@/components/owner/AdminReportsPage"),
 );
-const CustomerStatementPage = lazy(
-  () => import("@/components/owner/AdminCustomerStatementPage"),
+const SalesReportPage = lazy(
+  () => import("@/components/owner/SalesReportPage"),
 );
+const CollectionsReportPage = lazy(
+  () => import("@/components/owner/CollectionsReportPage"),
+);
+const CustomerBalancesReportPage = lazy(
+  () => import("@/components/owner/CustomerBalancesReportPage"),
+);
+const ReturnsReportPage = lazy(
+  () => import("@/components/owner/ReturnsReportPage"),
+);
+const InventoryReportPage = lazy(
+  () => import("@/components/owner/InventoryReportPage"),
+);
+const ChecksReportPage = lazy(
+  () => import("@/components/owner/ChecksReportPage"),
+);
+const ProductsReportPage = lazy(() => import('@/components/owner/ProductsReportPage'));
+const RepresentativesReportPage = lazy(() => import('@/components/owner/RepresentativesReportPage'));
+const WriteOffsReportPage = lazy(() => import('@/components/owner/WriteOffsReportPage'));
+const AccountsPage = lazy(() => import('@/components/finance/AccountsPage'));
+const AccountStatementPage = lazy(() => import('@/components/finance/AccountsPage').then((module) => ({ default: module.AccountStatementPage })));
+const VouchersPage = lazy(() => import('@/components/finance/VouchersPage'));
+const TreasuryPage = lazy(() => import('@/components/finance/TreasuryPage'));
+const PartyPaymentsPage = lazy(() => import('@/components/finance/PartyPaymentsPage'));
+const ReturnsOperationsPage = lazy(() => import('@/components/finance/ReturnsOperationsPage'));
 const AdminCompanyProfilePage = lazy(
   () => import("@/components/owner/AdminCompanyProfilePage"),
 );
@@ -91,8 +115,10 @@ const CustomersPage = lazy(
 const CustomerProfilePage = lazy(
   () => import("@/components/customers/CustomerProfilePage"),
 );
+const CustomerStatementPage = lazy(
+  () => import("@/components/customers/CustomerStatementPage"),
+);
 
-const RepSidebar = lazy(() => import("@/components/rep/RepSidebar"));
 const RepDashboard = lazy(() => import("@/components/rep/RepDashboard"));
 const WholesaleProductsPage = lazy(
   () => import("@/components/rep/WholesaleProductsPage"),
@@ -262,9 +288,10 @@ function OwnerLayout({ store }: { store: AppStore }) {
     [navigate, runOrConfirm],
   );
   return (
-    <div className="min-h-screen bg-stone-50 flex" dir="rtl">
-      <Suspense fallback={<div className="hidden w-72 shrink-0 lg:block" />}>
-        <OwnerSidebar
+    <div className="min-h-screen bg-stone-50" dir="rtl">
+      <Suspense fallback={<div className="h-[68px] border-b bg-white" />}>
+        <DashboardHeader
+          role="owner"
           currentPath={location.pathname}
           onNavigate={ownerNavigate}
           onLogout={() =>
@@ -273,14 +300,12 @@ function OwnerLayout({ store }: { store: AppStore }) {
               navigate("/");
             })
           }
-          adminName={user?.name || "مدير النظام"}
+          userName={user?.name || "مدير النظام"}
+          actions={<Suspense fallback={null}><AdminNotificationBell onNavigate={ownerNavigate} /></Suspense>}
         />
       </Suspense>
-      <Suspense fallback={null}>
-        <AdminNotificationBell onNavigate={ownerNavigate} />
-      </Suspense>
-      <main className="min-w-0 flex-1 overflow-x-hidden p-3 pt-20 sm:p-4 sm:pt-20 lg:p-8">
-        <div className="mx-auto max-w-6xl">
+      <main className="min-w-0 overflow-x-hidden px-3 py-5 sm:px-5 lg:px-8 lg:py-8">
+        <div className="mx-auto max-w-[1800px]">
           <Suspense fallback={<PageRouteFallback />}>
             <PageTransition>
               <Routes>
@@ -355,9 +380,18 @@ function OwnerLayout({ store }: { store: AppStore }) {
                   }
                 />
                 <Route path="reports" element={<AdminReportsPage />} />
+                <Route path="reports/sales" element={<SalesReportPage />} />
+                <Route path="reports/collections" element={<CollectionsReportPage />} />
+                <Route path="reports/customer-balances" element={<CustomerBalancesReportPage />} />
+                <Route path="reports/returns" element={<ReturnsReportPage />} />
+                <Route path="reports/inventory" element={<InventoryReportPage />} />
+                <Route path="reports/checks" element={<ChecksReportPage />} />
+                <Route path="reports/products" element={<ProductsReportPage />} />
+                <Route path="reports/representatives" element={<RepresentativesReportPage />} />
+                <Route path="reports/write-offs" element={<WriteOffsReportPage />} />
                 <Route
                   path="customer-statements"
-                  element={<CustomerStatementPage />}
+                  element={<Navigate to="/owner/customers" replace />}
                 />
                 <Route
                   path="settings"
@@ -378,16 +412,34 @@ function OwnerLayout({ store }: { store: AppStore }) {
                 />
                 <Route
                   path="store-sale"
-                  element={<AdminStoreSalePage onNavigate={ownerNavigate} />}
+                  element={<Navigate to="/owner/create-order/retail" replace />}
+                />
+                <Route
+                  path="create-order"
+                  element={<Navigate to="/owner/create-order/retail" replace />}
+                />
+                <Route
+                  path="create-order/retail"
+                  element={<AdminStoreSalePage key="retail" mode="retail" onNavigate={ownerNavigate} />}
+                />
+                <Route
+                  path="create-order/wholesale"
+                  element={<AdminStoreSalePage key="wholesale" mode="wholesale" onNavigate={ownerNavigate} />}
                 />
                 <Route
                   path="receivables"
-                  element={<Navigate to="/owner/customers" replace />}
+                  element={<Navigate to="/owner/reports/customer-balances" replace />}
                 />
                 <Route path="checks" element={<ChecksPage />} />
+                <Route path="checks/:id" element={<ChecksPage />} />
+                <Route path="accounts" element={<AccountsPage />} />
+                <Route path="accounts/:id" element={<AccountStatementPage />} />
+                <Route path="vouchers" element={<VouchersPage />} />
+                <Route path="treasury" element={<TreasuryPage />} />
+                <Route path="payments" element={<Navigate to="/owner/vouchers" replace />} />
                 <Route
                   path="returns"
-                  element={<Navigate to="/owner/customers" replace />}
+                  element={<ReturnsOperationsPage />}
                 />
                 <Route
                   path="customer-purchases"
@@ -406,6 +458,7 @@ function OwnerLayout({ store }: { store: AppStore }) {
                   path="customers/:id"
                   element={<CustomerProfileWrapper />}
                 />
+                <Route path="customers/:id/statement" element={<CustomerStatementPage basePath="/owner" />} />
               </Routes>
             </PageTransition>
           </Suspense>
@@ -511,9 +564,10 @@ function RepLayout() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-stone-50 flex" dir="rtl">
-      <Suspense fallback={<div className="hidden w-72 shrink-0 lg:block" />}>
-        <RepSidebar
+    <div className="min-h-screen bg-stone-50" dir="rtl">
+      <Suspense fallback={<div className="h-[68px] border-b bg-white" />}>
+        <DashboardHeader
+          role="rep"
           currentPath={location.pathname}
           onNavigate={repNavigate}
           onLogout={() =>
@@ -523,12 +577,12 @@ function RepLayout() {
               navigate("/");
             })
           }
-          repName={user.name}
+          userName={user.name}
           cartCount={totalQuantity}
         />
       </Suspense>
-      <main className="flex-1 min-w-0 p-4 pt-20 lg:p-8">
-        <div className="mx-auto max-w-6xl">
+      <main className="min-w-0 overflow-x-hidden px-3 py-5 sm:px-5 lg:px-8 lg:py-8">
+        <div className="mx-auto max-w-[1800px]">
           <Suspense fallback={<PageRouteFallback />}>
             <PageTransition>
               <Routes>
@@ -574,11 +628,11 @@ function RepLayout() {
                 />
                 <Route
                   path="customer-statement"
-                  element={<CustomerStatementPage />}
+                  element={<Navigate to="/rep/customers" replace />}
                 />
                 <Route
                   path="customer-statement/:id"
-                  element={<Navigate to="/rep/customers" replace />}
+                  element={<CustomerStatementPage basePath="/rep" />}
                 />
                 <Route
                   path="checks"
@@ -586,8 +640,10 @@ function RepLayout() {
                 />
                 <Route
                   path="customer-purchases"
-                  element={<Navigate to="/rep/customers" replace />}
+                  element={<CustomerPurchasesPage />}
                 />
+                <Route path="payments" element={<PartyPaymentsPage />} />
+                <Route path="returns" element={<ReturnsOperationsPage />} />
                 <Route
                   path="customers"
                   element={
@@ -598,6 +654,7 @@ function RepLayout() {
                   path="customers/:id"
                   element={<CustomerProfileWrapper />}
                 />
+                <Route path="customers/:id/statement" element={<CustomerStatementPage basePath="/rep" />} />
                 <Route path="*" element={<Navigate to="/rep" replace />} />
               </Routes>
             </PageTransition>

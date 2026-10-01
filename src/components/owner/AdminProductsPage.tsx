@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Eye, ImageOff, Plus, RefreshCw, Search } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Eye, ImageOff, Plus, Power, PowerOff, RefreshCw, Search } from "lucide-react";
 import {
   categoriesService,
   colorsService,
@@ -73,6 +73,13 @@ export default function AdminProductsPage({
     });
     return () => c.abort();
   }, [auxRetry]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setQuery(search.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   const load = useCallback(
     (signal?: AbortSignal) => {
       setLoading(true);
@@ -97,6 +104,7 @@ export default function AdminProductsPage({
           signal,
         )
         .then((r) => {
+          if (signal?.aborted) return;
           setProducts(r.products);
           setPagination(r.pagination);
         })
@@ -118,11 +126,6 @@ export default function AdminProductsPage({
   const change = (setter: (value: string) => void) => (value: string) => {
     setter(value);
     setPage(1);
-  };
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    setQuery(search.trim());
   };
   const clear = () => {
     setSearch("");
@@ -176,10 +179,7 @@ export default function AdminProductsPage({
         </div>
       )}
       <section className="rounded-2xl border bg-white p-4">
-        <form
-          onSubmit={submit}
-          className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-3"
-        >
+        <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-3">
           <label>
             <span className="rep-label">البحث</span>
             <span className="relative block">
@@ -248,10 +248,7 @@ export default function AdminProductsPage({
               { value: "code:asc", label: "الكود" },
             ]}
           />
-          <button className="min-h-11 rounded-xl bg-brand px-5 font-black text-white">
-            بحث
-          </button>
-        </form>
+        </div>
         {(search ||
           query ||
           category ||
@@ -426,20 +423,16 @@ function ProductRow({
         {formatOrderDate(product.created_at)}
       </td>
       <td className="px-4">
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={onOpen}
-            className="rounded-lg bg-brand p-2 text-white"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand text-white transition hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"
             aria-label="عرض وتعديل"
           >
             <Eye className="h-4 w-4" />
           </button>
-          <button
-            onClick={onStatus}
-            className="text-xs font-black text-gold-dark"
-          >
-            {product.is_active ? "تعطيل" : "تفعيل"}
-          </button>
+          <ProductStatusAction product={product} onClick={onStatus} />
         </div>
       </td>
     </tr>
@@ -483,15 +476,22 @@ function ProductCard({
         >
           عرض وتعديل
         </button>
-        <button
-          onClick={onStatus}
-          className="min-h-11 rounded-xl border px-4 font-bold"
-        >
-          {product.is_active ? "تعطيل" : "تفعيل"}
-        </button>
+        <ProductStatusAction product={product} onClick={onStatus} mobile />
       </div>
     </article>
   );
+}
+function ProductStatusAction({ product, onClick, mobile = false }: {
+  product: ProductResponseDto;
+  onClick: () => void;
+  mobile?: boolean;
+}) {
+  const Icon = product.is_active ? PowerOff : Power;
+  const label = product.is_active ? "تعطيل" : "تفعيل";
+  return <button type="button" onClick={onClick} aria-label={`${label} ${product.name}`}
+    className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${mobile ? "min-h-11 flex-1" : "min-h-9"} ${product.is_active ? "border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100" : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-300 hover:bg-emerald-100"}`}>
+    <Icon className="h-4 w-4 shrink-0" />{label}
+  </button>;
 }
 function Status({ active }: { active: boolean }) {
   return (

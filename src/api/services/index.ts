@@ -16,3 +16,4 @@ export { currenciesService } from "./currencies.service";
 export { writeOffsService } from "./write-offs.service";
 export { customerPurchasesService } from "./customer-purchases.service";
 export { returnsService } from "./returns.service";
+export { ledgerService } from './ledger.service';

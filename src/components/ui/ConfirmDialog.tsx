@@ -11,6 +11,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   loading?: boolean;
+  confirmDisabled?: boolean;
   severity?: "normal" | "destructive";
   details?: ReactNode;
 }
@@ -24,6 +25,7 @@ export default function ConfirmDialog({
   confirmLabel = "تأكيد",
   cancelLabel = "إلغاء",
   loading = false,
+  confirmDisabled = false,
   severity = "destructive",
   details,
 }: ConfirmDialogProps) {
@@ -57,7 +59,7 @@ export default function ConfirmDialog({
       )}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <button
-          disabled={loading}
+          disabled={loading || confirmDisabled}
           onClick={onConfirm}
           className={`${destructive ? "btn-danger" : "btn-primary"} flex-1 disabled:cursor-wait disabled:opacity-60`}
         >

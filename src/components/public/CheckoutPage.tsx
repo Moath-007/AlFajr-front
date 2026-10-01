@@ -13,16 +13,12 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 interface CheckoutFields {
   customer_name: string;
   phone: string;
-  email: string;
-  delivery_address: string;
   notes: string;
 }
 type FieldErrors = Partial<Record<keyof CheckoutFields, string>>;
 const EMPTY_FIELDS: CheckoutFields = {
   customer_name: "",
   phone: "",
-  email: "",
-  delivery_address: "",
   notes: "",
 };
 
@@ -85,12 +81,10 @@ export default function CheckoutPage({
       const response = await ordersService.createRetail({
         customer_name: fields.customer_name.trim(),
         phone: fields.phone.trim(),
-        delivery_address: fields.delivery_address.trim(),
         items: items.map((item) => ({
           product_variant_id: item.product_variant_id,
           quantity: item.quantity,
         })),
-        ...(fields.email.trim() ? { email: fields.email.trim() } : {}),
         ...(fields.notes.trim() ? { notes: fields.notes.trim() } : {}),
       });
       setResult(response);
@@ -114,7 +108,7 @@ export default function CheckoutPage({
         <div className="mb-6">
           <p className="text-xs font-extrabold text-[#C2A66D]">إتمام الطلب</p>
           <h1 className="mt-1 text-2xl font-black text-[#162E21] sm:text-[1.75rem]">
-            بيانات العميل والتوصيل
+            بيانات التواصل
           </h1>
         </div>
         <div className="grid gap-5 lg:grid-cols-[1fr_330px] lg:items-start">
@@ -152,23 +146,6 @@ export default function CheckoutPage({
                 required
                 inputMode="tel"
                 onChange={(value) => updateField("phone", value)}
-              />
-              <Field
-                id="email"
-                label="البريد الإلكتروني (اختياري)"
-                value={fields.email}
-                error={fieldErrors.email}
-                type="email"
-                inputMode="email"
-                onChange={(value) => updateField("email", value)}
-              />
-              <Field
-                id="delivery_address"
-                label="عنوان التوصيل"
-                value={fields.delivery_address}
-                error={fieldErrors.delivery_address}
-                required
-                onChange={(value) => updateField("delivery_address", value)}
               />
             </div>
             <label
@@ -321,13 +298,6 @@ function validate(fields: CheckoutFields): FieldErrors {
   const errors: FieldErrors = {};
   if (!fields.customer_name.trim()) errors.customer_name = "يرجى إدخال الاسم.";
   if (!fields.phone.trim()) errors.phone = "يرجى إدخال رقم الهاتف.";
-  if (!fields.delivery_address.trim())
-    errors.delivery_address = "يرجى إدخال عنوان التوصيل.";
-  if (
-    fields.email.trim() &&
-    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())
-  )
-    errors.email = "يرجى إدخال بريد إلكتروني صحيح.";
   return errors;
 }
 function SuccessState({

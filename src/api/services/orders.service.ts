@@ -3,6 +3,7 @@ import type {
   CreateRetailOrderDto,
   CreateStoreSaleOrderDto,
   CreateWholesaleOrderDto,
+  OrderMessageResponseDto,
   OrderActionResponseDto,
   OrderDetailsResponseDto,
   OrdersQuery,
@@ -32,7 +33,9 @@ export const ordersService = {
   updateStatus: (id: number, data: UpdateOrderStatusDto, signal?: AbortSignal) =>
     apiClient.patch<OrderActionResponseDto>(`/orders/${id}/status`, data, { signal }),
   cancel: (id: number, signal?: AbortSignal) =>
-    apiClient.delete<OrderActionResponseDto>(`/orders/${id}`, { signal }),
+    apiClient.delete<OrderMessageResponseDto>(`/orders/${id}`, { signal }),
+  deletePermanent: (id: number, signal?: AbortSignal) =>
+    apiClient.delete<OrderMessageResponseDto>(`/orders/${id}/permanent`, { signal }),
 };
 
 function withOrdersQuery(path: string, query: OrdersQuery): string {

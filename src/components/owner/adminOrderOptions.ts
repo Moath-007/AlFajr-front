@@ -11,7 +11,7 @@ export const typeOptions = [
   { value: "", label: "كل الأنواع" },
   { value: "Retail", label: "طلب أونلاين" },
   { value: "Wholesale", label: "طلب جملة" },
-  { value: "StoreSale", label: "بيع محل" },
+  { value: "StoreSale", label: "بيع مفرق" },
 ];
 
 export function orderTypeLabel(type: OrderType) {
@@ -19,5 +19,5 @@ export function orderTypeLabel(type: OrderType) {
     ? "طلب أونلاين"
     : type === "Wholesale"
       ? "طلب جملة"
-      : "بيع محل";
+      : "بيع مفرق";
 }

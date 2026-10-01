@@ -16,7 +16,7 @@ export interface NotificationRepresentativeDto {
   name: string;
 }
 export interface NotificationCustomerDto {
-  customer_id: NumericId;
+  customer_id: NumericId | null;
   name: string;
   phone: string;
 }

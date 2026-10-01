@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ArrowRight, Pencil } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { ordersService, type OrderResponseDto } from "@/api";
 import { OrderStatusBadge } from "./RepOrderUi";
 import { apiMessages, formatMoney, formatOrderDate } from "./repOrderUtils";
@@ -9,6 +9,9 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useCustomerCurrentDebt } from "@/components/orders/useCustomerCurrentDebt";
 import { useAuth } from "@/auth";
 import CreateReturnModal from "@/components/finance/CreateReturnModal";
+import { orderSaleAccountLabel, orderSourceLabel } from "@/components/orders/orderDisplay";
+import { canEditOrder } from "@/components/orders/orderEditPermission";
+import { rememberOrderDeleted } from "@/components/orders/orderDeleteFeedback";
 export default function RepOrderDetailsPage({
   orderId,
   onNavigate,
@@ -23,9 +26,33 @@ export default function RepOrderDetailsPage({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
-  const customerDebt = useCustomerCurrentDebt(order?.customer.phone);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deleteLock = useRef(false);
+  const [retry, setRetry] = useState(0);
+  const customerDebt = useCustomerCurrentDebt(order?.customer.phone, order?.order_type === 'Wholesale');
+  const deletePermanent = async () => {
+    if (deleteLock.current) return;
+    deleteLock.current = true;
+    setDeleting(true);
+    setErrors([]);
+    try {
+      const response = await ordersService.deletePermanent(orderId);
+      rememberOrderDeleted("representative", response.message);
+      onNavigate("/rep/orders");
+    } catch (reason) {
+      setDeleteOpen(false);
+      setErrors(apiMessages(reason, "تعذر حذف الطلب نهائيًا."));
+    } finally {
+      setDeleting(false);
+      deleteLock.current = false;
+    }
+  };
   useEffect(() => {
     const c = new AbortController();
+    setOrder(null);
+    setErrors([]);
+    setLoading(true);
     ordersService
       .getById(orderId, c.signal)
       .then((r) => setOrder(r.order))
@@ -37,7 +64,7 @@ export default function RepOrderDetailsPage({
         if (!c.signal.aborted) setLoading(false);
       });
     return () => c.abort();
-  }, [orderId]);
+  }, [orderId, retry]);
   if (loading)
     return (
       <div className="space-y-5">
@@ -45,13 +72,16 @@ export default function RepOrderDetailsPage({
         <Skeleton className="h-96" />
       </div>
     );
-  if (errors.length || !order)
+  if (!order)
     return (
       <div
         className="rounded-2xl border border-red-200 bg-red-50 p-8 text-center font-bold text-red-800"
         role="alert"
       >
-        {errors.join("، ") || "الطلب غير موجود."}
+        <p>{errors.join("، ") || "الطلب غير موجود."}</p>
+        <button type="button" onClick={() => { setErrors([]); setLoading(true); setRetry((value) => value + 1); }} className="mt-3 inline-flex items-center gap-2 underline">
+          <RefreshCw className="h-4 w-4" /> إعادة المحاولة
+        </button>
       </div>
     );
   const summary = (
@@ -71,20 +101,20 @@ export default function RepOrderDetailsPage({
       >
         <ArrowRight className="h-4 w-4" /> العودة إلى الطلبات
       </button>
+      {errors.length > 0 && <div className="rep-error" role="alert">{errors.join("، ")}</div>}
       <header className="flex flex-col justify-between gap-4 rounded-2xl border bg-white p-6 shadow-sm sm:flex-row sm:items-center">
         <div>
-          <p className="text-sm text-stone-400">تفاصيل الطلب</p>
+          <p className="text-sm text-stone-400">المصدر: {orderSourceLabel(order.order_type)}</p>
           <h1 className="mt-1 text-3xl font-black text-brand">
             طلب #{order.id}
           </h1>
-          <p className="mt-2 text-sm text-stone-500">
-            {formatOrderDate(order.created_at)}
-          </p>
+          <p className="mt-2 text-sm text-stone-500">تاريخ الإنشاء: {formatOrderDate(order.created_at)}</p>
+          <p className="mt-1 text-sm text-stone-600">حساب الفاتورة: <strong>{orderSaleAccountLabel(order)}</strong></p>
         </div>
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-stone-500"><span>حالة الطلب:</span><OrderStatusBadge status={order.status} /></div>
           <div className="flex flex-wrap items-center gap-2"><OrderReceipt order={order} customerCurrentDebt={customerDebt.debt} customerDebtLoading={customerDebt.loading} customerDebtFailed={customerDebt.failed} />
-          {order.status !== "Cancelled" && order.order_type === "Wholesale" && (
+          {canEditOrder(order, "Representative") && (
             <button
               onClick={() => onNavigate(`/rep/orders/${order.id}/edit`)}
               className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-black text-white"
@@ -94,6 +124,7 @@ export default function RepOrderDetailsPage({
           )}
           {order.status !== "Cancelled" && order.representative?.id === user?.id && <button onClick={() => setCancelOpen(true)} className="rounded-xl bg-red-50 px-4 py-2.5 text-sm font-black text-red-700">إلغاء الطلب</button>}
           {order.status === "Completed" && order.representative?.id === user?.id && <button onClick={() => setReturnOpen(true)} className="btn-outline">إنشاء مردود مبيعات</button>}
+          {order.order_type === "Wholesale" && <button type="button" onClick={() => setDeleteOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2.5 text-sm font-black text-red-800"><Trash2 className="h-4 w-4" /> حذف نهائي</button>}
           </div>
         </div>
       </header>
@@ -107,6 +138,7 @@ export default function RepOrderDetailsPage({
               <Info label="الهاتف" value={order.customer.phone} />
               <Info label="البريد" value={order.customer.email || "—"} />
               <Info label="العنوان" value={order.delivery_address || "—"} />
+              {order.representative && <Info label="المندوب" value={order.representative.name} />}
               {order.notes && <Info label="ملاحظات" value={order.notes} />}
             </dl>
             <button className="btn-outline mt-4" onClick={() => onNavigate(`/rep/customers/${order.customer.id}`)}>فتح حساب الزبون</button>
@@ -139,11 +171,9 @@ export default function RepOrderDetailsPage({
                       label="سعر الوحدة"
                       value={i.is_bonus ? "بونص · 0 ₪" : formatMoney(i.unit_price)}
                     />
-                    <Mini
-                      label="الخصم"
-                      value={formatMoney(i.product_discount)}
-                    />
+                    <Mini label="الخصم" value={formatMoney(i.product_discount)} />
                   </dl>
+                  {!i.is_bonus && Number(i.base_unit_price) !== Number(i.unit_price) && <p className="mt-2 text-xs text-stone-500">السعر الأساسي: {formatMoney(i.base_unit_price)}</p>}
                 </article>
               ))}
             </div>
@@ -198,7 +228,8 @@ export default function RepOrderDetailsPage({
         <aside className="hidden lg:block lg:sticky lg:top-6">{summary}</aside>
       </div>
       <ConfirmDialog open={cancelOpen} onClose={() => setCancelOpen(false)} onConfirm={async () => { setCancelling(true); try { await ordersService.cancel(order.id); onNavigate("/rep/orders"); } catch (error) { setErrors(apiMessages(error, "تعذر إلغاء الطلب.")); setCancelOpen(false); } finally { setCancelling(false); } }} loading={cancelling} severity="destructive" title="إلغاء الطلب" message="سيتم إلغاء الطلب وعكس أثره على المخزون والحساب. سندات القبض والصرف المستقلة ستبقى كما هي." confirmLabel="إلغاء الطلب" />
-      <CreateReturnModal open={returnOpen} sourceType="SalesReturn" sourceId={order.id} items={order.items.map((item) => ({ productVariantId: Number(item.variant.id), quantity: item.quantity, label: `${item.variant.product.name} — ${item.variant.size} — ${item.variant.color.name}` }))} onClose={() => setReturnOpen(false)} onSaved={() => { setReturnOpen(false); window.location.reload(); }}/>
+      <ConfirmDialog open={deleteOpen} onClose={() => setDeleteOpen(false)} onConfirm={() => void deletePermanent()} loading={deleting} severity="destructive" title="حذف الطلب نهائيًا" message={order.status === "Completed" ? "هل أنت متأكد من حذف هذا الطلب نهائيًا؟ سيعكس النظام أثر البيع ويعيد المخزون." : "هل أنت متأكد من حذف هذا الطلب نهائيًا؟"} confirmLabel="حذف نهائي" cancelLabel="تراجع" />
+      <CreateReturnModal open={returnOpen} sourceType="SalesReturn" sourceId={order.id} saleAccountName={order.sale_account?.name} items={order.items.map((item) => ({ productVariantId: Number(item.variant.id), quantity: item.quantity, label: `${item.variant.product.name} — ${item.variant.size} — ${item.variant.color.name}` }))} onClose={() => setReturnOpen(false)} onSaved={() => { setReturnOpen(false); window.location.reload(); }}/>
     </div>
   );
 }
@@ -206,7 +237,13 @@ function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-stone-50 p-4">
       <dt className="text-xs font-bold text-stone-400">{label}</dt>
-      <dd className="mt-1 font-black">{value}</dd>
+      <dd className="mt-1 font-black">
+        {label === "ملاحظات" ? (
+          <div className="space-y-3">
+            {value.split(/\r?\n/).filter(Boolean).map((line, index) => <p key={index}>{line}</p>)}
+          </div>
+        ) : value}
+      </dd>
     </div>
   );
 }

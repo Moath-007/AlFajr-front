@@ -46,12 +46,14 @@ const groups = [
     label: "الزبائن والحسابات",
     icon: Users,
     children: [
-      { path: "/rep/customers", label: "الزبائن والحسابات", icon: Users },
+      { path: "/rep/customers", label: "الجهات", icon: Users },
       {
-        path: "/rep/customer-statement",
-        label: "كشف حساب زبون",
+        path: "/rep/payments",
+        label: "قبض وصرف",
         icon: FileText,
       },
+      { path: "/rep/customer-purchases", label: "المشتريات", icon: ClipboardList },
+      { path: "/rep/returns", label: "المردودات", icon: FileText },
     ],
   },
 ] satisfies Array<{ id: string; label: string; icon: Icon; children: Child[] }>;

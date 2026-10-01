@@ -10,7 +10,7 @@ import { printThermalReceipt } from "@/utils/printDocument";
 const labels = {
   Retail: "أونلاين",
   Wholesale: "جملة",
-  StoreSale: "بيع محل",
+  StoreSale: "بيع مفرق",
 } as const;
 const money = (value: string | number) =>
   `₪${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -77,13 +77,15 @@ export default function OrderReceipt({
         </header>
         <div className="receipt-meta">
           <ReceiptRow label="رقم الطلب" value={`#${order.id}`} />
-          <ReceiptRow label="النوع" value={labels[order.order_type]} />
+          <ReceiptRow label="المصدر" value={labels[order.order_type]} />
           <ReceiptRow
-            label="التاريخ"
+            label="تاريخ إنشاء الطلب"
             value={formatOrderDateTime(order.created_at)}
           />
-          <ReceiptRow label="الزبون" value={order.customer.name} />
-          <ReceiptRow label="الهاتف" value={order.customer.phone} />
+          {order.customer ? <>
+            <ReceiptRow label="الزبون" value={order.customer.name} />
+            <ReceiptRow label="الهاتف" value={order.customer.phone} />
+          </> : <ReceiptRow label="الحساب" value={order.sale_account?.name ?? "—"} />}
           {order.representative && (
             <ReceiptRow label="المندوب" value={order.representative.name} />
           )}
@@ -105,11 +107,15 @@ export default function OrderReceipt({
                   </span>
                   <b>{money(item.line_total)}</b>
                 </div>
-                {item.is_bonus ? <small>بونص — القيمة المالية صفر والكمية محسوبة من المخزون</small> : Number(item.base_unit_price) !== Number(item.unit_price) ? <small>السعر الأساسي: {money(item.base_unit_price)} · السعر الفعلي: {money(item.unit_price)}</small> : discount > 0 && (
-                  <small>
-                    الخصم: {" "}
-                    {money(discount)}
-                  </small>
+                {item.is_bonus ? (
+                  <small>بونص — القيمة المالية صفر والكمية محسوبة من المخزون</small>
+                ) : (
+                  <>
+                    {Number(item.base_unit_price) !== Number(item.unit_price) && (
+                      <small>السعر الأساسي: {money(item.base_unit_price)} · السعر الفعلي: {money(item.unit_price)}</small>
+                    )}
+                    {discount > 0 && <small>خصم المنتج: {money(discount)}</small>}
+                  </>
                 )}
               </article>
             );
@@ -123,7 +129,7 @@ export default function OrderReceipt({
             value={money(order.total_amount)}
             strong
           />
-          {customerCurrentDebt != null && <ReceiptRow label="إجمالي الدين الحالي" value={money(customerCurrentDebt)} strong />}
+          {customerCurrentDebt != null && <ReceiptRow label="رصيد الحساب الحالي" value={money(customerCurrentDebt)} strong />}
         </div>
         <footer className="receipt-footer">شكرًا لتعاملكم معنا</footer>
       </section>

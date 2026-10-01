@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, Pencil, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowRight, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import {
   ordersService,
   type ApiOrderStatus,
@@ -13,10 +13,14 @@ import {
   formatMoney,
   formatOrderDate,
 } from "@/components/rep/repOrderUtils";
-import { orderTypeLabel } from "./adminOrderOptions";
+import { orderSaleAccountLabel, orderSourceLabel } from "@/components/orders/orderDisplay";
 import OrderReceipt from "@/components/ui/OrderReceipt";
 import { useCustomerCurrentDebt } from "@/components/orders/useCustomerCurrentDebt";
 import CreateReturnModal from "@/components/finance/CreateReturnModal";
+import { canEditOrder } from "@/components/orders/orderEditPermission";
+import GeneralSaleAccountSelect from "@/components/orders/GeneralSaleAccountSelect";
+import { useGeneralSaleAccounts } from "@/components/orders/useGeneralSaleAccounts";
+import { rememberOrderDeleted } from "@/components/orders/orderDeleteFeedback";
 export default function AdminOrderDetailsPage({
   orderId,
   onNavigate,
@@ -32,14 +36,22 @@ export default function AdminOrderDetailsPage({
     "Completed" | "Cancelled"
   > | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submissionLock = useRef(false);
+  const [saleAccountId, setSaleAccountId] = useState<number | null>(null);
+  const [confirmError, setConfirmError] = useState("");
+  const saleAccounts = useGeneralSaleAccounts(action === "Completed");
   const [retry, setRetry] = useState(0);
   const [success, setSuccess] = useState("");
   const [returnOpen, setReturnOpen] = useState(false);
-  const customerDebt = useCustomerCurrentDebt(order?.customer.phone);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deleteLock = useRef(false);
+  const customerDebt = useCustomerCurrentDebt(order?.customer?.phone, order?.customer != null && order?.order_type === 'Wholesale');
   const load = useCallback(
     (signal?: AbortSignal) => {
       setLoading(true);
       setErrors([]);
+      setOrder(null);
       return ordersService
         .getById(orderId, signal)
         .then((r) => setOrder(r.order))
@@ -59,21 +71,47 @@ export default function AdminOrderDetailsPage({
     return () => c.abort();
   }, [load, retry]);
   const changeStatus = async () => {
-    if (!action) return;
+    if (!action || submissionLock.current) return;
+    if (action === "Completed" && (saleAccountId === null || !saleAccounts.accounts.some((account) => account.id === saleAccountId))) {
+      setConfirmError("اختر حسابًا عامًا لتسجيل الفاتورة.");
+      return;
+    }
+    submissionLock.current = true;
     setSubmitting(true);
     setErrors([]);
+    setConfirmError("");
     try {
       const response = action === "Cancelled"
         ? await ordersService.cancel(orderId)
-        : await ordersService.updateStatus(orderId, { status: action });
+        : await ordersService.updateStatus(orderId, { status: "Completed", sale_account_id: saleAccountId! });
       setAction(null);
+      setSaleAccountId(null);
       setSuccess(response.message);
       await load();
     } catch (e) {
-      setAction(null);
-      setErrors(apiMessages(e, "تعذر تغيير حالة الطلب."));
+      const messages = apiMessages(e, "تعذر تغيير حالة الطلب.");
+      if (action === "Completed") setConfirmError(messages.join("، "));
+      else { setAction(null); setErrors(messages); }
     } finally {
       setSubmitting(false);
+      submissionLock.current = false;
+    }
+  };
+  const deletePermanent = async () => {
+    if (deleteLock.current) return;
+    deleteLock.current = true;
+    setDeleting(true);
+    setErrors([]);
+    try {
+      const response = await ordersService.deletePermanent(orderId);
+      rememberOrderDeleted("admin", response.message);
+      onNavigate("/owner/orders");
+    } catch (reason) {
+      setDeleteOpen(false);
+      setErrors(apiMessages(reason, "تعذر حذف الطلب نهائيًا."));
+    } finally {
+      setDeleting(false);
+      deleteLock.current = false;
     }
   };
   if (loading) return <Skeleton className="h-[600px]" />;
@@ -122,31 +160,23 @@ export default function AdminOrderDetailsPage({
       <header className="flex flex-col justify-between gap-4 rounded-2xl border bg-white p-5 sm:flex-row sm:items-center">
         <div>
           <p className="text-xs font-bold text-gold-dark">
-            {orderTypeLabel(order.order_type)}
+            المصدر: {orderSourceLabel(order.order_type)}
           </p>
           <h1 className="mt-1 text-3xl font-black text-brand">
             طلب #{order.id}
           </h1>
-          <p className="mt-2 text-sm text-stone-500">
-            {formatOrderDate(order.created_at)}
-          </p>
+          <p className="mt-2 text-sm text-stone-500">تاريخ الإنشاء: {formatOrderDate(order.created_at)}</p>
+          <p className="mt-1 text-sm text-stone-600">حساب الفاتورة: <strong>{orderSaleAccountLabel(order)}</strong></p>
         </div>
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-stone-500"><span>حالة الطلب:</span><OrderStatusBadge status={order.status} /></div>
           <div className="flex flex-wrap gap-2"><OrderReceipt order={order} customerCurrentDebt={customerDebt.debt} customerDebtLoading={customerDebt.loading} customerDebtFailed={customerDebt.failed} />
+          {canEditOrder(order, "Admin") && <button onClick={() => onNavigate(`/owner/orders/${order.id}/edit`)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-black text-white"><Pencil className="h-4 w-4" /> تعديل الطلب</button>}
           {order.status === "Pending" && (
             <>
-              {order.order_type !== "Retail" && (
-                <button
-                  onClick={() => onNavigate(`/owner/orders/${order.id}/edit`)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-black text-white"
-                >
-                  <Pencil className="h-4 w-4" />
-                  تعديل
-                </button>
-              )}
               <button
-                onClick={() => setAction("Completed")}
+                onClick={() => { setSaleAccountId(null); setConfirmError(""); setAction("Completed"); }}
+                disabled={submitting}
                 className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-black text-white"
               >
                 إكمال الطلب
@@ -159,21 +189,23 @@ export default function AdminOrderDetailsPage({
               </button>
             </>
           )}
-          {order.status === "Completed" && order.order_type !== "Retail" && <button onClick={() => onNavigate(`/owner/orders/${order.id}/edit`)} className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-black text-white"><Pencil className="h-4 w-4"/> تعديل الطلب المكتمل</button>}
           {order.status === "Completed" && <button onClick={() => setReturnOpen(true)} className="btn-outline">إنشاء مردود مبيعات</button>}
-          {order.status === "Completed" && <button onClick={() => setAction("Cancelled")} className="rounded-xl bg-red-50 px-4 py-2 text-sm font-black text-red-700">إلغاء الطلب</button>}</div>
+          {order.status === "Completed" && <button onClick={() => setAction("Cancelled")} className="rounded-xl bg-red-50 px-4 py-2 text-sm font-black text-red-700">إلغاء الطلب</button>}
+          <button type="button" onClick={() => setDeleteOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2 text-sm font-black text-red-800"><Trash2 className="h-4 w-4" /> حذف نهائي</button></div>
         </div>
       </header>
       <div className="lg:hidden">{summary}</div>
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
           <section className="rounded-2xl border bg-white p-5">
-            <h2 className="font-black text-brand">بيانات العميل</h2>
+            <h2 className="font-black text-brand">{order.customer ? "بيانات العميل" : order.sale_account ? "بيانات الحساب" : "بيانات الطلب"}</h2>
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Info label="الاسم" value={order.customer.name} />
-              <Info label="الهاتف" value={order.customer.phone} />
-              <Info label="البريد" value={order.customer.email || "—"} />
-              <Info label="العنوان" value={order.delivery_address || "—"} />
+              {order.customer ? <>
+                <Info label="الاسم" value={order.customer.name} />
+                <Info label="الهاتف" value={order.customer.phone} />
+                <Info label="البريد" value={order.customer.email || "—"} />
+                <Info label="العنوان" value={order.delivery_address || "—"} />
+              </> : order.sale_account ? <Info label="الحساب" value={order.sale_account.name} /> : null}
               {order.representative && (
                 <Info
                   label="المندوب"
@@ -182,7 +214,7 @@ export default function AdminOrderDetailsPage({
               )}{" "}
               {order.notes && <Info label="ملاحظات" value={order.notes} />}
             </dl>
-            <button className="btn-outline mt-4" onClick={() => onNavigate(`/owner/customers/${order.customer.id}`)}>فتح حساب الزبون</button>
+            {order.customer && <button className="btn-outline mt-4" onClick={() => onNavigate(`/owner/customers/${order.customer!.id}`)}>فتح حساب الزبون</button>}
           </section>
           <section className="overflow-hidden rounded-2xl border bg-white">
             <h2 className="p-5 font-black text-brand">عناصر الطلب</h2>
@@ -200,8 +232,9 @@ export default function AdminOrderDetailsPage({
                     {i.variant.color.name}
                   </p>
                   <p className="mt-2 text-xs">
-                    الكمية: {i.quantity} · الوحدة الفعلية: {formatMoney(i.unit_price)}
-                    {i.is_bonus ? " · بونص (القيمة صفر)" : Number(i.base_unit_price) !== Number(i.unit_price) ? ` · الأساسي: ${formatMoney(i.base_unit_price)}` : ` · الخصم: ${formatMoney(i.product_discount)}`}
+                    الكمية: {i.quantity} · {i.is_bonus ? "بونص · القيمة صفر" : `سعر الوحدة الفعلي: ${formatMoney(i.unit_price)}`}
+                    {!i.is_bonus && Number(i.base_unit_price) !== Number(i.unit_price) && ` · السعر الأساسي: ${formatMoney(i.base_unit_price)}`}
+                    {!i.is_bonus && Number(i.product_discount) !== 0 && ` · خصم المنتج: ${formatMoney(i.product_discount)}`}
                   </p>
                 </article>
               ))}
@@ -256,10 +289,22 @@ export default function AdminOrderDetailsPage({
         </aside>
       </div>
       <ConfirmDialog
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={() => void deletePermanent()}
+        loading={deleting}
+        severity="destructive"
+        title="حذف الطلب نهائيًا"
+        message={order.status === "Completed" ? "هل أنت متأكد من حذف هذا الطلب نهائيًا؟ سيعكس النظام أثر البيع ويعيد المخزون." : "هل أنت متأكد من حذف هذا الطلب نهائيًا؟"}
+        confirmLabel="حذف نهائي"
+        cancelLabel="تراجع"
+      />
+      <ConfirmDialog
         open={action !== null}
-        onClose={() => setAction(null)}
+        onClose={() => { setAction(null); setConfirmError(""); }}
         onConfirm={() => void changeStatus()}
         loading={submitting}
+        confirmDisabled={action === "Completed" && (saleAccounts.loading || !!saleAccounts.error || saleAccounts.accounts.length === 0 || saleAccountId === null)}
         severity={action === "Cancelled" ? "destructive" : "normal"}
         title={action === "Cancelled" ? "إلغاء الطلب" : "إكمال الطلب"}
         message={
@@ -268,8 +313,14 @@ export default function AdminOrderDetailsPage({
             : "هل أنت متأكد من إكمال الطلب؟"
         }
         confirmLabel={action === "Cancelled" ? "إلغاء الطلب" : "إكمال الطلب"}
+        details={action === "Completed" ? (
+          <div className="space-y-3">
+            <GeneralSaleAccountSelect floating accounts={saleAccounts.accounts} value={saleAccountId} onChange={(id) => { setSaleAccountId(id); setConfirmError(""); }} loading={saleAccounts.loading} error={saleAccounts.error} onRetry={saleAccounts.reload} onNavigate={onNavigate} />
+            {confirmError && <p className="font-bold text-red-700" role="alert">{confirmError}</p>}
+          </div>
+        ) : undefined}
       />
-      <CreateReturnModal open={returnOpen} sourceType="SalesReturn" sourceId={order.id} items={order.items.map((item) => ({ productVariantId: Number(item.variant.id), quantity: item.quantity, label: `${item.variant.product.name} — ${item.variant.size} — ${item.variant.color.name}` }))} onClose={() => setReturnOpen(false)} onSaved={(message) => { setReturnOpen(false); setSuccess(message); setRetry((value) => value + 1); }}/>
+      <CreateReturnModal open={returnOpen} sourceType="SalesReturn" sourceId={order.id} saleAccountName={order.sale_account?.name} items={order.items.map((item) => ({ productVariantId: Number(item.variant.id), quantity: item.quantity, label: `${item.variant.product.name} — ${item.variant.size} — ${item.variant.color.name}` }))} onClose={() => setReturnOpen(false)} onSaved={(message) => { setReturnOpen(false); setSuccess(message); setRetry((value) => value + 1); }}/>
     </div>
   );
 }
@@ -277,7 +328,13 @@ function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-stone-50 p-3">
       <dt className="text-xs text-stone-400">{label}</dt>
-      <dd className="mt-1 font-bold">{value}</dd>
+      <dd className="mt-1 font-bold">
+        {label === "ملاحظات" ? (
+          <div className="space-y-3">
+            {value.split(/\r?\n/).filter(Boolean).map((line, index) => <p key={index}>{line}</p>)}
+          </div>
+        ) : value}
+      </dd>
     </div>
   );
 }

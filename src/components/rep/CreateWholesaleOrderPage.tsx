@@ -1,7 +1,6 @@
-import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   CircleCheck,
-  MessageSquareText,
   Search,
   ShoppingCart,
   Trash2,
@@ -9,52 +8,18 @@ import {
 } from "lucide-react";
 import {
   customersService,
-  currenciesService,
   ordersService,
-  paymentsService,
   type CustomerSelectionDto,
-  type PaymentMethod,
 } from "@/api";
 import QuantityInput from "@/components/ui/QuantityInput";
 import { useOptionalWholesaleStockVisibility, useWholesaleCart } from "@/rep";
 import { apiMessages, formatMoney } from "./repOrderUtils";
-import { RepDateInput, RepFormSection, RepSelect } from "./RepFormControls";
+import { RepFormSection } from "./RepFormControls";
 import RepProductPicker, { type PickedOrderItem } from "./RepProductPicker";
 import { useCustomerLookup } from "./useCustomerLookup";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-
-interface PaymentDraft {
-  key: string;
-  amount: string;
-  payment_method: PaymentMethod;
-  check_number: string;
-  account_number: string;
-  bank_number: string;
-  branch_number: string;
-  due_date: string;
-  notes: string;
-}
-const emptyPayment = (paymentMethod: PaymentMethod = "Cash"): PaymentDraft => ({
-  key: crypto.randomUUID(),
-  amount: "",
-  payment_method: paymentMethod,
-  check_number: "",
-  account_number: "",
-  bank_number: "",
-  branch_number: "",
-  due_date: "",
-  notes: "",
-});
-
-function addMonthsToDate(value: string, months: number) {
-  if (!value) return "";
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return "";
-  const targetMonth = new Date(year, month - 1 + months, 1);
-  const lastDay = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
-  const result = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), Math.min(day, lastDay));
-  return `${result.getFullYear()}-${String(result.getMonth() + 1).padStart(2, "0")}-${String(result.getDate()).padStart(2, "0")}`;
-}
+import GeneralSaleAccountSelect from "@/components/orders/GeneralSaleAccountSelect";
+import { useGeneralSaleAccounts } from "@/components/orders/useGeneralSaleAccounts";
 
 export default function CreateWholesaleOrderPage({
   onNavigate,
@@ -71,9 +36,6 @@ export default function CreateWholesaleOrderPage({
     notes: "",
     order_discount: "",
   });
-  const [payments, setPayments] = useState<PaymentDraft[]>([]);
-  const [checksToAdd, setChecksToAdd] = useState("1");
-  const [openPaymentNotes, setOpenPaymentNotes] = useState<Set<string>>(new Set());
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerResults, setCustomerResults] = useState<CustomerSelectionDto[]>([]);
   const [customerSearchLoading, setCustomerSearchLoading] = useState(false);
@@ -83,6 +45,9 @@ export default function CreateWholesaleOrderPage({
   const [bonusPickerOpen, setBonusPickerOpen] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [saleAccountId, setSaleAccountId] = useState<number | null>(null);
+  const saleAccounts = useGeneralSaleAccounts();
+  const submissionLock = useRef(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmClearCart, setConfirmClearCart] = useState(false);
   const [itemToRemove, setItemToRemove] = useState<{
@@ -126,14 +91,6 @@ export default function CreateWholesaleOrderPage({
     setCustomerSearchLoading(false);
     void customerLookup.lookup(customer.phone);
   };
-  const updatePayment = (index: number, change: Partial<PaymentDraft>) => setPayments((current) => current.map((payment, itemIndex) => itemIndex === index ? { ...payment, ...change } : payment));
-  const togglePaymentNote = (key: string) => setOpenPaymentNotes((current) => {
-    const next = new Set(current);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    return next;
-  });
-
   const previewSubtotal = items.reduce(
     (sum, item) =>
       sum +
@@ -143,6 +100,7 @@ export default function CreateWholesaleOrderPage({
   );
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (submitting || submissionLock.current) return;
     setErrors([]);
     if (
       !fields.customer_name.trim() ||
@@ -152,35 +110,43 @@ export default function CreateWholesaleOrderPage({
       setErrors(["اسم العميل والهاتف ووجود منتج واحد على الأقل مطلوبة."]);
       return;
     }
-    if (items.some((item) => item.quantity + (itemOptions[item.product_variant_id]?.bonusQuantity ?? 0) > item.last_known_stock)) {
-      setErrors(["إجمالي الكمية العادية والبونص يتجاوز المخزون المتاح لأحد الخيارات."]);
+    if (bonusItems.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1) || Object.values(itemOptions).some((option) => !Number.isInteger(option.bonusQuantity) || option.bonusQuantity < 0)) {
+      setErrors(["راجع كميات أصناف البونص."]);
       return;
     }
-    if (bonusItems.some((item) => item.quantity < 1 || item.quantity > item.stock)) {
-      setErrors(["راجع كميات أصناف البونص والمخزون المتاح."]);
+    if (items.some((item) => !Number.isInteger(item.quantity) || item.quantity < 1 || !Number.isFinite(Number(itemOptions[item.product_variant_id]?.unitPrice ?? (Number(item.display_price) - Number(item.display_discount)))) || Number(itemOptions[item.product_variant_id]?.unitPrice ?? (Number(item.display_price) - Number(item.display_discount))) < 0)) {
+      setErrors(["راجع الكمية والسعر الفعلي لكل صنف."]);
       return;
     }
-    if (
-      payments.some((payment) => !payment.amount || Number(payment.amount) <= 0)
-    ) {
-      setErrors(["يجب أن يكون مبلغ كل سند قبض أكبر من صفر."]);
+    if (!Number.isFinite(Number(fields.order_discount || 0)) || Number(fields.order_discount || 0) < 0 || Number(fields.order_discount || 0) > previewSubtotal) {
+      setErrors(["خصم الطلب يجب ألا يتجاوز قيمة المنتجات."]);
       return;
     }
-    const invalidCheck = payments.some(
-      (payment) =>
-        payment.payment_method === "Check" && !payment.check_number.trim(),
-    );
-    if (invalidCheck) {
-      setErrors(["رقم الشيك مطلوب عند اختيار الدفع بالشيك."]);
+    if (saleAccountId === null || !saleAccounts.accounts.some((account) => account.id === saleAccountId)) {
+      setErrors(["اختر حسابًا عامًا لتسجيل الفاتورة."]);
       return;
     }
     setConfirmOpen(true);
   };
 
   const createOrder = async () => {
+    if (submissionLock.current) return;
+    if (saleAccountId === null || !saleAccounts.accounts.some((account) => account.id === saleAccountId)) {
+      setErrors(["اختر حسابًا عامًا لتسجيل الفاتورة."]);
+      setConfirmOpen(false);
+      return;
+    }
+    submissionLock.current = true;
     setSubmitting(true);
     try {
+      const bonusByVariant = new Map<number, number>();
+      for (const item of items) {
+        const quantity = itemOptions[item.product_variant_id]?.bonusQuantity ?? 0;
+        if (quantity > 0) bonusByVariant.set(item.product_variant_id, quantity);
+      }
+      for (const item of bonusItems) bonusByVariant.set(item.product_variant_id, (bonusByVariant.get(item.product_variant_id) ?? 0) + item.quantity);
       const response = await ordersService.createWholesale({
+        sale_account_id: saleAccountId,
         customer_name: fields.customer_name.trim(),
         phone: fields.phone.trim(),
         email: fields.email.trim() || undefined,
@@ -189,44 +155,12 @@ export default function CreateWholesaleOrderPage({
         order_discount: fields.order_discount
           ? Number(fields.order_discount)
           : undefined,
-        items: [...items.flatMap((item) => {
+        items: [...items.map((item) => {
           const options = itemOptions[item.product_variant_id];
-          const normal = { product_variant_id: item.product_variant_id, quantity: item.quantity, unit_price: Number(options?.unitPrice ?? (Number(item.display_price) - Number(item.display_discount))), is_bonus: false };
-          return options?.bonusQuantity ? [normal, { product_variant_id: item.product_variant_id, quantity: options.bonusQuantity, unit_price: 0, is_bonus: true }] : [normal];
-        }), ...bonusItems.map((item) => ({ product_variant_id: item.product_variant_id, quantity: item.quantity, unit_price: 0, is_bonus: true }))],
+          const finalPrice = Number(options?.unitPrice ?? (Number(item.display_price) - Number(item.display_discount)));
+          return { product_variant_id: item.product_variant_id, quantity: item.quantity, unit_price: finalPrice + Number(item.display_discount), is_bonus: false };
+        }), ...Array.from(bonusByVariant, ([product_variant_id, quantity]) => ({ product_variant_id, quantity, unit_price: 0, is_bonus: true }))],
       });
-      if (payments.length) {
-        try {
-          const [balance, currencyResponse] = await Promise.all([
-            customersService.findByPhone(fields.phone.trim()),
-            currenciesService.list(),
-          ]);
-          const currencies = Array.isArray(currencyResponse) ? currencyResponse : currencyResponse.items ?? currencyResponse.currencies ?? [];
-          const base = currencies.find((currency) => currency.is_base) ?? currencies[0];
-          if (!base) throw new Error("لم يتم تعريف العملة الأساسية.");
-          for (const payment of payments) {
-            await paymentsService.createForCustomer(balance.customer.id, {
-              amount: Number(payment.amount),
-              currency_id: base.currency_id,
-              exchange_rate: 1,
-              payment_method: payment.payment_method,
-              notes: payment.notes.trim() || undefined,
-              check: payment.payment_method === "Check" ? {
-                check_number: payment.check_number.trim(),
-                account_number: payment.account_number.trim() || undefined,
-                bank_number: payment.bank_number.trim() || undefined,
-                branch_number: payment.branch_number.trim() || undefined,
-                due_date: payment.due_date || undefined,
-              } : undefined,
-            });
-          }
-        } catch (paymentError) {
-          setConfirmOpen(false);
-          clearCart();
-          setErrors([`تم إنشاء الطلب #${response.order.order_id}، لكن تعذر إنشاء سند القبض: ${apiMessages(paymentError, "راجع حساب الزبون وسجّل السند يدويًا.").join("، ")}`]);
-          return;
-        }
-      }
       setConfirmOpen(false);
       clearCart();
       onNavigate(`/rep/orders/${response.order.order_id}`);
@@ -235,6 +169,7 @@ export default function CreateWholesaleOrderPage({
       setErrors(apiMessages(error, "تعذر إنشاء الطلب."));
     } finally {
       setSubmitting(false);
+      submissionLock.current = false;
     }
   };
   if (items.length === 0)
@@ -262,12 +197,12 @@ export default function CreateWholesaleOrderPage({
           <div>
             <p className="text-xs font-black text-gold-dark">طلب جملة جديد</p>
             <h1 className="mt-1 text-2xl font-black text-brand">إنشاء الطلب</h1>
-        <p className="mt-1 text-sm text-stone-500">أدخل بيانات الزبون، راجع الأصناف، ثم أضف سندات القبض الاختيارية على حسابه.</p>
+        <p className="mt-1 text-sm text-stone-500">أدخل بيانات الزبون والأصناف. إنشاء الفاتورة يحتاج اختيار حساب عام.</p>
           </div>
           <div className="flex items-center gap-2 text-xs font-bold text-stone-500">
             <span className="rounded-full bg-brand px-3 py-1.5 text-white">1 البيانات</span>
             <span className="rounded-full bg-brand-50 px-3 py-1.5 text-brand">2 الأصناف</span>
-            <span className="rounded-full bg-stone-100 px-3 py-1.5">3 سندات القبض</span>
+
           </div>
         </header>
         {errors.length > 0 && (
@@ -297,6 +232,9 @@ export default function CreateWholesaleOrderPage({
               {customerLookup.state === "new" && <div className="mb-4 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3"><LookupNote text="لا يوجد زبون بهذا الرقم — أكمل البيانات كزبون جديد" /></div>}
               {customerLookup.state === "error" && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{customerLookup.messages.join("، ")}</div>}
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+                <div className="md:col-span-2 xl:col-span-12">
+                  <GeneralSaleAccountSelect accounts={saleAccounts.accounts} value={saleAccountId} onChange={setSaleAccountId} loading={saleAccounts.loading} error={saleAccounts.error} onRetry={saleAccounts.reload} />
+                </div>
                 <div className="xl:col-span-3"><Field label="اسم الزبون *" value={fields.customer_name} onChange={(value) => setFields({ ...fields, customer_name: value })}/></div>
                 <div className="xl:col-span-4">
                   <Field label="رقم الهاتف *" value={fields.phone} onChange={(value) => setFields({ ...fields, phone: value })}/>
@@ -342,8 +280,8 @@ export default function CreateWholesaleOrderPage({
                       return <article key={item.product_variant_id} className="grid grid-cols-[minmax(300px,1fr)_140px_190px_130px_130px_44px] items-center gap-5 px-6 py-4 hover:bg-stone-50/60">
                         <div className="min-w-0"><strong className="block truncate text-sm text-brand">{item.product_name}</strong><div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone-500"><span>{item.size} — {item.color}</span><span className="rounded-md bg-stone-100 px-2 py-0.5 text-[11px]">السعر الأساسي {formatMoney(item.display_price)}</span></div></div>
                         <label><span className="sr-only">السعر الفعلي</span><input className="rep-control min-h-10 py-2" type="number" min="0" step="0.01" value={itemOptions[item.product_variant_id]?.unitPrice ?? String(unitPrice)} onChange={(event) => setItemOptions((all) => ({ ...all, [item.product_variant_id]: { unitPrice: event.target.value, bonusQuantity: all[item.product_variant_id]?.bonusQuantity ?? 0 } }))}/></label>
-                        <QuantityInput value={item.quantity} max={item.last_known_stock} onChange={(quantity) => updateQuantity(item.product_variant_id, quantity)} showStock={showWholesaleStock} />
-                        <label><span className="sr-only">كمية البونص</span><input className="rep-control min-h-10 border-gold/30 bg-gold/5 py-2 text-center" type="number" min="0" max={item.last_known_stock} step="1" value={itemOptions[item.product_variant_id]?.bonusQuantity ?? 0} onChange={(event) => setItemOptions((all) => ({ ...all, [item.product_variant_id]: { unitPrice: all[item.product_variant_id]?.unitPrice ?? String(unitPrice), bonusQuantity: Math.max(0, Number(event.target.value)) } }))}/></label>
+                        <QuantityInput value={item.quantity} max={Number.MAX_SAFE_INTEGER} onChange={(quantity) => updateQuantity(item.product_variant_id, quantity)} showStock={showWholesaleStock} />
+                        <label><span className="sr-only">كمية البونص</span><input className="rep-control min-h-10 border-gold/30 bg-gold/5 py-2 text-center" type="number" min="0" step="1" value={itemOptions[item.product_variant_id]?.bonusQuantity ?? 0} onChange={(event) => setItemOptions((all) => ({ ...all, [item.product_variant_id]: { unitPrice: all[item.product_variant_id]?.unitPrice ?? String(unitPrice), bonusQuantity: Math.max(0, Number(event.target.value)) } }))}/></label>
                         <strong className="text-center text-base text-gold-dark">{formatMoney(unitPrice * item.quantity)}</strong>
                         <button type="button" onClick={() => setItemToRemove({ id: item.product_variant_id, name: item.product_name })} className="rounded-lg p-2 text-red-500 hover:bg-red-50" aria-label={`حذف ${item.product_name}`}><Trash2 className="h-4 w-4" /></button>
                       </article>;
@@ -362,79 +300,22 @@ export default function CreateWholesaleOrderPage({
               className="w-full"
               action={<button type="button" onClick={() => setBonusPickerOpen(true)} className="rounded-lg bg-gold/15 px-3 py-2 text-xs font-black text-brand hover:bg-gold/25">+ اختيار صنف بونص</button>}
             >
-              {bonusItems.length === 0 ? <p className="rounded-xl border border-dashed border-stone-200 bg-stone-50/70 p-5 text-center text-sm text-stone-500">لا توجد أصناف بونص مستقلة.</p> : <div className="space-y-3">{bonusItems.map((item, index) => <div key={`${item.product_variant_id}-${index}`} className="grid items-center gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4 sm:grid-cols-[1fr_150px_auto]"><div><b className="text-sm text-brand">{item.label}</b><p className="mt-1 text-xs font-bold text-gold-dark">بونص · السعر صفر</p></div><QuantityInput value={item.quantity} max={item.stock} onChange={(quantity) => setBonusItems((current) => current.map((entry, itemIndex) => itemIndex === index ? { ...entry, quantity } : entry))}/><button type="button" className="justify-self-end rounded-lg p-2 text-red-600 hover:bg-red-50" onClick={() => setBonusItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label="حذف صنف البونص"><Trash2 className="h-5 w-5"/></button></div>)}</div>}
+              {bonusItems.length === 0 ? <p className="rounded-xl border border-dashed border-stone-200 bg-stone-50/70 p-5 text-center text-sm text-stone-500">لا توجد أصناف بونص مستقلة.</p> : <div className="space-y-3">{bonusItems.map((item, index) => <div key={`${item.product_variant_id}-${index}`} className="grid items-center gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4 sm:grid-cols-[1fr_150px_auto]"><div><b className="text-sm text-brand">{item.label}</b><p className="mt-1 text-xs font-bold text-gold-dark">بونص · السعر صفر</p></div><QuantityInput value={item.quantity} max={Number.MAX_SAFE_INTEGER} onChange={(quantity) => setBonusItems((current) => current.map((entry, itemIndex) => itemIndex === index ? { ...entry, quantity } : entry))}/><button type="button" className="justify-self-end rounded-lg p-2 text-red-600 hover:bg-red-50" onClick={() => setBonusItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label="حذف صنف البونص"><Trash2 className="h-5 w-5"/></button></div>)}</div>}
             </RepFormSection>
-            <RepFormSection
-              title="سندات قبض بعد إنشاء الطلب"
-              description="اختياري — تُسجل على حساب الزبون ولا ترتبط بالطلب"
-              className="w-full"
-              action={
-                <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" onClick={() => setPayments((current) => [...current, emptyPayment("Cash")])} className="rounded-lg border border-brand/15 bg-white px-3 py-2 text-xs font-black text-brand hover:bg-brand-50">+ سند قبض نقدي</button>
-                  <div className="flex items-center overflow-hidden rounded-lg border border-brand/15 bg-white">
-                    <input aria-label="عدد الشيكات المراد إضافتها" className="h-9 w-14 border-0 px-2 text-center text-sm font-bold outline-none" type="number" min="1" max="60" value={checksToAdd} onChange={(event) => setChecksToAdd(event.target.value)}/>
-                    <button type="button" onClick={() => {
-                      const count = Math.min(60, Math.max(1, Number(checksToAdd) || 1));
-                      setPayments((current) => {
-                        const previousCheck = [...current].reverse().find((payment) => payment.payment_method === "Check");
-                        const numericCheckNumber = previousCheck?.check_number.trim() && /^\d+$/.test(previousCheck.check_number.trim()) ? Number(previousCheck.check_number.trim()) : null;
-                        const additions = Array.from({ length: count }, (_, offset) => ({
-                          ...emptyPayment("Check"),
-                          amount: previousCheck?.amount ?? "",
-                          check_number: numericCheckNumber === null ? "" : String(numericCheckNumber + offset + 1),
-                          account_number: previousCheck?.account_number ?? "",
-                          bank_number: previousCheck?.bank_number ?? "",
-                          branch_number: previousCheck?.branch_number ?? "",
-                          due_date: previousCheck?.due_date ? addMonthsToDate(previousCheck.due_date, offset + 1) : "",
-                          notes: previousCheck?.notes ?? "",
-                        }));
-                        return [...current, ...additions];
-                      });
-                      setChecksToAdd("1");
-                    }} className="h-9 bg-brand-50 px-3 text-xs font-black text-brand hover:bg-brand-100">+ إضافة شيكات</button>
-                  </div>
-                </div>
-              }
-            >
-              {payments.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/70 px-5 py-8 text-center">
-                  <p className="text-sm font-bold text-stone-600">لا توجد سندات قبض</p>
-                  <p className="mt-1 text-xs text-stone-400">يمكن إنشاء الطلب دون قبض، أو إصدار سند قبض نقدي أو بشيك بعد نجاح الطلب.</p>
-                </div>
-              ) : (
-                <div className="max-h-[520px] overflow-auto rounded-xl border border-stone-200">
-                  <table className="w-full min-w-[1020px] border-collapse text-xs">
-                    <thead className="sticky top-0 z-10 bg-stone-50 text-stone-600 shadow-[0_1px_0_0_rgba(0,0,0,.06)]"><tr><th className="w-12 p-2 text-center">#</th><th className="w-28 p-2 text-right">الطريقة</th><th className="w-28 p-2 text-right">المبلغ</th><th className="w-32 p-2 text-right">رقم الشيك</th><th className="w-32 p-2 text-right">الحساب</th><th className="w-24 p-2 text-right">البنك</th><th className="w-24 p-2 text-right">الفرع</th><th className="w-36 p-2 text-right">الاستحقاق</th><th className="w-24 p-2" /></tr></thead>
-                    <tbody className="divide-y divide-stone-100">
-                      {payments.map((payment, index) => { const check = payment.payment_method === "Check"; const noteOpen = openPaymentNotes.has(payment.key); const inputClass = "h-9 w-full rounded-lg border border-stone-200 bg-white px-2 outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/10 disabled:border-transparent disabled:bg-stone-50 disabled:text-transparent"; return <Fragment key={payment.key}><tr className="hover:bg-stone-50/60">
-                        <td className="p-2 text-center font-black text-stone-400">{index + 1}</td>
-                        <td className="p-1.5"><RepSelect value={payment.payment_method} options={[{ value: "Cash", label: "نقدًا" }, { value: "Check", label: "شيك" }]} onChange={(payment_method) => updatePayment(index, { payment_method })}/></td>
-                        <td className="p-1.5"><input className={inputClass} type="number" min="0.01" step="0.01" placeholder="0.00" value={payment.amount} onChange={(event) => updatePayment(index, { amount: event.target.value })}/></td>
-                        <td className="p-1.5">{check ? <input className={inputClass} value={payment.check_number} onChange={(event) => updatePayment(index, { check_number: event.target.value })}/> : <span className="block text-center text-stone-300">—</span>}</td>
-                        <td className="p-1.5">{check ? <input className={inputClass} value={payment.account_number} onChange={(event) => updatePayment(index, { account_number: event.target.value })}/> : <span className="block text-center text-stone-300">—</span>}</td>
-                        <td className="p-1.5">{check ? <input className={inputClass} value={payment.bank_number} onChange={(event) => updatePayment(index, { bank_number: event.target.value })}/> : <span className="block text-center text-stone-300">—</span>}</td>
-                        <td className="p-1.5">{check ? <input className={inputClass} value={payment.branch_number} onChange={(event) => updatePayment(index, { branch_number: event.target.value })}/> : <span className="block text-center text-stone-300">—</span>}</td>
-                        <td className="p-1.5">{check ? <RepDateInput value={payment.due_date} onChange={(due_date) => updatePayment(index, { due_date })}/> : <span className="block text-center text-stone-300">—</span>}</td>
-                        <td className="p-1.5"><div className="flex items-center justify-center gap-1"><button type="button" onClick={() => togglePaymentNote(payment.key)} className={`relative grid h-8 w-8 place-items-center rounded-lg transition ${payment.notes ? "bg-gold/15 text-gold-dark" : noteOpen ? "bg-brand-50 text-brand" : "text-stone-400 hover:bg-stone-100"}`} aria-label={noteOpen ? "إخفاء الملاحظة" : "إضافة ملاحظة"} aria-expanded={noteOpen}><MessageSquareText className="h-4 w-4" />{payment.notes && <span className="absolute left-1 top-1 h-1.5 w-1.5 rounded-full bg-gold-dark" />}</button><button type="button" onClick={() => { setPayments((current) => current.filter((_, itemIndex) => itemIndex !== index)); setOpenPaymentNotes((current) => { const next = new Set(current); next.delete(payment.key); return next; }); }} className="grid h-8 w-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" aria-label={`حذف سند القبض ${index + 1}`}><Trash2 className="h-4 w-4" /></button></div></td>
-                      </tr>{noteOpen && <tr className="bg-stone-50/70"><td colSpan={9} className="px-4 py-2"><div className="flex items-center gap-3"><span className="shrink-0 text-xs font-bold text-stone-500">ملاحظة السند</span><input autoFocus className="h-9 flex-1 rounded-lg border border-stone-200 bg-white px-3 outline-none focus:border-gold focus:ring-2 focus:ring-gold/10" placeholder="اكتب ملاحظة اختيارية…" value={payment.notes} onChange={(event) => updatePayment(index, { notes: event.target.value })}/><button type="button" onClick={() => togglePaymentNote(payment.key)} className="rounded-lg px-3 py-2 text-xs font-bold text-stone-500 hover:bg-stone-100">إغلاق</button></div></td></tr>}</Fragment>; })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {payments.length > 0 && <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-brand-50/60 px-4 py-3 text-xs text-stone-500"><span>{payments.length} سندات قبض · {payments.filter((payment) => payment.payment_method === "Check").length} شيكات</span><b className="text-sm text-brand">إجمالي القبض: {formatMoney(payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0))}</b></div>}
-            </RepFormSection>
+
           </div>
         </div>
         <footer className="sticky bottom-4 z-30 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-brand/15 bg-white/95 px-5 py-4 shadow-[0_18px_55px_-18px_rgba(22,46,33,.4)] backdrop-blur">
           <div className="flex items-center gap-8">
             <div><span className="block text-xs font-bold text-stone-500">إجمالي الطلب بعد الخصم</span><strong className="text-2xl text-gold-dark">{formatMoney(Math.max(0, previewSubtotal - Number(fields.order_discount || 0)))}</strong></div>
-            <div className="hidden sm:block"><span className="block text-xs font-bold text-stone-500">سندات القبض</span><strong className="text-sm text-brand">{formatMoney(payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0))}</strong></div>
+
           </div>
-          <button disabled={submitting} className="min-h-12 rounded-xl bg-brand px-8 font-black text-white shadow-lg shadow-brand/15 transition hover:bg-brand-700 disabled:opacity-60">{submitting ? "جاري إنشاء الطلب…" : "مراجعة وتأكيد الطلب"}</button>
+          <button disabled={submitting || saleAccounts.loading || !!saleAccounts.error || saleAccounts.accounts.length === 0} className="min-h-12 rounded-xl bg-brand px-8 font-black text-white shadow-lg shadow-brand/15 transition hover:bg-brand-700 disabled:opacity-60">{submitting ? "جاري إنشاء الطلب…" : "مراجعة وتأكيد الطلب"}</button>
         </footer>
       </form>
       <RepProductPicker
         open={bonusPickerOpen}
+        allowOutOfStock
         existing={[...items.map((item) => ({ product_variant_id: item.product_variant_id, quantity: item.quantity })), ...bonusItems]}
         onClose={() => setBonusPickerOpen(false)}
         onAdd={(picked) => {

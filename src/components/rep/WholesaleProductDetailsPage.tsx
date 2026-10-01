@@ -41,10 +41,7 @@ export default function WholesaleProductDetailsPage({
             response.product.images[0]?.id ??
             null,
         );
-        const available = response.product.variants.find(
-          (variant) => variant.stock_quantity > 0,
-        );
-        setVariantId(available?.id ?? response.product.variants[0]?.id ?? null);
+        setVariantId(response.product.variants[0]?.id ?? null);
       })
       .catch((error) => {
         if (!controller.signal.aborted)
@@ -78,7 +75,7 @@ export default function WholesaleProductDetailsPage({
     ? Math.max(0, Number(variant.price) - Number(variant.discount))
     : 0;
   const add = () => {
-    if (!variant || variant.stock_quantity <= 0) return;
+    if (!variant) return;
     addItem({
       product_id: product.id,
       product_name: product.name,
@@ -86,7 +83,7 @@ export default function WholesaleProductDetailsPage({
       product_variant_id: variant.id,
       size: variant.size,
       color: variant.color.name,
-      quantity: Math.min(quantity, variant.stock_quantity),
+      quantity,
       last_known_stock: variant.stock_quantity,
       display_price: variant.price,
       display_discount: variant.discount,
@@ -171,7 +168,6 @@ export default function WholesaleProductDetailsPage({
               {product.variants.map((item) => (
                 <button
                   key={item.id}
-                  disabled={item.stock_quantity <= 0}
                   onClick={() => {
                     setVariantId(item.id);
                     setQuantity(1);
@@ -181,7 +177,7 @@ export default function WholesaleProductDetailsPage({
                   <strong className="block text-brand">
                     {item.size} — {item.color.name}
                   </strong>
-                  <span className="mt-1 block text-xs text-stone-500">{item.stock_quantity > 0 ? showWholesaleStock ? `المتوفر: ${item.stock_quantity}` : "متوفر" : "غير متوفر"}</span>
+                  <span className="mt-1 block text-xs text-stone-500">{showWholesaleStock ? `الرصيد الحالي: ${item.stock_quantity}` : "متاح للطلب"}</span>
                 </button>
               ))}
             </div>
@@ -205,12 +201,12 @@ export default function WholesaleProductDetailsPage({
               </div>
               <div className="mt-5 flex items-center justify-between">
                 <span className="text-sm font-bold text-stone-600">الكمية</span>
-                <QuantityInput value={quantity} max={variant.stock_quantity} onChange={setQuantity} showStock={showWholesaleStock} />
+                <QuantityInput value={quantity} max={variant.stock_quantity} allowOverMax onChange={setQuantity} showStock={showWholesaleStock} />
               </div>
             </div>
           )}
           <button
-            disabled={!variant || variant.stock_quantity <= 0}
+            disabled={!variant}
             onClick={add}
             className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
           >

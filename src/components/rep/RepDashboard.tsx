@@ -132,7 +132,7 @@ export default function RepDashboard({
             ))}
             <article className="rounded-2xl border border-gold/30 bg-gold/10 p-5">
               <p className="text-sm font-bold text-stone-600">
-              صافي مبيعاتي المكتملة
+              قيمة طلبات الجملة المكتملة حاليًا
               </p>
               <p className="mt-5 text-2xl font-black text-brand">
                 {formatMoney(stats.completed_sales_total)}

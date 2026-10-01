@@ -1,0 +1,104 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { Check, ChevronDown, Search } from "lucide-react";
+import type { SaleAccountOption } from "@/api";
+
+export default function GeneralSaleAccountSelect({
+  accounts, value, onChange, loading, error, onRetry, onNavigate, label = "الحساب *", floating = false,
+}: {
+  accounts: SaleAccountOption[];
+  value: number | null;
+  onChange: (id: number | null) => void;
+  loading: boolean;
+  error: string;
+  onRetry: () => void;
+  onNavigate?: (path: string) => void;
+  label?: string;
+  floating?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const root = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const focusInput = useCallback((node: HTMLInputElement | null) => {
+    input.current = node;
+    node?.focus();
+  }, []);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState<{ left: number; width: number; top?: number; bottom?: number; maxHeight: number } | null>(null);
+  const chosen = accounts.find((account) => account.id === value);
+  const options = accounts.filter((account) => account.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+
+  useEffect(() => {
+    if (!open) return;
+    input.current?.focus();
+    const close = (event: MouseEvent) => {
+      if (!root.current?.contains(event.target as Node) && !menu.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !floating) return;
+    const position = () => {
+      const rect = trigger.current?.getBoundingClientRect();
+      if (!rect) return;
+      const below = window.innerHeight - rect.bottom;
+      const above = rect.top;
+      const placeAbove = below < 300 && above > below;
+      const available = placeAbove ? above : below;
+      setPlacement({
+        left: Math.max(8, rect.left),
+        width: Math.min(rect.width, window.innerWidth - 16),
+        ...(placeAbove ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
+        maxHeight: Math.max(120, Math.min(320, available - 14)),
+      });
+    };
+    position();
+    window.addEventListener("resize", position);
+    window.addEventListener("scroll", position, true);
+    return () => {
+      window.removeEventListener("resize", position);
+      window.removeEventListener("scroll", position, true);
+    };
+  }, [open, floating]);
+
+  const dropdown = <div ref={menu} style={floating ? placement ?? undefined : undefined}
+    className={`${floating ? "fixed z-[950] flex flex-col" : "absolute inset-x-0 top-full z-40"} overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl`}>
+    <div className="relative shrink-0 border-b p-2">
+      <Search className="absolute right-5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+      <input ref={focusInput} className="rep-control pr-10" value={search} onChange={(event) => setSearch(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") { event.stopPropagation(); setOpen(false); trigger.current?.focus(); event.preventDefault(); }
+          if (event.key === "Enter" && options[0]) { onChange(options[0].id); setOpen(false); trigger.current?.focus(); event.preventDefault(); }
+        }} placeholder="ابحث باسم الحساب" aria-label="ابحث باسم الحساب" />
+    </div>
+    <div role="listbox" aria-label={label} className="min-h-0 max-h-60 overflow-y-auto p-1.5">
+      {options.map((account) => <button key={account.id} type="button" role="option" aria-selected={account.id === value}
+        onClick={() => { onChange(account.id); setOpen(false); trigger.current?.focus(); }}
+        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-right text-sm font-bold text-brand hover:bg-brand-50">
+        <span>{account.name}</span>{account.id === value && <Check className="h-4 w-4" />}
+      </button>)}
+      {options.length === 0 && <p className="p-4 text-center text-sm text-stone-500">لا توجد حسابات مطابقة.</p>}
+    </div>
+  </div>;
+
+  return <div ref={root} className="relative space-y-2">
+    <span className="rep-label">{label}</span>
+    <button ref={trigger} type="button" disabled={loading || !!error || accounts.length === 0}
+      aria-haspopup="listbox" aria-expanded={open}
+      onClick={() => { setSearch(""); if (floating) setPlacement(null); setOpen((current) => !current); }}
+      className="rep-control flex items-center justify-between gap-3 text-right">
+      <span className={chosen ? "truncate font-bold text-brand" : "text-stone-400"}>{chosen?.name ?? (loading ? "جاري تحميل الحسابات…" : "اختر حسابًا")}</span>
+      <ChevronDown className="h-4 w-4 shrink-0 text-stone-500" />
+    </button>
+    {open && (floating ? placement && createPortal(dropdown, document.body) : dropdown)}
+    {error && <div className="text-sm font-bold text-red-700" role="alert">{error} <button type="button" className="underline" onClick={onRetry}>إعادة المحاولة</button></div>}
+    {!loading && !error && accounts.length === 0 && <div className="text-sm font-bold text-amber-800" role="status">
+      لا توجد حسابات متاحة للبيع. أنشئ حسابًا مناسبًا أولًا.
+      {onNavigate && <button type="button" className="mr-2 underline" onClick={() => onNavigate("/owner/accounts")}>فتح الحسابات</button>}
+    </div>}
+  </div>;
+}

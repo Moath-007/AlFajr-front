@@ -110,7 +110,7 @@ export default function CartPage({
                   </div>
                 </div>
                 <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
-                  <QuantityInput value={item.quantity} max={item.stock_quantity} onChange={(quantity) => setQuantity(item.product_variant_id, quantity)} ariaLabel={`كمية ${item.product_name}`} showStock={false} />
+                  <QuantityInput value={item.quantity} max={item.stock_quantity} allowOverMax onChange={(quantity) => setQuantity(item.product_variant_id, quantity)} ariaLabel={`كمية ${item.product_name}`} showStock={false} />
                   <p className="font-black text-[#162E21]">
                     {formatPrice(item.display_effective_price * item.quantity)}
                   </p>

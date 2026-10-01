@@ -36,6 +36,8 @@ type Child = {
   aliases?: string[];
   quick?: boolean;
 };
+type NestedChild = { path: string; label: string; icon: Icon; children: Child[] };
+type GroupChild = Child | NestedChild;
 const direct = [
   { path: "/owner", label: "لوحة التحكم", icon: LayoutDashboard, exact: true },
   { path: "/owner/reports", label: "التقارير", icon: BarChart3 },
@@ -47,12 +49,11 @@ const groups = [
     icon: ShoppingBasket,
     children: [
       { path: "/owner/orders", label: "الطلبات", icon: ClipboardList },
-      {
-        path: "/owner/store-sale",
-        label: "بيع من المحل",
-        icon: ShoppingBasket,
-        quick: true,
-      },
+      { path: "/owner/create-order", label: "إنشاء طلب", icon: ShoppingBasket,
+        children: [
+          { path: "/owner/create-order/retail", label: "بيع مفرق", icon: ShoppingBasket, quick: true },
+          { path: "/owner/create-order/wholesale", label: "بيع جملة", icon: ShoppingBasket, quick: true },
+        ] },
     ],
   },
   {
@@ -61,20 +62,21 @@ const groups = [
     icon: Users,
     children: [
       {
-        path: "/owner/customers",
-        label: "الزبائن والحسابات",
+        path: "/owner/accounts",
+        label: "جميع الحسابات",
         icon: Users,
-        aliases: ["/owner/receivables", "/owner/returns"],
+        aliases: ["/owner/returns"],
       },
       {
-        path: "/owner/customer-statements",
-        label: "كشف حساب زبون",
+        path: "/owner/vouchers",
+        label: "سندات القبض والصرف والقيد",
         icon: FileText,
       },
-      { path: "/owner/checks", label: "الشيكات والخزنة", icon: Banknote },
+      { path: "/owner/checks", label: "الشيكات", icon: Banknote },
+      { path: "/owner/returns", label: "المردودات", icon: ReceiptText },
       {
         path: "/owner/customer-purchases",
-        label: "مشتريات الزبائن",
+        label: "المشتريات",
         icon: ReceiptText,
       },
     ],
@@ -108,10 +110,11 @@ const groups = [
       },
     ],
   },
-] satisfies Array<{ id: string; label: string; icon: Icon; children: Child[] }>;
+] satisfies Array<{ id: string; label: string; icon: Icon; children: GroupChild[] }>;
 const matches = (current: string, path: string, exact = false) =>
   exact ? current === path : current === path || current.startsWith(`${path}/`);
-const childActive = (current: string, child: Child) =>
+const childActive = (current: string, child: GroupChild): boolean =>
+  'children' in child ? child.children.some((nested) => childActive(current, nested)) :
   [child.path, ...(child.aliases ?? [])].some((path) => matches(current, path));
 
 export default function OwnerSidebar({
@@ -133,7 +136,9 @@ export default function OwnerSidebar({
     [currentPath],
   );
   const [expanded, setExpanded] = useState<string | null>(currentGroup);
+  const [createExpanded, setCreateExpanded] = useState(() => matches(currentPath, '/owner/create-order'));
   useEffect(() => setExpanded(currentGroup), [currentGroup]);
+  useEffect(() => { if (matches(currentPath, '/owner/create-order')) setCreateExpanded(true); }, [currentPath]);
   const go = (path: string) => {
     onNavigate(path);
     setMobileOpen(false);
@@ -218,13 +223,20 @@ export default function OwnerSidebar({
               >
                 <div className="overflow-hidden">
                   <div className="mt-1 space-y-1 rounded-xl bg-black/10 p-1.5">
-                    {group.children.map((child) => (
-                      <ChildLink
-                        key={child.path}
-                        child={child}
-                        active={childActive(currentPath, child)}
-                        onClick={() => go(child.path)}
-                      />
+                    {group.children.map((child) => 'children' in child ? (
+                      <div key={child.path}>
+                        <button type="button" onClick={() => setCreateExpanded((value) => !value)}
+                          aria-expanded={createExpanded}
+                          className={`flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-right text-[13px] font-bold transition ${childActive(currentPath, child) ? 'text-gold' : 'text-stone-300 hover:bg-white/10 hover:text-white'}`}>
+                          <child.icon className="h-4 w-4" /><span>{child.label}</span>
+                          <ChevronDown className={`mr-auto h-4 w-4 transition-transform ${createExpanded ? 'rotate-180' : ''}`} />
+                        </button>
+                        {createExpanded && <div className="mr-5 space-y-1 border-r border-white/20 pr-2">{child.children.map((nested) =>
+                          <ChildLink key={nested.path} child={nested} active={childActive(currentPath, nested)} onClick={() => go(nested.path)} />
+                        )}</div>}
+                      </div>
+                    ) : (
+                      <ChildLink key={child.path} child={child} active={childActive(currentPath, child)} onClick={() => go(child.path)} />
                     ))}
                   </div>
                 </div>

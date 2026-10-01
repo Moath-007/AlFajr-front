@@ -14,14 +14,13 @@ function restoreCart(): WholesaleCartItem[] {
       const quantity = value.quantity;
       const stock = value.last_known_stock;
       const positiveInteger = (candidate: unknown) => typeof candidate === 'number' && Number.isSafeInteger(candidate) && candidate > 0;
-      const finiteNonNegative = (candidate: unknown) => typeof candidate === 'number' && Number.isFinite(candidate) && candidate >= 0;
+      const finiteStock = (candidate: unknown) => typeof candidate === 'number' && Number.isSafeInteger(candidate);
       const nonEmpty = (candidate: unknown) => typeof candidate === 'string' && candidate.trim().length > 0;
       const decimal = (candidate: unknown) => typeof candidate === 'string' && candidate.trim() !== '' && Number.isFinite(Number(candidate)) && Number(candidate) >= 0;
       return positiveInteger(value.product_id)
         && positiveInteger(value.product_variant_id)
         && positiveInteger(quantity)
-        && finiteNonNegative(stock)
-        && Number(quantity) <= Number(stock)
+        && finiteStock(stock)
         && nonEmpty(value.product_name)
         && nonEmpty(value.product_code)
         && nonEmpty(value.size)
@@ -53,12 +52,12 @@ export default function WholesaleCartProvider({ children }: { children: ReactNod
     const existing = current.find((entry) => entry.product_variant_id === item.product_variant_id);
     if (!existing) return [...current, item];
     return current.map((entry) => entry.product_variant_id === item.product_variant_id
-      ? { ...item, quantity: Math.min(entry.quantity + item.quantity, item.last_known_stock) }
+      ? { ...item, quantity: entry.quantity + item.quantity }
       : entry);
   }), [save]);
 
   const updateQuantity = useCallback((variantId: NumericId, quantity: number) => save((current) => current.map((item) => item.product_variant_id === variantId
-    ? { ...item, quantity: Math.max(1, Math.min(quantity, item.last_known_stock)) }
+    ? { ...item, quantity: Math.max(1, Math.trunc(quantity)) }
     : item)), [save]);
   const removeItem = useCallback((variantId: NumericId) => save((current) => current.filter((item) => item.product_variant_id !== variantId)), [save]);
   const clearCart = useCallback(() => save(() => []), [save]);

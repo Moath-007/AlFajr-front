@@ -10,17 +10,21 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { RepDateInput, RepSearchField, RepSelect } from "./RepFormControls";
 import { OrderStatusBadge } from "./RepOrderUi";
 import { apiMessages, formatMoney, formatOrderDate } from "./repOrderUtils";
+import { canEditOrder } from "@/components/orders/orderEditPermission";
+import { takeOrderDeletedMessage } from "@/components/orders/orderDeleteFeedback";
 
 export default function RepOrders({
   onNavigate,
 }: {
   onNavigate: (path: string) => void;
 }) {
+  const [deleteMessage] = useState(() => takeOrderDeletedMessage("representative"));
   const [orders, setOrders] = useState<OrderListItemResponseDto[]>([]),
     [loading, setLoading] = useState(true),
     [errors, setErrors] = useState<string[]>([]),
     [page, setPage] = useState(1),
     [pages, setPages] = useState(1),
+    [total, setTotal] = useState(0),
     [search, setSearch] = useState(""),
     [submitted, setSubmitted] = useState(""),
     [status, setStatus] = useState(""),
@@ -48,10 +52,15 @@ export default function RepOrders({
       .then((r) => {
         setOrders(r.orders);
         setPages(r.pagination.total_pages || 1);
+        setTotal(r.pagination.total);
       })
       .catch((e) => {
-        if (!c.signal.aborted)
+        if (!c.signal.aborted) {
+          setOrders([]);
+          setPages(1);
+          setTotal(0);
           setErrors(apiMessages(e, "تعذر تحميل طلبات الجملة."));
+        }
       })
       .finally(() => {
         if (!c.signal.aborted) setLoading(false);
@@ -70,7 +79,7 @@ export default function RepOrders({
           <p className="rep-eyebrow">سجل المبيعات المشترك</p>
           <h1 className="rep-title">كل طلبات الجملة</h1>
           <p className="rep-subtitle">
-            عرض وتعديل وإلغاء طلبات الجملة لجميع المناديب.
+            المصدر: مندوب · عرض وتعديل وإلغاء طلبات الجملة لجميع المناديب.
           </p>
         </div>
         <button
@@ -80,6 +89,7 @@ export default function RepOrders({
           <Plus className="h-5 w-5" /> إنشاء طلب جديد
         </button>
       </header>
+      {deleteMessage && <div className="rounded-xl bg-emerald-50 p-3 font-bold text-emerald-800" role="status">{deleteMessage}</div>}
       <form
         onSubmit={submit}
         className="grid gap-3 rounded-2xl border bg-white p-4 shadow-sm md:grid-cols-2 xl:grid-cols-5"
@@ -99,16 +109,17 @@ export default function RepOrders({
             { value: "Cancelled", label: "ملغي" },
           ]}
         />
-        <RepDateInput label="من" value={from} onChange={setFrom} />
-        <RepDateInput label="إلى" value={to} onChange={setTo} />
+        <RepDateInput label="من" value={from} max={to || undefined} onChange={(value) => { setFrom(value); setPage(1); }} />
+        <RepDateInput label="إلى" value={to} min={from || undefined} onChange={(value) => { setTo(value); setPage(1); }} />
         <button className="btn-primary self-end">بحث</button>
       </form>
       {errors.length > 0 && (
         <div className="rep-error">{errors.join("، ")}</div>
       )}
+      {!loading && errors.length === 0 && <p className="text-sm text-stone-500">عدد الطلبات المطابقة: {total}</p>}
       {loading ? (
         <Skeleton className="h-80" />
-      ) : orders.length === 0 ? (
+      ) : errors.length > 0 ? null : orders.length === 0 ? (
         <EmptyState title="لا توجد طلبات مطابقة" />
       ) : (
         <>
@@ -122,7 +133,7 @@ export default function RepOrders({
                     "المندوب",
                     "الحالة",
                     "الإجمالي",
-                    "التاريخ",
+                    "تاريخ الإنشاء",
                     "الإجراءات",
                   ].map((label) => (
                     <th key={label} className="whitespace-nowrap px-4 py-3 text-right">
@@ -133,7 +144,7 @@ export default function RepOrders({
               </thead>
               <tbody className="divide-y">
                 {orders.map((order) => {
-                  const canEdit = order.status !== "Cancelled";
+                  const canEdit = canEditOrder(order, "Representative");
                   return (
                     <tr key={order.id} className="transition hover:bg-stone-50/70">
                       <td className="px-4 py-4 font-black text-brand">#{order.id}</td>
@@ -159,7 +170,7 @@ export default function RepOrders({
           </div>
           <div className="space-y-3 lg:hidden">
             {orders.map((order) => {
-              const canEdit = order.status !== "Cancelled";
+              const canEdit = canEditOrder(order, "Representative");
               return <article key={order.id} className="rounded-2xl border bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3"><div><b className="text-brand">طلب #{order.id}</b><p className="mt-1 text-sm font-bold">{order.customer.name}</p></div><OrderStatusBadge status={order.status} /></div>
                 <p className="mt-2 text-xs text-stone-500">{order.representative?.name || "بدون مندوب"} · {formatOrderDate(order.created_at)}</p>

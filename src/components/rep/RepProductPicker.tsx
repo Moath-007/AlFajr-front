@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArrowRight,
   PackageOpen,
@@ -47,7 +47,8 @@ export default function RepProductPicker({
   onClose,
   onAdd,
   priceMode = "wholesale",
-  allowOutOfStock = false,
+  allowOutOfStock = true,
+  purpose = "الطلب",
 }: {
   open: boolean;
   existing: Array<{ product_variant_id: number; quantity: number }>;
@@ -55,6 +56,7 @@ export default function RepProductPicker({
   onAdd: (item: PickedOrderItem) => void;
   priceMode?: "retail" | "wholesale";
   allowOutOfStock?: boolean;
+  purpose?: "الطلب" | "المردود" | "الشراء";
 }) {
   const stockVisibility = useOptionalWholesaleStockVisibility();
   const showWholesaleStock = stockVisibility?.showWholesaleStock ?? true;
@@ -74,6 +76,15 @@ export default function RepProductPicker({
   const [loading, setLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setSubmittedSearch(search.trim());
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [open, search]);
 
   useEffect(() => {
     if (!open || categories.length || colors.length) return;
@@ -113,6 +124,7 @@ export default function RepProductPicker({
         signal,
       )
         .then((response) => {
+          if (signal?.aborted) return;
           setProducts(response.products);
           setPagination(response.pagination);
         })
@@ -134,11 +146,6 @@ export default function RepProductPicker({
     return () => controller.abort();
   }, [details, loadProducts, open]);
 
-  const submitSearch = (event: FormEvent) => {
-    event.preventDefault();
-    setPage(1);
-    setSubmittedSearch(search.trim());
-  };
   const openProduct = async (id: number) => {
     setDetailsLoading(true);
     setErrors([]);
@@ -179,7 +186,7 @@ export default function RepProductPicker({
     onAdd({
       product_variant_id: variant.id,
       quantity,
-      stock: allowOutOfStock ? Number.MAX_SAFE_INTEGER : variant.stock_quantity,
+      stock: variant.stock_quantity,
       original_price: variant.price,
       display_discount: variant.discount,
       display_price: String(
@@ -194,7 +201,7 @@ export default function RepProductPicker({
     <Modal
       open={open}
       onClose={closePicker}
-      title={details ? `اختيار خيار — ${details.name}` : "إضافة منتج للطلب"}
+      title={details ? `اختيار خيار — ${details.name}` : `إضافة منتج ${purpose === 'المردود' ? 'للمردود' : purpose === 'الشراء' ? 'للشراء' : 'للطلب'}`}
       size="xl"
       mobileFullscreen
     >
@@ -285,7 +292,7 @@ export default function RepProductPicker({
                         </span>
                         {exists && (
                           <span className="mt-1 block text-[11px] font-bold text-amber-700">
-                            موجود في الطلب بكمية {exists.quantity}
+                            موجود في {purpose} بكمية {exists.quantity}
                           </span>
                         )}
                       </button>
@@ -301,7 +308,7 @@ export default function RepProductPicker({
                     {variant.size} — {variant.color.name}
                   </strong>
                   <p className="text-xs text-stone-500">
-                    {allowOutOfStock ? "الكمية ستضاف إلى المخزون" : `متاح للإضافة: ${availableToAdd}`}
+                    {allowOutOfStock ? "يمكن إدخال الكمية المطلوبة دون تقييدها بالرصيد الحالي" : `متاح للإضافة: ${availableToAdd}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -313,7 +320,7 @@ export default function RepProductPicker({
                     className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-5 text-sm font-black text-white disabled:opacity-45"
                   >
                     <ShoppingCart className="h-4 w-4" />{" "}
-                    {current ? "زيادة الكمية" : "إضافة للطلب"}
+                    {current ? "زيادة الكمية" : `إضافة ${purpose === 'المردود' ? 'للمردود' : purpose === 'الشراء' ? 'للشراء' : 'للطلب'}`}
                   </button>
                 </div>
               </div>
@@ -321,10 +328,7 @@ export default function RepProductPicker({
           </div>
         ) : (
           <>
-            <form
-              onSubmit={submitSearch}
-              className="grid items-end gap-3 rounded-2xl bg-stone-50 p-3 md:grid-cols-2 xl:grid-cols-[1fr_170px_170px_180px_auto]"
-            >
+            <div className="grid items-end gap-3 rounded-2xl bg-stone-50 p-3 md:grid-cols-2 xl:grid-cols-[1fr_170px_170px_180px]">
               <RepSearchField
                 label="البحث"
                 value={search}
@@ -374,10 +378,7 @@ export default function RepProductPicker({
                   { value: "price_desc", label: "السعر: الأعلى" },
                 ]}
               />
-              <button className="min-h-11 rounded-xl bg-brand px-4 text-sm font-black text-white">
-                بحث
-              </button>
-            </form>
+            </div>
             {loading ? (
               <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {Array.from({ length: 8 }, (_, index) => (

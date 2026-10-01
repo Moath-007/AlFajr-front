@@ -23,24 +23,12 @@ export type StoreSaleOrderItemDto = OrderItemDto;
 export interface CreateRetailOrderDto {
   customer_name: string;
   phone: string;
-  email?: string;
-  delivery_address: string;
   notes?: string;
   items: RetailOrderItemDto[];
 }
 
-export interface WholesalePaymentDto {
-  amount: number;
-  payment_method: PaymentMethod;
-  check_number?: string;
-  account_number?: string;
-  bank_number?: string;
-  branch_number?: string;
-  due_date?: string;
-  notes?: string;
-}
-
 export interface CreateWholesaleOrderDto {
+  sale_account_id: NumericId;
   customer_name: string;
   phone: string;
   email?: string;
@@ -48,13 +36,11 @@ export interface CreateWholesaleOrderDto {
   order_discount?: number;
   notes?: string;
   items: WholesaleOrderItemDto[];
-  payments?: WholesalePaymentDto[];
 }
 
 export interface CreateStoreSaleOrderDto {
-  customer_name: string;
-  phone: string;
-  email?: string;
+  sale_type?: "Retail" | "Wholesale";
+  sale_account_id: NumericId;
   order_discount?: number;
   notes?: string;
   items: StoreSaleOrderItemDto[];
@@ -62,10 +48,11 @@ export interface CreateStoreSaleOrderDto {
 
 export interface OrderActionDataDto {
   order_id: NumericId;
-  customer_id: NumericId;
+  customer_id: NumericId | null;
   representative_id?: NumericId | null;
   order_type: OrderType;
   status: ApiOrderStatus;
+  sale_account_id: NumericId | null;
   total_amount: DecimalString;
   order_discount: DecimalString;
   delivery_address?: string | null;
@@ -78,9 +65,9 @@ export interface OrderActionResponseDto {
   order: OrderActionDataDto;
 }
 
-export interface UpdateOrderStatusDto {
-  status: Extract<ApiOrderStatus, "Completed" | "Cancelled">;
-}
+export type UpdateOrderStatusDto =
+  | { status: "Completed"; sale_account_id: NumericId }
+  | { status: "Cancelled"; sale_account_id?: never };
 
 export interface OrderCustomerResponseDto {
   id: NumericId;
@@ -129,12 +116,14 @@ export interface OrderResponseDto {
   id: NumericId;
   order_type: OrderType;
   status: ApiOrderStatus;
+  sale_account_id: NumericId | null;
+  sale_account: { id: NumericId; name: string; kind: string } | null;
   total_amount: DecimalString;
   order_discount: DecimalString;
   delivery_address?: string | null;
   notes?: string | null;
   created_at: IsoDateTimeString;
-  customer: OrderCustomerResponseDto;
+  customer: OrderCustomerResponseDto | null;
   representative?: OrderRepresentativeResponseDto | null;
   items: OrderItemResponseDto[];
 }
@@ -171,7 +160,9 @@ export interface OrderListItemResponseDto {
   id: NumericId;
   order_type: OrderType;
   status: ApiOrderStatus;
-  customer: OrderListCustomerDto;
+  notes: string | null;
+  customer: OrderListCustomerDto | null;
+  sale_account: { id: NumericId; name: string; kind: string } | null;
   representative?: OrderListRepresentativeDto | null;
   total_amount: DecimalString;
   created_at: IsoDateTimeString;
@@ -196,22 +187,19 @@ export interface RepresentativeOrderStatsResponseDto {
   stats: RepresentativeOrderStatsDto;
 }
 
-export interface UpdateOrderPaymentDto {
-  payment_id?: NumericId;
-  amount: number;
-  payment_method: PaymentMethod;
-  check_number?: string;
-  notes?: string;
-}
-
 export interface UpdateOrderDto {
-  customer_name: string;
-  phone: string;
+  sale_account_id?: NumericId;
+  customer_name?: string;
+  phone?: string;
   email?: string;
   delivery_address?: string;
   notes?: string;
   order_discount?: number;
   items: UpdateOrderItemDto[];
+}
+
+export interface OrderMessageResponseDto {
+  message: string;
 }
 
 export interface UpdateOrderItemDto {
