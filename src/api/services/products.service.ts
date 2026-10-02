@@ -19,10 +19,6 @@ import type {
 export const productsService = {
   permanentDelete: (id: number) =>
     apiClient.delete<{ message: string }>(`/products/${id}/permanent`),
-  deleteVariant: (id: number, variant: number) =>
-    apiClient.delete<{ message: string }>(
-      `/products/${id}/variants/${variant}`,
-    ),
   listAdmin: (query: AdminProductsQuery = {}, signal?: AbortSignal) =>
     apiClient.get<ProductsListResponseDto>(withAdminQuery("/products", query), {
       signal,

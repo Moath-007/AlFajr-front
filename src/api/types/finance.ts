@@ -1,4 +1,4 @@
-import type { DecimalString, IsoDateTimeString, NumericId, PaginationResponseDto } from "./common";
+import type { DecimalString, IsoDateTimeString, NumericId } from "./common";
 import type { PaymentMethod } from "./orders";
 
 export interface CurrencyDto { currency_id: NumericId; code: string; name: string; symbol: string; is_base: boolean; is_active: boolean; created_at: IsoDateTimeString; }
@@ -7,7 +7,6 @@ export interface CreatePaymentDto { amount: number; currency_id: NumericId; exch
 export type CheckDisplayStatus = "NotDue" | "Due" | "Returned";
 export interface PaymentCheckDto { managed_check_id?: number; location?: string; check_number: string; account_number?: string | null; bank_number?: string | null; branch_number?: string | null; due_date?: string | null; status: CheckDisplayStatus; collected_at?: IsoDateTimeString | null; returned_at?: IsoDateTimeString | null; return_reason?: string | null; }
 export interface PaymentDto { id: NumericId; voucher_number?: string; payment_type: "Receipt" | "Disbursement"; amount: DecimalString; currency: CurrencyDto | null; exchange_rate: DecimalString | null; base_amount: DecimalString | null; payment_method: PaymentMethod; paid_at: IsoDateTimeString; notes?: string | null; recorded_by: { user_id: NumericId; name: string } | null; updated_by?: { user_id: NumericId; name: string } | null; cancelled_at?: IsoDateTimeString | null; cancelled_by?: { user_id: NumericId; name: string } | null; effective_state: "Effective" | "Returned" | "Cancelled"; check: PaymentCheckDto | null; account: { account_id: NumericId; name: string; phone: string | null } | null; }
-export interface PaymentsListResponseDto { message: string; items: PaymentDto[]; pagination: PaginationResponseDto; }
 export interface PaymentDetailsResponseDto { message: string; payment: PaymentDto; }
 export interface CreatePaymentResponseDto { message: string; payment_id: NumericId; voucher_number?: string; base_amount: DecimalString; }
 export type ReturnType = "SalesReturn" | "PurchaseReturn";
@@ -17,5 +16,4 @@ export interface SalesReturnDto { customer_return_id: number; return_number: str
 export interface SalesReturnInput { account_id: number; return_date: string; notes?: string; items: Array<{ customer_return_item_id?: number; product_variant_id: number; quantity: number; unit_price: number }>; }
 export interface ReturnVariant { product_variant_id: number; size: string; is_active: boolean; products: { name: string; code: string; is_active: boolean }; colors: { name: string }; }
 export interface ReturnsQuery { page?: number; limit?: number; search?: string; account_id?: number; status?: "Completed" | "Cancelled"; date_from?: string; date_to?: string; }
-export interface CreateReturnDto { items: Array<{ product_variant_id: number; quantity: number; unit_price?: number }>; notes?: string; }
 export interface CreateAccountReturnDto { account_id: number; type: "PurchaseReturn"; items: Array<{ product_variant_id: number; quantity: number; unit_price: number }>; notes?: string; }

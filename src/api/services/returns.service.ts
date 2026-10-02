@@ -2,7 +2,6 @@ import { accountsService } from './accounts.service';
 import { apiClient } from "../client";
 import type {
   CreateAccountReturnDto,
-  CreateReturnDto,
   PurchaseReturnDto,
   SalesReturnDto,
   SalesReturnInput,
@@ -40,16 +39,6 @@ export const returnsService = {
       `/purchase-returns${accountId ? `?account_id=${accountId}` : ""}`,
     ),
   purchaseDetails: (id: number, signal?: AbortSignal) => apiClient.get<PurchaseReturnDto>(`/purchase-returns/${id}`, {signal}),
-  createPurchase: (
-    purchaseId: number,
-    data: CreateReturnDto,
-    signal?: AbortSignal,
-  ) =>
-    apiClient.post<{
-      message: string;
-      return_id: number;
-      total_amount: string;
-    }>(`/purchases/${purchaseId}/returns`, data, { signal }),
   createPurchaseForAccount: (
     data: CreateAccountReturnDto,
     signal?: AbortSignal,
