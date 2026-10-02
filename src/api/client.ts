@@ -18,10 +18,10 @@ const pendingCreates = new Map<string, Promise<unknown>>();
 const idempotentCreate = (path: string) => [
   /^\/orders(?:\/online)?$/,
   /^\/inventory\/\d+\/opening-stock$/,
-  /^\/customer-purchases(?:\/\d+\/(?:payments|returns))?$/,
+  /^\/purchases(?:\/\d+\/returns)?$/,
   /^\/returns(?:\/\d+\/(?:cancel|restore))?$/,
-  /^\/purchase-returns\/(?:account|customer\/\d+)$/,
-  /^\/customers\/\d+\/(payments|disbursements)$/,
+  /^\/purchase-returns\/account$/,
+  /^\/accounts\/\d+\/(payments|disbursements|check-receipts|check-disbursements)$/,
   /^\/ledger\/vouchers$/,
   /^\/accounts\/\d+\/(?:opening-balance(?:\/cancel)?|discounts)$/,
   /^\/account-discounts\/\d+\/cancel$/,

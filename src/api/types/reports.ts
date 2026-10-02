@@ -11,7 +11,6 @@ export interface GroupedReportQuery extends DateReportQuery {
 
 export interface SalesReportQuery extends GroupedReportQuery {
   sale_account_id?: NumericId;
-  customer_id?: NumericId;
   created_by?: NumericId;
   page?: number;
   limit?: number;
@@ -23,7 +22,7 @@ export interface SalesReportSummaryDto {
 }
 export interface SalesReportBreakdownDto extends SalesReportSummaryDto { sale_account_id?: NumericId | null; sale_account_name?: string | null }
 export interface SalesReportSeriesItemDto extends SalesReportSummaryDto { period: string }
-export interface SalesReportActivityDto { journal_entry_id: NumericId; occurred_at: string; kind: "Sale" | "SaleReversal" | "SalesReturn" | "ReturnReversal"; order_id: NumericId | null; return_id: NumericId | null; sale_account_id: NumericId | null; sale_account_name: string | null; customer: { id: NumericId; name: string | null } | null; creator: { id: NumericId; name: string | null } | null; gross_effect: DecimalString; returns_effect: DecimalString; net_effect: DecimalString }
+export interface SalesReportActivityDto { journal_entry_id: NumericId; occurred_at: string; kind: "Sale" | "SaleReversal" | "SalesReturn" | "ReturnReversal"; order_id: NumericId | null; return_id: NumericId | null; sale_account_id: NumericId | null; sale_account_name: string | null; creator: { id: NumericId; name: string | null } | null; gross_effect: DecimalString; returns_effect: DecimalString; net_effect: DecimalString }
 export interface SalesReportResponseDto {
   period: { date_from: string; date_to: string; timezone: "Asia/Hebron" };
   filter_scope: "ledger_activity" | "known_metadata_only";
@@ -84,25 +83,24 @@ export interface CollectionsReportResponseDto {
   time_series: Array<CollectionsReportTotalsDto & { period: string }>;
   activity: { items: CollectionsReportActivityDto[]; pagination: PaginationResponseDto };
 }
-export interface CustomerBalancesReportQuery {
+export interface AccountBalancesReportQuery {
   search?: string;
   balance_side?: 'All' | 'Debit' | 'Credit' | 'Zero';
   page?: number;
   limit?: number;
 }
-export interface CustomerBalancesReportResponseDto {
+export interface AccountBalancesReportResponseDto {
   snapshot_at: string;
   filter_scope: 'current_party_ledger';
   summary: {
-    customers_count: number;
-    customers_with_balance: number;
+    accounts_count: number;
+    accounts_with_balance: number;
     debit_balances: DecimalString;
     credit_balances: DecimalString;
     net_balance: DecimalString;
   };
   items: Array<{
-    customer: { id: NumericId; name: string; phone: string };
-    party_account: { id: NumericId; name: string | null } | null;
+    account: { id: NumericId; number: string | null; name: string; phone: string | null };
     balance_base: DecimalString;
     balance_side: 'Debit' | 'Credit' | 'Zero';
     pending_checks_base: DecimalString;
@@ -112,7 +110,6 @@ export interface CustomerBalancesReportResponseDto {
 
 export interface ReturnsReportQuery extends GroupedReportQuery {
   return_type?: 'SalesReturn' | 'PurchaseReturn';
-  customer_id?: NumericId;
   source?: 'Online' | 'Direct' | 'Representative' | 'CustomerPurchase' | 'Unknown';
   sale_account_id?: NumericId;
   search?: string;
@@ -140,7 +137,6 @@ export interface ReturnsReportResponseDto {
       return_id: NumericId | null;
       order_id: NumericId | null;
       customer_purchase_id: NumericId | null;
-      customer: { id: NumericId; name: string | null } | null;
       source: 'Online' | 'Direct' | 'Representative' | 'CustomerPurchase' | 'Unknown';
       sale_account_id: NumericId | null;
       sale_account_name: string | null;
@@ -280,17 +276,4 @@ export interface RepresentativesReportResponseDto {
   semantics: 'current_invoice_documents';
   representatives: RepresentativeReportRowDto[];
   pagination: ReportPaginationDto;
-}
-
-export interface WriteOffsReportQuery extends DateReportQuery {
-  customer_id?: NumericId; actor_id?: NumericId; page?: number; limit?: number;
-}
-export interface WriteOffsReportResponseDto {
-  date_basis: 'journal_entries.occurred_at'; timezone: 'Asia/Hebron';
-  summary: { gross_write_offs: DecimalString; reversals: DecimalString; net_write_offs: DecimalString };
-  activity: { items: Array<{ journal_entry_id: NumericId; original_journal_entry_id: NumericId | null;
-    occurred_at: string; kind: 'WriteOff' | 'Reversal'; write_off_id: NumericId;
-    customer: { id: NumericId; name: string }; actor: { id: NumericId; name: string | null } | null;
-    amount: DecimalString; effect: DecimalString; notes: string | null }>;
-    pagination: PaginationResponseDto };
 }

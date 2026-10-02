@@ -14,7 +14,6 @@ type DraftLine = { key: number; account_id: number | null; side: 'debit' | 'cred
 type BatchStep =
   | { key: PaymentDraftTableRow['key']; kind: 'voucher'; input: VoucherInput }
   | { key: PaymentDraftTableRow['key']; kind: 'account-check'; accountId: number; type: 'Receipt' | 'Disbursement'; input: CreatePaymentDto }
-  | { key: PaymentDraftTableRow['key']; kind: 'customer'; customerId: number; type: 'Receipt' | 'Disbursement'; input: CreatePaymentDto };
 type Pending = { kind: 'journal'; input: VoucherInput; summary: string }
   | { kind: 'batch'; steps: BatchStep[]; summary: string };
 
@@ -108,7 +107,6 @@ export default function VouchersPage() {
 
   const selectedAccount = accounts.find((account) => account.account_id === accountId);
   const manualAccounts = accounts.filter((account) => !isInternalAccount(account));
-  const customerAccount = selectedAccount?.kind === 'Party' && !!selectedAccount.customer_id;
   const baseCurrency = currencies.find((currency) => currency.is_base);
   const cashChoices = accounts.filter((account) => account.kind === 'Cash' && cashAccounts.some((cash) => cash.account_id === account.account_id));
   const treasuryAccountIds = accounts.filter((account) => treasuryKinds.includes(account.kind)).map((account) => account.account_id);
@@ -171,7 +169,7 @@ export default function VouchersPage() {
     if (!baseCurrency) { setError('العملة الأساسية غير محددة. تحقق من إعدادات العملات.'); return; }
     const cashAccount = cashAccounts.find((account) => account.account_id === cashId);
     const bankAccount = accounts.find((account) => account.account_id === bankId);
-    if (hasCheck && (selectedAccount.is_system || !['General', 'Party'].includes(selectedAccount.kind))) { setError('اختر حسابًا عامًا للشيك.'); return; }
+    if (hasCheck && (selectedAccount.is_system || !['General'].includes(selectedAccount.kind))) { setError('اختر حسابًا عامًا للشيك.'); return; }
     if (hasCash && !cashAccount) { setError('اختر صندوقًا نقديًا للسند.'); return; }
     if (type === 'Disbursement' && hasCheck && bankAccount?.kind !== 'Bank') { setError('اختر البنك المسحوب عليه للشيكات الصادرة.'); return; }
     const steps: BatchStep[] = [];
@@ -187,12 +185,11 @@ export default function VouchersPage() {
       if (draft.method === 'Check' && (!draft.checkNumber.trim() || !draft.dueDate)) {
         setError(`رقم الشيك وتاريخ استحقاقه مطلوبان في السطر ${index + 1}.`); return;
       }
-      if (draft.method === 'Check' || customerAccount) {
+      if (draft.method === 'Check') {
         const input: CreatePaymentDto = {
           amount: Number(draft.amount), currency_id: currency.currency_id, exchange_rate: rate,
           payment_method: draft.method, paid_at: draft.paidAt ? new Date(draft.paidAt).toISOString() : undefined,
           notes,
-          ...(draft.method === 'Cash' ? { cash_account_id: cashAccount!.account_id } : {}),
           ...(draft.method === 'Check' ? { check: {
             check_number: draft.checkNumber.trim(), account_number: draft.accountNumber.trim() || undefined,
             bank_number: draft.bankNumber.trim() || undefined, branch_number: draft.branchNumber.trim() || undefined,
@@ -201,8 +198,6 @@ export default function VouchersPage() {
         };
         if (draft.method === 'Check')
           steps.push({ key: draft.key, kind: 'account-check', accountId: selectedAccount.account_id, type, input });
-        else
-          steps.push({ key: draft.key, kind: 'customer', customerId: selectedAccount.customer_id!, type, input });
       } else if (draft.method === 'Cash') {
         const amount = amountInBaseCents / 100;
         const input: VoucherInput = { type, occurred_at: draft.paidAt ? new Date(draft.paidAt).toISOString() : undefined,
@@ -236,10 +231,6 @@ export default function VouchersPage() {
         for (const step of pending.steps) {
           if (step.kind === 'voucher') await ledgerService.voucher(step.input);
           else if (step.kind === 'account-check') await paymentsService.createAccountCheck(step.accountId, step.type, step.input);
-          else if (step.kind === 'customer') {
-            if (step.type === 'Receipt') await paymentsService.createForCustomer(step.customerId, step.input);
-            else await paymentsService.createDisbursement(step.customerId, step.input);
-          }
           completed++;
           setDrafts((current) => current.filter((draft) => draft.key !== step.key));
         }

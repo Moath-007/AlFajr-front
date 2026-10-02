@@ -11,13 +11,13 @@ import { usePublicCart } from "@/public";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface CheckoutFields {
-  customer_name: string;
+  name: string;
   phone: string;
   notes: string;
 }
 type FieldErrors = Partial<Record<keyof CheckoutFields, string>>;
 const EMPTY_FIELDS: CheckoutFields = {
-  customer_name: "",
+  name: "",
   phone: "",
   notes: "",
 };
@@ -79,7 +79,7 @@ export default function CheckoutPage({
     setSubmitting(true);
     try {
       const response = await ordersService.createOnline({
-        customer_name: fields.customer_name.trim(),
+        name: fields.name.trim(),
         phone: fields.phone.trim(),
         items: items.map((item) => ({
           product_variant_id: item.product_variant_id,
@@ -131,12 +131,12 @@ export default function CheckoutPage({
             )}
             <div className="grid gap-4 sm:grid-cols-2">
               <Field
-                id="customer_name"
+                id="name"
                 label="الاسم"
-                value={fields.customer_name}
-                error={fieldErrors.customer_name}
+                value={fields.name}
+                error={fieldErrors.name}
                 required
-                onChange={(value) => updateField("customer_name", value)}
+                onChange={(value) => updateField("name", value)}
               />
               <Field
                 id="phone"
@@ -236,7 +236,7 @@ export default function CheckoutPage({
         details={
           <div className="space-y-1">
             <p>
-              الزبون: <strong>{fields.customer_name}</strong>
+              الاسم: <strong>{fields.name}</strong>
             </p>
             <p>
               عدد المنتجات: <strong>{items.length}</strong>
@@ -296,7 +296,7 @@ function Field({
 }
 function validate(fields: CheckoutFields): FieldErrors {
   const errors: FieldErrors = {};
-  if (!fields.customer_name.trim()) errors.customer_name = "يرجى إدخال الاسم.";
+  if (!fields.name.trim()) errors.name = "يرجى إدخال الاسم.";
   if (!fields.phone.trim()) errors.phone = "يرجى إدخال رقم الهاتف.";
   return errors;
 }

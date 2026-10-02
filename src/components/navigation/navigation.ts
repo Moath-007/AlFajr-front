@@ -20,14 +20,13 @@ export const ownerNavigation: NavItem[] = [
       { path: "/owner/create-order/wholesale", label: "بيع جملة", icon: ShoppingBasket },
     ] },
   ] },
-  { label: "الزبائن والحسابات", icon: Users, children: [
-    { path: "/owner/accounts", label: "جميع الحسابات", icon: Users, aliases: ["/owner/customer-statements"] },
-    { path: "/owner/customers", label: "الزبائن", icon: Users },
+  { label: "الحسابات", icon: Users, children: [
+    { path: "/owner/accounts", label: "جميع الحسابات", icon: Users },
     { path: "/owner/vouchers", label: "سندات القبض والصرف والقيد", icon: FileText },
     { path: "/owner/checks", label: "الشيكات", icon: Banknote },
     { path: "/owner/treasury", label: "الخزينة", icon: Banknote },
     { path: "/owner/returns", label: "المردودات", icon: ReceiptText },
-    { path: "/owner/customer-purchases", label: "المشتريات", icon: ReceiptText },
+    { path: "/owner/purchases", label: "المشتريات", icon: ReceiptText },
   ] },
   { label: "المنتجات والمخزون", icon: Boxes, children: [
     { path: "/owner/products", label: "المنتجات", icon: Package },
@@ -48,10 +47,10 @@ export const repNavigation: NavItem[] = [
     { path: "/rep/orders/new", label: "إنشاء طلب", icon: ShoppingCart, badge: true, aliases: ["/rep/create-order"] },
     { path: "/rep/orders", label: "الطلبات", icon: ClipboardList },
   ] },
-  { label: "الزبائن والحسابات", icon: Users, children: [
-    { path: "/rep/customers", label: "الجهات", icon: Users, aliases: ["/rep/receivables", "/rep/customer-statement", "/rep/checks"] },
+  { label: "الحسابات", icon: Users, children: [
+    { path: "/rep/accounts", label: "الحسابات", icon: Users },
     { path: "/rep/payments", label: "قبض وصرف", icon: FileText },
-    { path: "/rep/customer-purchases", label: "المشتريات", icon: ClipboardList },
+    { path: "/rep/purchases", label: "المشتريات", icon: ClipboardList },
     { path: "/rep/returns", label: "المردودات", icon: FileText },
   ] },
 ];

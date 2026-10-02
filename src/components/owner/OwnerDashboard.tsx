@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 const quickLinks = [
   { path: 'orders', label: 'الطلبات', icon: ClipboardList },
   { path: 'vouchers', label: 'السندات', icon: FileText },
-  { path: 'customers', label: 'العملاء', icon: Users },
+  { path: 'accounts', label: 'الحسابات', icon: Users },
   { path: 'accounts', label: 'الحسابات', icon: Banknote },
   { path: 'checks', label: 'الشيكات', icon: Banknote },
   { path: 'inventory', label: 'المخزون', icon: Boxes },
@@ -52,9 +52,9 @@ export default function OwnerDashboard({ onNavigate }: { onNavigate: (page: stri
         <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Metric label="صافي المبيعات خلال الفترة" value={data.financial.net_sales_base} hint="نشاط قيود المبيعات والمردودات وعكوسها" icon={TrendingUp} />
           <Metric label="صافي التحصيلات خلال الفترة" value={data.financial.net_collections_base} hint="القبض والعكوس وتسويات الشيكات" icon={Banknote} />
-          <Metric label="أرصدة العملاء المدينة الحالية" value={data.financial.party_debit_balances_base} hint="حسابات Party من دفتر الأستاذ" icon={Users} />
+          <Metric label="أرصدة الحسابات المدينة الحالية" value={data.financial.account_debit_balances_base} hint="الحسابات العامة من دفتر الأستاذ" icon={Users} />
           <Metric label="أرصدة النقد والبنوك والشيكات الحالية" value={data.financial.treasury_base_balance} hint="Cash وBank وCheckHolding وClearing" icon={Banknote} />
-        </div><p className="mt-2 text-xs text-stone-500">أرصدة العملاء الدائنة الحالية: {formatMoney(data.financial.party_credit_balances_base)} بالعملة الأساسية.</p>
+        </div><p className="mt-2 text-xs text-stone-500">أرصدة الحسابات الدائنة الحالية: {formatMoney(data.financial.account_credit_balances_base)} بالعملة الأساسية.</p>
       </section>
       <div className="grid gap-4 lg:grid-cols-3">
         <section className="rounded-2xl border bg-white p-5"><h2 className="font-black text-brand">الطلبات الحالية</h2><p className="mt-1 text-xs text-stone-500">حالة المستندات الآن، بصرف النظر عن فلتر الفترة المالية.</p>
@@ -73,7 +73,7 @@ export default function OwnerDashboard({ onNavigate }: { onNavigate: (page: stri
       </div>
       <nav aria-label="روابط سريعة" className="flex flex-wrap gap-2">{quickLinks.map(({ path, label, icon: Icon }) => <button key={path} className="btn-outline inline-flex items-center gap-2" onClick={() => onNavigate(path)}><Icon className="h-4 w-4" />{label}</button>)}<button className="btn-primary" onClick={() => onNavigate('reports')}>كل التقارير ←</button></nav>
       <section className="rounded-2xl border bg-white"><div className="flex justify-between border-b p-5"><div><h2 className="font-black text-brand">آخر الطلبات</h2><p className="text-xs text-stone-500">أحدث المستندات المسجلة، لا نشاط Ledger.</p></div><button className="text-sm font-bold text-gold-dark" onClick={() => onNavigate('orders')}>عرض الكل ←</button></div>
-        {data.recent_orders.length ? <div className="divide-y">{data.recent_orders.map((order) => <div key={order.order_id} className="grid gap-2 p-4 text-sm sm:grid-cols-[auto_1fr_auto_auto] sm:items-center"><b>#{order.order_id}</b><span>{order.customer?.name ?? order.sale_account?.name ?? "—"} · {formatOrderDate(order.created_at)}</span><OrderStatusBadge status={order.status} /><b>{formatMoney(order.total_amount)}</b></div>)}</div> : <p className="p-5 text-sm text-stone-500">لا توجد طلبات.</p>}
+        {data.recent_orders.length ? <div className="divide-y">{data.recent_orders.map((order) => <div key={order.order_id} className="grid gap-2 p-4 text-sm sm:grid-cols-[auto_1fr_auto_auto] sm:items-center"><b>#{order.order_id}</b><span>{order.sale_account?.name ?? "—"} · {formatOrderDate(order.created_at)}</span><OrderStatusBadge status={order.status} /><b>{formatMoney(order.total_amount)}</b></div>)}</div> : <p className="p-5 text-sm text-stone-500">لا توجد طلبات.</p>}
       </section>
     </>}
   </main>;

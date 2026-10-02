@@ -20,8 +20,8 @@ const movementLabels: Record<string, string> = {
   OpeningBalance: 'رصيد افتتاحي', OpeningStock: 'رصيد افتتاحي', Sale: 'بيع',
   OrderEdit: 'تعديل طلب', OrderCancelled: 'إلغاء طلب', OrderDeleted: 'حذف طلب',
   SalesReturn: 'مردود مبيعات', PurchaseReturn: 'مردود مشتريات زبون',
-  ReturnCancelled: 'إلغاء مردود', CustomerPurchase: 'شراء من زبون',
-  CustomerPurchaseEdit: 'تعديل شراء من زبون', CustomerPurchaseCancelled: 'إلغاء شراء من زبون',
+  ReturnCancelled: 'إلغاء مردود', CustomerPurchase: 'شراء بضاعة',
+  CustomerPurchaseEdit: 'تعديل شراء بضاعة', CustomerPurchaseCancelled: 'إلغاء شراء بضاعة',
   OpeningStockCorrected: 'تصحيح مخزون افتتاحي',
   OpeningStockCancelled: 'إلغاء مخزون افتتاحي',
 };

@@ -324,13 +324,13 @@ export default function ChecksPage() {
     const needsParty = movementAction === 'ENDORSED';
     const bank = accounts.find((item) => item.account_id === movementBankId && item.kind === 'Bank');
     const cash = accounts.find((item) => item.account_id === movementCashId && item.kind === 'Cash');
-    const party = accounts.find((item) => item.account_id === movementPartyId && ['General', 'Party'].includes(item.kind) && !item.is_system && item.account_id !== selected.source_account_id);
+    const party = accounts.find((item) => item.account_id === movementPartyId && ['General'].includes(item.kind) && !item.is_system && item.account_id !== selected.source_account_id);
     if (needsBank && !bank) { setMovementError('اختر الحساب البنكي.'); return; }
     if (needsCash && !cash) { setMovementError('اختر الصندوق النقدي الذي ستدخل إليه قيمة الشيك.'); return; }
     if (needsParty && !party) { setMovementError('اختر حساب طرف موجودًا يختلف عن مصدر الشيك.'); return; }
     const destination = movementAction === 'DEPOSITED' ? 'البنك ' + bank?.name
       : movementAction === 'SENT_TO_COLLECTION' ? 'التحصيل عبر البنك ' + bank?.name
-      : movementAction === 'ENDORSED' ? 'الطرف ' + (party?.customer_name ?? party?.name)
+      : movementAction === 'ENDORSED' ? 'الطرف ' + (party?.name)
       : movementAction === 'RETURNED_TO_SOURCE' ? 'مصدر الشيك ' + sourceLabel(selected)
       : movementAction === 'CASHED' ? 'الصندوق ' + cash?.name
       : 'الخزنة';
@@ -556,7 +556,7 @@ export default function ChecksPage() {
               {movementAction === 'DEPOSITED' && <p className="text-xs text-stone-600">الإيداع المباشر متاح من يوم استحقاق الشيك. قبل ذلك يمكن الإرسال للتحصيل.</p>}
               {movementAction === 'SENT_TO_COLLECTION' && <p className="text-xs text-stone-600">سيُنشئ النظام حساب التحصيل المرتبط بالبنك عند الحاجة؛ اختر البنك فقط.</p>}
             </>}
-            {movementAction === 'ENDORSED' && <AccountPicker accounts={accounts.filter((item) => ['General', 'Party'].includes(item.kind) && !item.is_system && item.account_id !== selected.source_account_id)} kinds={['General', 'Party']} label="الطرف المستفيد" value={movementPartyId} onChange={setMovementPartyId} disabled={movementSaving || !!accountsError} />}
+            {movementAction === 'ENDORSED' && <AccountPicker accounts={accounts.filter((item) => ['General'].includes(item.kind) && !item.is_system && item.account_id !== selected.source_account_id)} kinds={['General']} label="الطرف المستفيد" value={movementPartyId} onChange={setMovementPartyId} disabled={movementSaving || !!accountsError} />}
             {movementAction === 'CASHED' && <AccountPicker accounts={accounts.filter((item) => item.kind === 'Cash')} kinds={['Cash']} label="الصندوق النقدي" value={movementCashId} onChange={setMovementCashId} disabled={movementSaving || !!accountsError} />}
             {movementAction === 'RETURNED_TO_SOURCE' && <p className="text-sm text-stone-600">المصدر المسجل: <b>{sourceLabel(selected)}</b></p>}
             <div className="grid gap-3 sm:grid-cols-2">
@@ -598,7 +598,7 @@ export default function ChecksPage() {
           <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-4 sm:p-5" aria-label="الحساب والتواريخ">
             <h3 className="font-black text-brand">الحساب والتواريخ</h3>
             <div className="grid gap-4 sm:grid-cols-2">
-              <AccountPicker accounts={accounts.filter((account) => ['General', 'Party'].includes(account.kind) && !account.is_system)} kinds={['General', 'Party']} label="الحساب المرتبط" value={editSourceId} onChange={setEditSourceId} disabled={editSaving || !!accountsError} />
+              <AccountPicker accounts={accounts.filter((account) => ['General'].includes(account.kind) && !account.is_system)} kinds={['General']} label="الحساب المرتبط" value={editSourceId} onChange={setEditSourceId} disabled={editSaving || !!accountsError} />
               {selected.direction === 'Outgoing' && <AccountPicker accounts={accounts.filter((account) => account.kind === 'Bank')} kinds={['Bank']} label="البنك المسحوب عليه" value={editBankId} onChange={setEditBankId} disabled={editSaving || !!accountsError} />}
               <RepDateInput label="تاريخ الاستلام/الإصدار" value={editReceivedDate} onChange={setEditReceivedDate} disabled={editSaving} />
               <RepDateInput label="تاريخ الاستحقاق" value={editDueDate} onChange={setEditDueDate} disabled={editSaving} />

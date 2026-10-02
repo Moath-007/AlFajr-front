@@ -15,8 +15,7 @@ export interface NotificationRepresentativeDto {
   user_id: NumericId;
   name: string;
 }
-export interface NotificationCustomerDto {
-  customer_id: NumericId | null;
+export interface NotificationContactDto {
   name: string;
   phone: string;
 }
@@ -31,7 +30,7 @@ export interface NotificationDto {
   amount: DecimalString;
   payment_method: PaymentMethod | null;
   representative: NotificationRepresentativeDto | null;
-  customer: NotificationCustomerDto;
+  contact: NotificationContactDto;
 }
 export interface NotificationsListResponseDto {
   notifications: NotificationDto[];

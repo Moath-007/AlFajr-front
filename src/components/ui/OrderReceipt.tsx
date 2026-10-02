@@ -93,18 +93,7 @@ export default function OrderReceipt({ order }: { order: OrderResponseDto }) {
             label="تاريخ إنشاء الطلب"
             value={formatOrderDateTime(order.created_at)}
           />
-          {order.customer ? (
-            <>
-              <ReceiptRow label="الزبون" value={order.customer.name} />
-              <ReceiptRow label="الهاتف" value={order.customer.phone} />
-            </>
-          ) : null}
-          {order.contact_name && (
-            <ReceiptRow label="جهة التواصل" value={order.contact_name} />
-          )}
-          {order.contact_phone && (
-            <ReceiptRow label="هاتف التواصل" value={order.contact_phone} />
-          )}
+          {order.contact_text && <ReceiptRow label="بيانات التواصل" value={order.contact_text} />}
           {order.creator && (
             <ReceiptRow label="المنشئ" value={order.creator.name} />
           )}

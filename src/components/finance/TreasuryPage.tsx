@@ -51,7 +51,7 @@ export default function TreasuryPage() {
     const bankTotal = banks.reduce((sum, account) => sum + cents(account.balance), 0);
     const pendingTotal = clearing.reduce((sum, account) => sum + cents(account.balance), 0);
     const holdingTotal = holding.reduce((sum, account) => sum + cents(account.balance), 0);
-    const externalAccounts = accounts.filter((account) => !account.is_system && (account.kind === 'General' || account.kind === 'Party'));
+    const externalAccounts = accounts.filter((account) => !account.is_system && (account.kind === 'General'));
     const receivable = externalAccounts.reduce((sum, account) => sum + Math.max(0, cents(account.balance)), 0);
     const payable = externalAccounts.reduce((sum, account) => sum + Math.max(0, -cents(account.balance)), 0);
     return { cashboxes, banks, holding, pendingByBank, unlinkedPending, cashTotal, bankTotal, pendingTotal, holdingTotal, receivable, payable };

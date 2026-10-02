@@ -98,7 +98,7 @@ export default function ChecksReportPage() {
       date_from: movementDraft.from || undefined, date_to: movementDraft.to || undefined, page: 1, limit: 20 });
   };
   const print = (element: HTMLElement | null, title: string) => element && void printA4Element({ element, title, orientation: 'landscape' });
-  const accountSelect = (value: string, onChange: (value: string) => void) => <Select label="حساب مصدر الشيك" value={value} onChange={onChange} searchable searchPlaceholder="ابحث باسم الحساب" options={[{ value: '', label: 'كل الحسابات' }, ...accounts.filter((row) => ['General', 'Party'].includes(row.kind)).map((row) => ({ value: String(row.account_id), label: `${row.name} · #${row.account_id}` }))]} />;
+  const accountSelect = (value: string, onChange: (value: string) => void) => <Select label="حساب مصدر الشيك" value={value} onChange={onChange} searchable searchPlaceholder="ابحث باسم الحساب" options={[{ value: '', label: 'كل الحسابات' }, ...accounts.filter((row) => ['General'].includes(row.kind)).map((row) => ({ value: String(row.account_id), label: `${row.name} · #${row.account_id}` }))]} />;
   const currencySelect = (value: string, onChange: (value: string) => void) => <Select label="العملة" value={value} onChange={onChange} options={[{ value: '', label: 'كل العملات' }, ...currencies.map((row) => ({ value: String(row.currency_id), label: `${row.code} · ${row.name}` }))]} />;
   const directionSelect = (value: string, onChange: (value: string) => void) => <Select label="الاتجاه" value={value} onChange={onChange} options={[{ value: '', label: 'وارد وصادر' }, { value: 'Incoming', label: 'وارد' }, { value: 'Outgoing', label: 'صادر' }]} />;
 

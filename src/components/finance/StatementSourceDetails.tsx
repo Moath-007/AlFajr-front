@@ -1,4 +1,4 @@
-import type { StatementCounterpartLine, StatementSourceDetails } from '@/api/types/ledger';
+import type { StatementSourceDetails } from '@/api/types/ledger';
 import { formatMoney } from '@/utils/money';
 
 const statuses: Record<string, string> = { Pending: 'معلّق', Completed: 'مكتمل', Cancelled: 'ملغى' };
@@ -15,26 +15,6 @@ const checkLocations: Record<string, string> = {
   CLEARED: 'مسدّد', RETURNED_OUTGOING: 'راجع صادر',
 };
 
-export const statementMovementName: Record<string, string> = {
-  Sale: 'بيع', Purchase: 'شراء من عميل', SalesReturn: 'مردود مبيعات',
-  PurchaseReturn: 'مردود مشتريات', Receipt: 'سند قبض', Disbursement: 'سند صرف',
-  CustomerDebt: 'دين يدوي', WriteOff: 'مسامحة', Opening: 'رصيد افتتاحي',
-  Reversal: 'عكس حركة', Journal: 'قيد يدوي',
-  CheckMovement: 'حركة شيك',
-};
-
-export function StatementCounterparts({ lines }: { lines: StatementCounterpartLine[] }) {
-  if (!lines.length) return null;
-  return <div className="mt-2 rounded-lg bg-stone-50 p-3 text-xs sm:text-sm">
-    <b className="text-brand">الطرف المقابل في القيد</b>
-    <div className="mt-1 space-y-1">{lines.map((line, index) => <div key={`${line.account_code}-${index}`} className="flex flex-wrap gap-x-4">
-      <span>{line.account_name} #{line.account_code}</span>
-      {Number(line.debit) > 0 && <span>مدين: {formatMoney(line.debit)}</span>}
-      {Number(line.credit) > 0 && <span>دائن: {formatMoney(line.credit)}</span>}
-    </div>)}</div>
-  </div>;
-}
-
 function Detail({ label, value }: { label: string; value: string | number | null | undefined }) {
   if (value === null || value === undefined || value === '') return null;
   return <div><span className="text-stone-500">{label}: </span><b className="text-brand">{value}</b></div>;
@@ -47,7 +27,6 @@ export default function StatementSourceDetailsView({ details }: { details: State
       <b className="text-brand">{details.kind === 'Order' ? 'فاتورة بيع' :
         details.kind === 'Purchase' ? 'عملية شراء' : details.kind === 'Return' ? details.return_type === 'SalesReturn' ? 'مردود مبيعات' : 'مردود مشتريات' :
         details.kind === 'Payment' ? details.payment_type === 'Receipt' ? 'سند قبض' : 'سند صرف' :
-        details.kind === 'Debt' ? 'دين يدوي' : details.kind === 'WriteOff' ? 'مسامحة' :
         details.kind === 'CheckMovement' ? 'حركة شيك' : 'رصيد افتتاحي'} {details.return_number ?? `#${details.reference_id}`}</b>
       {details.is_reversal && <span className="font-bold text-red-700">حركة معكوسة</span>}
       {details.status && <span>{statuses[details.status] ?? details.status}</span>}
@@ -85,7 +64,7 @@ export default function StatementSourceDetailsView({ details }: { details: State
         <Detail label="المبلغ الأصلي" value={details.amount ? `${formatMoney(details.amount)} ${details.currency?.code ?? ''}` : null} />
         <Detail label="بالعملة الأساسية" value={details.base_amount ? formatMoney(details.base_amount) : null} />
       </>}
-      {(details.kind === 'Debt' || details.kind === 'WriteOff' || details.kind === 'Opening') && <><Detail label="المبلغ" value={details.amount ? formatMoney(details.amount) : null} /><Detail label="السبب" value={details.reason} /><Detail label="التاريخ" value={details.debt_date?.slice(0, 10)} /><Detail label="الاتجاه" value={details.direction === 'Debit' ? 'مدين' : details.direction === 'Credit' ? 'دائن' : details.direction} /></>}
+      {details.kind === 'Opening' && <><Detail label="المبلغ" value={details.amount ? formatMoney(details.amount) : null} /><Detail label="السبب" value={details.reason} /><Detail label="التاريخ" value={details.debt_date?.slice(0, 10)} /><Detail label="الاتجاه" value={details.direction === 'Debit' ? 'مدين' : details.direction === 'Credit' ? 'دائن' : details.direction} /></>}
     </div>
     {details.notes && <p className="whitespace-pre-wrap text-stone-600"><b>ملاحظات:</b> {details.notes}</p>}
     {items.length > 0 && <p className="text-xs text-stone-500">تفاصيل المستند كما هي الآن؛ أثر الحركة والرصيد مأخوذان من القيد بتاريخها.</p>}

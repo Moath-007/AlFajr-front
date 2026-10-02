@@ -1,3 +1,4 @@
+import { accountsService } from './accounts.service';
 import { apiClient } from "../client";
 import type {
   CreateAccountReturnDto,
@@ -21,11 +22,7 @@ export const returnsService = {
   },
   details: (id: number, signal?: AbortSignal) =>
     apiClient.get<SalesReturnDto>(`/returns/${id}`, { signal }),
-  accounts: (signal?: AbortSignal) =>
-    apiClient.get<Array<{ account_id: number; name: string }>>(
-      "/returns/accounts",
-      { signal },
-    ),
+  accounts: (signal?: AbortSignal) => accountsService.allOptions({ type: 'General' }, signal),
   variants: (signal?: AbortSignal) =>
     apiClient.get<ReturnVariant[]>("/returns/variants", { signal }),
   create: (data: SalesReturnInput) =>
@@ -38,9 +35,9 @@ export const returnsService = {
     apiClient.post<SalesReturnDto>(`/returns/${id}/restore`, { note }),
   permanentDelete: (id: number) =>
     apiClient.delete<{ message: string }>(`/returns/${id}/permanent`),
-  listPurchase: (customerId?: number) =>
+  listPurchase: (accountId?: number) =>
     apiClient.get<PurchaseReturnDto[]>(
-      `/purchase-returns${customerId ? `?customer_id=${customerId}` : ""}`,
+      `/purchase-returns${accountId ? `?account_id=${accountId}` : ""}`,
     ),
   createPurchase: (
     purchaseId: number,
@@ -51,7 +48,7 @@ export const returnsService = {
       message: string;
       return_id: number;
       total_amount: string;
-    }>(`/customer-purchases/${purchaseId}/returns`, data, { signal }),
+    }>(`/purchases/${purchaseId}/returns`, data, { signal }),
   createPurchaseForAccount: (
     data: CreateAccountReturnDto,
     signal?: AbortSignal,

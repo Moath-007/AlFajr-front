@@ -42,17 +42,17 @@ const groups = [
     ],
   },
   {
-    id: "customers",
-    label: "الزبائن والحسابات",
+    id: "accounts",
+    label: "الحسابات",
     icon: Users,
     children: [
-      { path: "/rep/customers", label: "الجهات", icon: Users },
+      { path: "/rep/accounts", label: "الجهات", icon: Users },
       {
         path: "/rep/payments",
         label: "قبض وصرف",
         icon: FileText,
       },
-      { path: "/rep/customer-purchases", label: "المشتريات", icon: ClipboardList },
+      { path: "/rep/purchases", label: "المشتريات", icon: ClipboardList },
       { path: "/rep/returns", label: "المردودات", icon: FileText },
     ],
   },

@@ -78,8 +78,8 @@ const SalesReportPage = lazy(
 const CollectionsReportPage = lazy(
   () => import("@/components/owner/CollectionsReportPage"),
 );
-const CustomerBalancesReportPage = lazy(
-  () => import("@/components/owner/CustomerBalancesReportPage"),
+const AccountBalancesReportPage = lazy(
+  () => import("@/components/owner/AccountBalancesReportPage"),
 );
 const ReturnsReportPage = lazy(
   () => import("@/components/owner/ReturnsReportPage"),
@@ -92,12 +92,13 @@ const ChecksReportPage = lazy(
 );
 const ProductsReportPage = lazy(() => import('@/components/owner/ProductsReportPage'));
 const RepresentativesReportPage = lazy(() => import('@/components/owner/RepresentativesReportPage'));
-const WriteOffsReportPage = lazy(() => import('@/components/owner/WriteOffsReportPage'));
 const AccountsPage = lazy(() => import('@/components/finance/AccountsPage'));
-const AccountStatementPage = lazy(() => import('@/components/finance/AccountsPage').then((module) => ({ default: module.AccountStatementPage })));
+const AccountStatementPage = lazy(() => import('@/components/finance/AccountStatementPage'));
+const AccountDetailsPage = lazy(() => import('@/components/finance/AccountDetailsPage'));
+const AccountSourcePage = lazy(() => import('@/components/finance/AccountSourcePage'));
 const VouchersPage = lazy(() => import('@/components/finance/VouchersPage'));
 const TreasuryPage = lazy(() => import('@/components/finance/TreasuryPage'));
-const PartyPaymentsPage = lazy(() => import('@/components/finance/PartyPaymentsPage'));
+const AccountPaymentsPage = lazy(() => import('@/components/finance/AccountPaymentsPage'));
 const ReturnsOperationsPage = lazy(() => import('@/components/finance/ReturnsOperationsPage'));
 const AdminCompanyProfilePage = lazy(
   () => import("@/components/owner/AdminCompanyProfilePage"),
@@ -106,17 +107,8 @@ const AdminNotificationBell = lazy(
   () => import("@/components/owner/AdminNotificationBell"),
 );
 const ChecksPage = lazy(() => import("@/components/finance/ChecksPage"));
-const CustomerPurchasesPage = lazy(
-  () => import("@/components/customer-purchases/CustomerPurchasesPage"),
-);
-const CustomersPage = lazy(
-  () => import("@/components/customers/CustomersPage"),
-);
-const CustomerProfilePage = lazy(
-  () => import("@/components/customers/CustomerProfilePage"),
-);
-const CustomerStatementPage = lazy(
-  () => import("@/components/customers/CustomerStatementPage"),
+const PurchasesPage = lazy(
+  () => import("@/components/purchases/PurchasesPage"),
 );
 
 const RepDashboard = lazy(() => import("@/components/rep/RepDashboard"));
@@ -382,17 +374,14 @@ function OwnerLayout({ store }: { store: AppStore }) {
                 <Route path="reports" element={<AdminReportsPage />} />
                 <Route path="reports/sales" element={<SalesReportPage />} />
                 <Route path="reports/collections" element={<CollectionsReportPage />} />
-                <Route path="reports/customer-balances" element={<CustomerBalancesReportPage />} />
+                <Route path="reports/account-balances" element={<AccountBalancesReportPage />} />
                 <Route path="reports/returns" element={<ReturnsReportPage />} />
                 <Route path="reports/inventory" element={<InventoryReportPage />} />
                 <Route path="reports/checks" element={<ChecksReportPage />} />
                 <Route path="reports/products" element={<ProductsReportPage />} />
                 <Route path="reports/representatives" element={<RepresentativesReportPage />} />
-                <Route path="reports/write-offs" element={<WriteOffsReportPage />} />
-                <Route
-                  path="customer-statements"
-                  element={<Navigate to="/owner/customers" replace />}
-                />
+
+
                 <Route
                   path="settings"
                   element={
@@ -428,12 +417,14 @@ function OwnerLayout({ store }: { store: AppStore }) {
                 />
                 <Route
                   path="receivables"
-                  element={<Navigate to="/owner/reports/customer-balances" replace />}
+                  element={<Navigate to="/owner/reports/account-balances" replace />}
                 />
                 <Route path="checks" element={<ChecksPage />} />
                 <Route path="checks/:id" element={<ChecksPage />} />
                 <Route path="accounts" element={<AccountsPage />} />
-                <Route path="accounts/:id" element={<AccountStatementPage />} />
+                <Route path="accounts/:id" element={<AccountDetailsPage />} />
+                <Route path="accounts/:id/statement" element={<AccountStatementPage />} />
+                <Route path="account-sources/:kind/:id" element={<AccountSourcePage />} />
                 <Route path="vouchers" element={<VouchersPage />} />
                 <Route path="treasury" element={<TreasuryPage />} />
                 <Route path="payments" element={<Navigate to="/owner/vouchers" replace />} />
@@ -442,23 +433,12 @@ function OwnerLayout({ store }: { store: AppStore }) {
                   element={<ReturnsOperationsPage />}
                 />
                 <Route
-                  path="customer-purchases"
-                  element={<CustomerPurchasesPage />}
+                  path="purchases"
+                  element={<PurchasesPage />}
                 />
-                <Route
-                  path="customers"
-                  element={
-                    <CustomersPage
-                      onNavigate={ownerNavigate}
-                      basePath="/owner"
-                    />
-                  }
-                />
-                <Route
-                  path="customers/:id"
-                  element={<CustomerProfileWrapper />}
-                />
-                <Route path="customers/:id/statement" element={<CustomerStatementPage basePath="/owner" />} />
+
+
+
               </Routes>
             </PageTransition>
           </Suspense>
@@ -622,39 +602,23 @@ function RepLayout() {
                   }
                 />
                 <Route path="orders/:id" element={<RepOrderDetailsWrapper />} />
+
+
+
+
                 <Route
-                  path="receivables"
-                  element={<Navigate to="/rep/customers" replace />}
+                  path="purchases"
+                  element={<PurchasesPage />}
                 />
-                <Route
-                  path="customer-statement"
-                  element={<Navigate to="/rep/customers" replace />}
-                />
-                <Route
-                  path="customer-statement/:id"
-                  element={<CustomerStatementPage basePath="/rep" />}
-                />
-                <Route
-                  path="checks"
-                  element={<Navigate to="/rep/customers" replace />}
-                />
-                <Route
-                  path="customer-purchases"
-                  element={<CustomerPurchasesPage />}
-                />
-                <Route path="payments" element={<PartyPaymentsPage />} />
+                <Route path="accounts" element={<AccountsPage />} />
+                <Route path="accounts/:id" element={<AccountDetailsPage />} />
+                <Route path="accounts/:id/statement" element={<AccountStatementPage />} />
+                <Route path="account-sources/:kind/:id" element={<AccountSourcePage />} />
+                <Route path="payments" element={<AccountPaymentsPage />} />
                 <Route path="returns" element={<ReturnsOperationsPage />} />
-                <Route
-                  path="customers"
-                  element={
-                    <CustomersPage onNavigate={repNavigate} basePath="/rep" />
-                  }
-                />
-                <Route
-                  path="customers/:id"
-                  element={<CustomerProfileWrapper />}
-                />
-                <Route path="customers/:id/statement" element={<CustomerStatementPage basePath="/rep" />} />
+
+
+
                 <Route path="*" element={<Navigate to="/rep" replace />} />
               </Routes>
             </PageTransition>
@@ -676,16 +640,6 @@ function RepLayout() {
         cancelLabel="متابعة التعديل"
       />
     </div>
-  );
-}
-
-function CustomerProfileWrapper() {
-  const { id } = useParams();
-  const customerId = Number(id);
-  return Number.isInteger(customerId) && customerId > 0 ? (
-    <CustomerProfilePage customerId={customerId} />
-  ) : (
-    <Navigate to=".." replace />
   );
 }
 

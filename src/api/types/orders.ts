@@ -14,10 +14,7 @@ export interface InvoiceItemDto {
   is_bonus?: boolean;
 }
 export interface InvoiceDto {
-  customer_id?: NumericId | null;
-  contact_name?: string | null;
-  contact_phone?: string | null;
-  contact_email?: string | null;
+  contact_text?: string | null;
   delivery_address?: string | null;
   notes?: string | null;
   order_discount?: number;
@@ -30,7 +27,7 @@ export interface UpdateOrderDto extends InvoiceDto {
   sale_account_id?: NumericId;
 }
 export interface CreateOnlineOrderDto {
-  customer_name: string;
+  name: string;
   phone: string;
   notes?: string;
   items: Array<{ product_variant_id: NumericId; quantity: number }>;
@@ -45,12 +42,6 @@ export interface OrderActionDataDto {
 export interface OrderActionResponseDto {
   message: string;
   order: OrderActionDataDto;
-}
-export interface OrderCustomerResponseDto {
-  id: NumericId;
-  name: string;
-  phone: string;
-  email?: string | null;
 }
 export interface OrderCreatorResponseDto {
   id: NumericId;
@@ -74,16 +65,13 @@ export interface OrderItemResponseDto {
   variant: OrderVariantResponseDto;
 }
 export interface OrderResponseDto {
+  contact_text: string | null;
   id: NumericId;
   status: ApiOrderStatus;
   sale_account_id: NumericId | null;
   sale_account: { id: NumericId; name: string; kind: string } | null;
   created_by: NumericId | null;
   creator: OrderCreatorResponseDto | null;
-  customer: OrderCustomerResponseDto | null;
-  contact_name: string | null;
-  contact_phone: string | null;
-  contact_email: string | null;
   delivery_address: string | null;
   notes: string | null;
   total_amount: DecimalString;
@@ -96,7 +84,6 @@ export interface OrdersQuery {
   limit?: number;
   search?: string;
   status?: ApiOrderStatus;
-  customer_id?: NumericId;
   created_by?: NumericId;
   date_from?: string;
   date_to?: string;

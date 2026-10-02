@@ -57,8 +57,8 @@ const groups: Array<{ id: string; label: string; icon: Icon; children: GroupChil
     ],
   },
   {
-    id: "customers",
-    label: "الزبائن والحسابات",
+    id: "accounts",
+    label: "الحسابات",
     icon: Users,
     children: [
       {
@@ -75,7 +75,7 @@ const groups: Array<{ id: string; label: string; icon: Icon; children: GroupChil
       { path: "/owner/checks", label: "الشيكات", icon: Banknote },
       { path: "/owner/returns", label: "المردودات", icon: ReceiptText },
       {
-        path: "/owner/customer-purchases",
+        path: "/owner/purchases",
         label: "المشتريات",
         icon: ReceiptText,
       },

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   returnsService,
   type SalesReturnDto,
+  type AccountIdentityOption,
   type ReturnVariant,
   type PurchaseReturnDto,
 } from "@/api";
@@ -15,11 +17,13 @@ import AccountReturnLauncher from "./AccountReturnLauncher";
 type Action = "cancel" | "restore" | "delete";
 export default function ReturnsOperationsPage() {
   const { user } = useAuth();
+  const [sourceParams] = useSearchParams();
+  const sourceId = Number(sourceParams.get("return"));
   const [rows, setRows] = useState<SalesReturnDto[]>([]);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(0);
   const [accounts, setAccounts] = useState<
-    Array<{ account_id: number; name: string }>
+    AccountIdentityOption[]
   >([]);
   const [variants, setVariants] = useState<ReturnVariant[]>([]);
   const [search, setSearch] = useState("");
@@ -94,6 +98,7 @@ export default function ReturnsOperationsPage() {
       });
     return () => c.abort();
   }, []);
+  useEffect(() => { if (!sourceId) return; const c=new AbortController();returnsService.details(sourceId,c.signal).then(setSelected).catch(e=>{if(!c.signal.aborted)setError(apiMessages(e,"تعذر فتح المردود.").join("، "));});return()=>c.abort(); },[sourceId]);
   const details = async (id: number) => {
     try {
       setSelected(await returnsService.details(id));
@@ -379,7 +384,7 @@ export default function ReturnsOperationsPage() {
           >
             <span>
               #{r.customer_return_id} ·{" "}
-              {r.account?.name ?? `جهة #${r.customer_id}`} ·{" "}
+              {r.account?.name ?? `حساب #${r.account_id}`} ·{" "}
               {formatMoney(r.total_amount)} ₪ ·{" "}
               {r.cancelled_at ? "ملغى" : "فعال"}
             </span>

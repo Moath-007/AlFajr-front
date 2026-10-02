@@ -177,7 +177,7 @@ export default function RepDashboard({
               >
                 <strong className="text-brand">#{order.id}</strong>
                 <span>
-                  <b className="block text-sm">{order.customer?.name ?? "—"}</b>
+                  <b className="block text-sm">{order.sale_account?.name ?? "—"}</b>
                   <small className="text-stone-400">
                     {formatOrderDate(order.created_at)}
                   </small>

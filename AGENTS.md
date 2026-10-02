@@ -6,6 +6,25 @@
 - لا يتوفر هنا سجل قرارات محادثة Work السابقة أو نقطة توقف Manual QA مؤكدة. لا تدّعِ مراجعتها أو اعتماد قواعد غير موثقة. عند تعارض مهم مع تعليمات مستخدم مؤكدة، اعرضه قبل أي تغيير.
 - المستندات المؤرخة في backend/docs تقارير سابقة وليست عقدًا بديلًا للكود الحالي. لا تستخدم النسخ الاحتياطية أو migrations_archive أو scripts/archive كمصدر للتنفيذ الحالي.
 
+## آخر تحديث Accounts — Part 3، 2026-10-02
+
+- النموذج الحالي لا يحتوي Customer كهوية أعمال أو جدول أو API. General هو الطرف المباشر للبيع والشراء والمردود والدفعات. أي وصف Customer/Party قديم أدناه يوثق الحالة السابقة ولا يعلو على هذا التحديث أو الكود الحالي.
+- هوية الحساب عبر /accounts و/accounts/options: General/Cash/Bank، رقم ACC موحد ثابت، اسم فريد بعد trim وبلا حساسية للحالة، هاتف اختياري لـGeneral وملاحظات. المندوب ينشئ/يعدل General فقط؛ الحذف Admin ويمنع عند أي تاريخ مالي، حتى لو الرصيد صفر.
+- بيع داخلي Completed يحتاج General غير system. جهة التواصل contact_text اختيارية مستقلة. الطلب العام Pending يستقبل name/phone/notes ويجمعها في contact_text، بلا إنشاء هوية؛ التأكيد Admin وباختيار General صريح.
+- مسارات المشتريات الحالية /purchases؛ الشراء ومردوده والدفعات يعتمدون account_id، بلا دفعات مرتبطة بالشراء. module الخلفية src/purchases والواجهة components/purchases. source_type/الجداول customer_purchases وcustomer_returns ومعرفات البنود باقية لتجنب تغيير مصادر inventory/cost/ledger، وليست هوية Customer.
+- Customer/debts/WriteOff والواجهات والمسارات القديمة أزيلت. Discount وOpening الحاليان عبر AccountFinancialService وبنفس lifecycle/permissions/audit المعتمدين.
+- QA الوحيدة لهذه المرحلة alfajr_accounts_runtime_qa_20261002، مستعادة من Accounts Financial QA. هجرة 20261002050000_direct_account_runtime تشترط القطع النظيف أولًا؛ لا تطبقها على المصدر تلقائيًا.
+- القطع حذف التاريخ المالي/المعاملات وجميع 52 مستند Opening/Discount قديمًا؛ حفظ stock/average لكل Variant في baseline ثابت قبل حذف cost events القديمة. لا reset للـACC sequence. النسخة الأصلية alfajrdb وProduction لم تُغيّرا.
+- المرجع النهائي للنتائج: backend/docs/ACCOUNTS_PART3_COMPLETE_2026-10-02.md. لا يبدأ Manual UI QA تلقائيًا.
+
+## آخر تحديث Accounts UI & Statement — 2026-10-02
+
+- قائمة /owner/accounts و/rep/accounts موحدة General/Cash/Bank بالهوية والبحث/النوع/pagination، بلا أرصدة. المندوب لا يدير Cash/Bank ولا يحذف الحسابات.
+- /accounts/:id في الواجهة للتفاصيل، و/accounts/:id/statement للكشف. API الحالي /accounts/:id/financial-details و/statement يدعم الفترة؛ القراءة RepeatableRead، current_balance إجمالي مستقل، opening_balance في الكشف هو المرحّل قبل الفترة. رصيد الصف يحسب زمنيًا قبل فلتر النوع والصفحات، ثم يعرض الأحدث أولًا. الأصل/العكس للمستندات المالية يحتفظ به وفق الإسقاط الفعال المعتمد.
+- واجهة Opening للمدير إنشاء/تعديل الفعال/إلغاء، صفر صالح، لا Restore. خصم General للدورين باتجاه صريح، إنشاء/تعديل/إلغاء/حذف وفق lifecycle الحالي. المصادر الحقيقية تفتح في تبويب جديد وفق صلاحية وحدتها؛ الطباعة للصفحة الحالية فقط وبالفلاتر نفسها.
+- تحقق على alfajr_accounts_runtime_qa_20261002 فقط: 188 اختبار Backend، 113 مجموعة PostgreSQL مختلفة، 9 مجموعات متصفح Accounts بما فيها الهاتف وPDF؛ الفحوص الآلية ناجحة. حفظ 44 Variant/907 و368 Variant/2765 والحالة الحالية للتكلفة والكتالوج و43 uploads والهويات والإعدادات. لا migration/cutover جديد ولا المصدر/Production/نشر.
+- التقرير: [Accounts UI & Statement](C:/Users/dweer/Desktop/alfajr-backend/alfajr-backend/docs/ACCOUNTS_UI_STATEMENT_COMPLETE_2026-10-02.md). الحالة READY FOR REVIEW؛ لا تعني اكتمال Manual QA الشاملة للوحدات الأخرى.
+
 ## المشروع والبنية
 
 متجر عربي مع كتالوج وسلة وطلبات عامة، لوحة Admin، لوحة Representative، مخزون ومشتريات ومردودات، حسابات وقيود وسندات وشيكات وتقارير.

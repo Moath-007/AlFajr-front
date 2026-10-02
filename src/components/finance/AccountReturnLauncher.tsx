@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ledgerService, returnsService, type LedgerAccount } from '@/api';
+import { accountsService, returnsService, type AccountIdentityOption } from '@/api';
 import RepProductPicker, { type PickedOrderItem } from '@/components/rep/RepProductPicker';
 import { apiMessages } from '@/components/rep/repOrderUtils';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -10,7 +10,7 @@ import AccountPicker from './AccountPicker';
 type DraftItem = PickedOrderItem & { price: string };
 
 export default function AccountReturnLauncher({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: (id: number) => void }) {
-  const [accounts, setAccounts] = useState<LedgerAccount[]>([]);
+  const [accounts, setAccounts] = useState<AccountIdentityOption[]>([]);
   const [accountId, setAccountId] = useState<number | null>(null);
   const type = 'PurchaseReturn' as const;
   const [items, setItems] = useState<DraftItem[]>([]);
@@ -27,8 +27,8 @@ export default function AccountReturnLauncher({ open, onClose, onSaved }: { open
     if (!open) return;
     const controller = new AbortController();
     setAccountId(null); setItems([]); setNotes(''); setError(''); setLoading(true);
-    ledgerService.accounts(controller.signal).then((rows) => {
-      if (!controller.signal.aborted) setAccounts(rows.filter((row) => !row.is_system && (row.kind === 'General' || row.kind === 'Party')));
+    accountsService.allOptions({ type: 'General' }, controller.signal).then((rows) => {
+      if (!controller.signal.aborted) setAccounts(rows);
     }).catch((reason) => {
       if (!controller.signal.aborted) setError(apiMessages(reason, 'تعذر تحميل الحسابات.').join('، '));
     }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -68,7 +68,7 @@ export default function AccountReturnLauncher({ open, onClose, onSaved }: { open
     <Modal open={open} onClose={onClose} title="إنشاء مردود شراء" size="return" mobileFullscreen>
       <div className="space-y-4" dir="rtl">
         <div className="grid gap-3 md:grid-cols-[280px_minmax(0,1fr)]">
-          <AccountPicker accounts={accounts} value={accountId} onChange={setAccountId} label="الحساب" kinds={['General', 'Party']} disabled={loading} />
+          <AccountPicker accounts={accounts} value={accountId} onChange={setAccountId} label="الحساب" kinds={['General']} disabled={loading} />
         </div>
         <p className="rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand">{'سيخرج الصنف من المخزون وتُسجل قيمته مستحقة على الحساب.'}</p>
         {error && <div className="rep-error" role="alert">{error}</div>}

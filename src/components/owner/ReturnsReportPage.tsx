@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { customersService, reportsService, type CustomerSelectionDto, type ReturnsReportQuery,
+import { reportsService, type ReturnsReportQuery,
   type ReturnsReportResponseDto } from '@/api';
 import { useGeneralSaleAccounts } from '@/components/orders/useGeneralSaleAccounts';
 import { RepDateInput } from '@/components/rep/RepFormControls';
@@ -9,12 +9,11 @@ import PrintHeader from '@/components/printing/PrintHeader';
 import { printA4Element } from '@/utils/printDocument';
 import { formatMoney } from '@/utils/money';
 
-type Draft = { from: string; to: string; group: 'day' | 'week' | 'month'; type: string;
-  customer: string; source: string; account: string; search: string };
-const blank: Draft = { from: '', to: '', group: 'day', type: '', customer: '', source: '', account: '', search: '' };
+type Draft = { from: string; to: string; group: 'day' | 'week' | 'month'; type: string; source: string; account: string; search: string };
+const blank: Draft = { from: '', to: '', group: 'day', type: '', source: '', account: '', search: '' };
 const typeName: Record<string, string> = { SalesReturn: 'مردود مبيعات', PurchaseReturn: 'مردود مشتريات الزبائن' };
 const sourceName: Record<string, string> = { Online: 'أونلاين', Direct: 'مباشر / محل', Representative: 'مندوب / جملة',
-  CustomerPurchase: 'مرتبط بمشتريات زبون', Unknown: 'غير متاح' };
+  CustomerPurchase: 'مرتبط بعملية شراء', Unknown: 'غير متاح' };
 const localTime = (value: string) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Hebron',
   year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(value));
 const reference = (row: ReturnsReportResponseDto['activity']['items'][number]) => [
@@ -30,18 +29,9 @@ export default function ReturnsReportPage() {
   const [data, setData] = useState<ReturnsReportResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [customers, setCustomers] = useState<CustomerSelectionDto[]>([]);
   const accounts = useGeneralSaleAccounts();
   const printRef = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    customersService.list({ page: 1, limit: 30, search: customerSearch.trim() || undefined }, controller.signal)
-      .then((result) => { if (!controller.signal.aborted) setCustomers(result.customers); })
-      .catch(() => { if (!controller.signal.aborted) setCustomers([]); });
-    return () => controller.abort();
-  }, [customerSearch]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(''); setData(null);
@@ -56,15 +46,13 @@ export default function ReturnsReportPage() {
     if (draft.from && draft.to && draft.from > draft.to) { setError('تاريخ البداية يجب أن يسبق تاريخ النهاية.'); return; }
     setQuery({ date_from: draft.from || undefined, date_to: draft.to || undefined, group_by: draft.group,
       return_type: (draft.type || undefined) as ReturnsReportQuery['return_type'],
-      customer_id: draft.customer ? Number(draft.customer) : undefined,
       source: (draft.source || undefined) as ReturnsReportQuery['source'],
       sale_account_id: draft.account ? Number(draft.account) : undefined,
       search: draft.search.trim() || undefined, page: 1, limit: 20 });
   };
-  const reset = () => { setDraft(blank); setCustomerSearch(''); setQuery({ page: 1, limit: 20 }); };
+  const reset = () => { setDraft(blank); setQuery({ page: 1, limit: 20 }); };
   const page = data?.activity.pagination;
   const period = data ? `${data.period.date_from} — ${data.period.date_to}` : '';
-  const selectedCustomer = customers.find((customer) => String(customer.customer_id) === draft.customer);
   return <div className="mx-auto max-w-[1450px] space-y-5 pb-10" dir="rtl">
     <Link to="/owner/reports" className="text-sm font-bold text-gold-dark">← التقارير</Link>
     <header className="border-b pb-4"><h1 className="text-3xl font-black text-brand">تقرير المردودات</h1>
@@ -76,8 +64,7 @@ export default function ReturnsReportPage() {
       <Select label="نوع المردود" value={draft.type} onChange={(type) => setDraft({ ...draft, type })} options={[["", "كل الأنواع"], ["SalesReturn", typeName.SalesReturn], ["PurchaseReturn", typeName.PurchaseReturn]]} />
       <Select label="المصدر" value={draft.source} onChange={(source) => setDraft({ ...draft, source })} options={[["", "كل المصادر"], ...Object.entries(sourceName)]} />
       <Select label="حساب البيع General" value={draft.account} onChange={(account) => setDraft({ ...draft, account })} options={[["", "كل الحسابات"], ...accounts.accounts.map((account) => [String(account.id), account.name])]} />
-      <label className="block"><span className="rep-label">الزبون</span><input className="rep-control mb-1" value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} placeholder="بحث بالاسم أو الهاتف" />
-        <select className="rep-control" value={draft.customer} onChange={(event) => setDraft({ ...draft, customer: event.target.value })}><option value="">كل الزبائن</option>{draft.customer && !selectedCustomer && <option value={draft.customer}>زبون #{draft.customer}</option>}{customers.map((customer) => <option key={customer.customer_id} value={customer.customer_id}>{customer.name} · #{customer.customer_id}</option>)}</select></label>
+
       <label className="block"><span className="rep-label">رقم المرجع</span><input className="rep-control" value={draft.search} onChange={(event) => setDraft({ ...draft, search: event.target.value })} placeholder="رقم المردود أو الطلب أو الشراء" /></label>
       <div className="flex items-end gap-2"><button className="btn-primary min-h-11">تطبيق</button><button type="button" className="btn-outline min-h-11" onClick={reset}>إعادة ضبط</button></div>
     </form>
@@ -94,7 +81,7 @@ export default function ReturnsReportPage() {
         <section className="grid gap-4 lg:grid-cols-2"><Breakdown title="حسب النوع" rows={data.by_type.map((row) => ({ label: typeName[row.return_type], ...row }))} /><Breakdown title="حسب المصدر" rows={data.by_source.map((row) => ({ label: sourceName[row.source], ...row }))} /></section>
         <section><h2 className="mb-3 text-lg font-black text-brand">النشاط حسب الفترة</h2><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-stone-100">{['الفترة', 'مردودات', 'عكوس', 'صافي'].map((label) => <th key={label} className="border p-2 text-right">{label}</th>)}</tr></thead><tbody>{data.time_series.map((row) => <tr key={row.period}><td className="border p-2">{row.period}</td><td className="border p-2">{formatMoney(row.gross_returns)}</td><td className="border p-2">{formatMoney(row.return_reversals)}</td><td className="border p-2 font-bold">{formatMoney(row.net_returns)}</td></tr>)}</tbody></table>{!data.time_series.length && <p className="p-4 text-stone-500">لا يوجد نشاط في الفترة.</p>}</div></section>
         <section><h2 className="mb-3 text-lg font-black text-brand">حركات المردودات</h2>
-          <div className="print-active hidden overflow-x-auto md:block"><table className="w-full min-w-[1050px] text-sm"><thead><tr className="bg-stone-100">{['التاريخ', 'الحركة / المرجع', 'النوع / المصدر', 'الزبون', 'الحساب', 'الكمية / الحالة الحالية', 'الأثر المالي'].map((label) => <th key={label} className="border p-2 text-right">{label}</th>)}</tr></thead><tbody>{data.activity.items.map((row) => <tr key={row.journal_entry_id}><td className="border p-2">{localTime(row.occurred_at)}</td><td className="border p-2"><b>{row.kind === 'Return' ? 'مردود' : 'عكس مردود'}</b><small className="block text-stone-500">{reference(row)}</small></td><td className="border p-2">{typeName[row.return_type]}<small className="block">{sourceName[row.source]}</small></td><td className="border p-2">{row.customer?.name ?? '—'}<small className="block text-stone-500">نفّذ الحركة: {row.actor?.name ?? 'غير متاح'}</small></td><td className="border p-2">{row.sale_account_name ?? '—'}</td><td className="border p-2">{row.quantity ?? '—'} قطعة<small className="block">المستند حاليًا: {row.current_document_status === 'Cancelled' ? 'ملغى' : row.current_document_status === 'Active' ? 'فعال' : 'غير متاح'}</small></td><td className="border p-2 font-bold">{formatMoney(row.net_effect)}</td></tr>)}</tbody></table></div>
+          <div className="print-active hidden overflow-x-auto md:block"><table className="w-full min-w-[1050px] text-sm"><thead><tr className="bg-stone-100">{['التاريخ', 'الحركة / المرجع', 'النوع / المصدر', 'الزبون', 'الحساب', 'الكمية / الحالة الحالية', 'الأثر المالي'].map((label) => <th key={label} className="border p-2 text-right">{label}</th>)}</tr></thead><tbody>{data.activity.items.map((row) => <tr key={row.journal_entry_id}><td className="border p-2">{localTime(row.occurred_at)}</td><td className="border p-2"><b>{row.kind === 'Return' ? 'مردود' : 'عكس مردود'}</b><small className="block text-stone-500">{reference(row)}</small></td><td className="border p-2">{typeName[row.return_type]}<small className="block">{sourceName[row.source]}</small></td><td className="border p-2">{row.sale_account_name ?? '—'}<small className="block text-stone-500">نفّذ الحركة: {row.actor?.name ?? 'غير متاح'}</small></td><td className="border p-2">{row.sale_account_name ?? '—'}</td><td className="border p-2">{row.quantity ?? '—'} قطعة<small className="block">المستند حاليًا: {row.current_document_status === 'Cancelled' ? 'ملغى' : row.current_document_status === 'Active' ? 'فعال' : 'غير متاح'}</small></td><td className="border p-2 font-bold">{formatMoney(row.net_effect)}</td></tr>)}</tbody></table></div>
           <div className="report-mobile-cards space-y-2 md:hidden print:hidden">{data.activity.items.map((row) => <div key={row.journal_entry_id} className="rounded-xl border p-3 text-sm"><div className="flex justify-between gap-2"><b>{row.kind === 'Return' ? 'مردود' : 'عكس مردود'} · {typeName[row.return_type]}</b><b>{formatMoney(row.net_effect)}</b></div><p>{localTime(row.occurred_at)} · {reference(row)}</p><p>{sourceName[row.source]} · الحساب: {row.sale_account_name ?? 'غير متاح'}</p></div>)}</div>
           {!data.activity.items.length && <p className="p-4 text-stone-500">لا توجد حركات.</p>}
         </section>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { customersService, representativesService, reportsService,
-  type CustomerSelectionDto, type RepresentativeResponseDto, type SalesReportQuery,
+import { representativesService, reportsService,
+  type RepresentativeResponseDto, type SalesReportQuery,
   type SalesReportResponseDto } from '@/api';
 import { useGeneralSaleAccounts } from '@/components/orders/useGeneralSaleAccounts';
 import { RepDateInput } from '@/components/rep/RepFormControls';
@@ -11,8 +11,8 @@ import { printA4Element } from '@/utils/printDocument';
 import { formatMoney } from '@/utils/money';
 
 type Draft = { from: string; to: string; group: 'day' | 'week' | 'month';
-  account: string; customer: string; representative: string };
-const blank: Draft = { from: '', to: '', group: 'day', account: '', customer: '', representative: '' };
+  account: string; representative: string };
+const blank: Draft = { from: '', to: '', group: 'day', account: '', representative: '' };
 const kindName: Record<string, string> = { Sale: 'بيع', SaleReversal: 'عكس بيع', SalesReturn: 'مردود بيع', ReturnReversal: 'عكس مردود' };
 const referenceText = (row: SalesReportResponseDto['activity']['items'][number]) => [
   row.order_id ? `طلب #${row.order_id}` : null,
@@ -30,8 +30,6 @@ export default function SalesReportPage() {
   const [data, setData] = useState<SalesReportResponseDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [customers, setCustomers] = useState<CustomerSelectionDto[]>([]);
   const [representatives, setRepresentatives] = useState<RepresentativeResponseDto[]>([]);
   const [lookupError, setLookupError] = useState('');
   const accounts = useGeneralSaleAccounts();
@@ -44,13 +42,6 @@ export default function SalesReportPage() {
       .catch((reason) => { if (!controller.signal.aborted) setLookupError(apiMessages(reason, 'تعذر تحميل المناديب.').join('، ')); });
     return () => controller.abort();
   }, []);
-  useEffect(() => {
-    const controller = new AbortController();
-    customersService.list({ page: 1, limit: 30, search: customerSearch.trim() || undefined }, controller.signal)
-      .then((result) => setCustomers(result.customers))
-      .catch(() => { if (!controller.signal.aborted) setCustomers([]); });
-    return () => controller.abort();
-  }, [customerSearch]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError(''); setData(null);
@@ -67,13 +58,11 @@ export default function SalesReportPage() {
     setQuery({ date_from: draft.from || undefined, date_to: draft.to || undefined,
       group_by: draft.group,
       sale_account_id: draft.account ? Number(draft.account) : undefined,
-      customer_id: draft.customer ? Number(draft.customer) : undefined,
       created_by: draft.representative ? Number(draft.representative) : undefined,
       page: 1, limit: 20 });
   };
-  const reset = () => { setDraft(blank); setCustomerSearch(''); setQuery({ page: 1, limit: 20 }); };
+  const reset = () => { setDraft(blank); setQuery({ page: 1, limit: 20 }); };
   const page = data?.activity.pagination;
-  const selectedCustomer = customers.find((row) => String(row.customer_id) === draft.customer);
   const period = data ? `${data.period.date_from} — ${data.period.date_to}` : '';
 
   return <div className="mx-auto max-w-[1450px] space-y-5 pb-10" dir="rtl">
@@ -85,8 +74,7 @@ export default function SalesReportPage() {
       <RepDateInput label="إلى تاريخ" value={draft.to} onChange={(to) => setDraft({ ...draft, to })} min={draft.from || undefined} />
       <Select label="التجميع" value={draft.group} onChange={(group) => setDraft({ ...draft, group: group as Draft['group'] })} options={[["day", "يوم"], ["week", "أسبوع"], ["month", "شهر"]]} />
       <Select label="حساب البيع" value={draft.account} onChange={(account) => setDraft({ ...draft, account })} options={[["", "كل الحسابات"], ...accounts.accounts.map((account) => [String(account.id), account.name])]} />
-      <label className="block"><span className="rep-label">الزبون</span><input className="rep-control mb-1" value={customerSearch} onChange={(event) => setCustomerSearch(event.target.value)} placeholder="بحث بالاسم أو الهاتف" />
-        <select className="rep-control" value={draft.customer} onChange={(event) => setDraft({ ...draft, customer: event.target.value })}><option value="">كل الزبائن</option>{draft.customer && !selectedCustomer && <option value={draft.customer}>زبون #{draft.customer}</option>}{customers.map((customer) => <option key={customer.customer_id} value={customer.customer_id}>{customer.name} · #{customer.customer_id}</option>)}</select></label>
+
       <Select label="المندوب المنشئ" value={draft.representative} onChange={(representative) => setDraft({ ...draft, representative })} options={[["", "كل المناديب"], ...representatives.map((rep) => [String(rep.user_id), rep.name])]} />
       <div className="flex items-end gap-2"><button className="btn-primary min-h-11">تطبيق</button><button type="button" className="btn-outline min-h-11" onClick={reset}>إعادة ضبط</button></div>
     </form>
@@ -102,8 +90,8 @@ export default function SalesReportPage() {
         <section className="grid gap-4 lg:grid-cols-2"><Breakdown title="حسب حساب البيع" rows={data.by_sale_account.map((row) => ({ label: row.sale_account_name ?? 'بدون حساب بيع', ...row }))} /></section>
         <section><h2 className="mb-3 text-lg font-black text-brand">النشاط حسب الفترة</h2><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-stone-100">{['الفترة', 'مبيعات', 'مردودات', 'صافي'].map((x) => <th key={x} className="border p-2 text-right">{x}</th>)}</tr></thead><tbody>{data.time_series.map((row) => <tr key={row.period}><td className="border p-2">{row.period}</td><td className="border p-2">{formatMoney(row.gross_sales)}</td><td className="border p-2">{formatMoney(row.returns)}</td><td className="border p-2 font-bold">{formatMoney(row.net_sales)}</td></tr>)}</tbody></table>{!data.time_series.length && <p className="p-4 text-stone-500">لا يوجد نشاط في الفترة.</p>}</div></section>
         <section><h2 className="mb-3 text-lg font-black text-brand">حركات المبيعات</h2>
-          <div className="print-active hidden overflow-x-auto md:block"><table className="w-full min-w-[900px] text-sm"><thead><tr className="bg-stone-100">{['التاريخ', 'الحركة / المرجع', 'حساب البيع', 'الزبون / المنشئ', 'الأثر الصافي'].map((x) => <th key={x} className="border p-2 text-right">{x}</th>)}</tr></thead><tbody>{data.activity.items.map((row) => <tr key={row.journal_entry_id}><td className="border p-2">{localTime(row.occurred_at)}</td><td className="border p-2"><b>{kindName[row.kind]}</b><small className="block text-stone-500">{referenceText(row)}</small></td><td className="border p-2">{row.sale_account_name ?? '—'}</td><td className="border p-2">{row.customer?.name ?? '—'}{row.creator && <small className="block">{row.creator.name}</small>}</td><td className="border p-2 font-bold">{formatMoney(row.net_effect)}</td></tr>)}</tbody></table></div>
-          <div className="report-mobile-cards space-y-2 md:hidden print:hidden">{data.activity.items.map((row) => <div key={row.journal_entry_id} className="rounded-xl border p-3 text-sm"><div className="flex justify-between gap-2"><b>{kindName[row.kind]}</b><b>{formatMoney(row.net_effect)}</b></div><p>{localTime(row.occurred_at)} · {referenceText(row)}</p><p>{row.sale_account_name ?? 'بدون حساب بيع'} · {row.customer?.name ?? 'زبون غير متاح'}</p></div>)}</div>
+          <div className="print-active hidden overflow-x-auto md:block"><table className="w-full min-w-[900px] text-sm"><thead><tr className="bg-stone-100">{['التاريخ', 'الحركة / المرجع', 'حساب البيع', 'الزبون / المنشئ', 'الأثر الصافي'].map((x) => <th key={x} className="border p-2 text-right">{x}</th>)}</tr></thead><tbody>{data.activity.items.map((row) => <tr key={row.journal_entry_id}><td className="border p-2">{localTime(row.occurred_at)}</td><td className="border p-2"><b>{kindName[row.kind]}</b><small className="block text-stone-500">{referenceText(row)}</small></td><td className="border p-2">{row.sale_account_name ?? '—'}</td><td className="border p-2">{row.sale_account_name ?? '—'}{row.creator && <small className="block">{row.creator.name}</small>}</td><td className="border p-2 font-bold">{formatMoney(row.net_effect)}</td></tr>)}</tbody></table></div>
+          <div className="report-mobile-cards space-y-2 md:hidden print:hidden">{data.activity.items.map((row) => <div key={row.journal_entry_id} className="rounded-xl border p-3 text-sm"><div className="flex justify-between gap-2"><b>{kindName[row.kind]}</b><b>{formatMoney(row.net_effect)}</b></div><p>{localTime(row.occurred_at)} · {referenceText(row)}</p><p>{row.sale_account_name ?? 'بدون حساب بيع'}</p></div>)}</div>
           {!data.activity.items.length && <p className="p-4 text-stone-500">لا توجد حركات.</p>}
         </section>
       </article>

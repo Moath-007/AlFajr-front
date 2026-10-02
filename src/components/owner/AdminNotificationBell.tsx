@@ -191,7 +191,7 @@ export default function AdminNotificationBell({
                     )}
                     <span>الطلب #{item.order_id}</span>
                     <span>
-                      {item.customer.name} · {item.customer.phone}
+                      {item.contact.name} · {item.contact.phone}
                     </span>
                     <span>
                       {item.representative

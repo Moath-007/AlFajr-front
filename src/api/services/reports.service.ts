@@ -10,16 +10,14 @@ import type {
   ChecksMovementsReportResponseDto,
   ProductsReportQuery,
   ProductsReportResponseDto,
-  CustomerBalancesReportQuery,
-  CustomerBalancesReportResponseDto,
+  AccountBalancesReportQuery,
+  AccountBalancesReportResponseDto,
   RepresentativesReportQuery,
   RepresentativesReportResponseDto,
   SalesReportResponseDto,
   SalesReportQuery,
   CollectionsReportQuery,
   CollectionsReportResponseDto,
-  WriteOffsReportQuery,
-  WriteOffsReportResponseDto,
   ReturnsReportQuery,
   ReturnsReportResponseDto,
 } from "../types";
@@ -31,12 +29,10 @@ export const reportsService = {
     }),
   collections: (query: CollectionsReportQuery = {}, signal?: AbortSignal) =>
     apiClient.get<CollectionsReportResponseDto>(withQuery("/reports/collections", query), { signal }),
-  customerBalances: (query: CustomerBalancesReportQuery = {}, signal?: AbortSignal) =>
-    apiClient.get<CustomerBalancesReportResponseDto>(withQuery('/reports/customer-balances', query), { signal }),
+  accountBalances: (query: AccountBalancesReportQuery = {}, signal?: AbortSignal) =>
+    apiClient.get<AccountBalancesReportResponseDto>(withQuery('/reports/account-balances', query), { signal }),
   returns: (query: ReturnsReportQuery = {}, signal?: AbortSignal) =>
     apiClient.get<ReturnsReportResponseDto>(withQuery("/reports/returns", query), { signal }),
-  writeOffs: (query: WriteOffsReportQuery = {}, signal?: AbortSignal) =>
-    apiClient.get<WriteOffsReportResponseDto>(withQuery('/reports/write-offs', query), { signal }),
   products: (query: ProductsReportQuery = {}, signal?: AbortSignal) =>
     apiClient.get<ProductsReportResponseDto>(
       withQuery("/reports/products", query),

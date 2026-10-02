@@ -28,7 +28,7 @@ export default function GeneralSaleAccountSelect({
   const menu = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState<{ left: number; width: number; top?: number; bottom?: number; maxHeight: number } | null>(null);
   const chosen = accounts.find((account) => account.id === value);
-  const options = accounts.filter((account) => account.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const options = accounts.filter((account) => `${account.name} ${account.account_number ?? ''} ${account.phone ?? ''}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
 
   useEffect(() => {
     if (!open) return;
@@ -73,13 +73,13 @@ export default function GeneralSaleAccountSelect({
         onKeyDown={(event) => {
           if (event.key === "Escape") { event.stopPropagation(); setOpen(false); trigger.current?.focus(); event.preventDefault(); }
           if (event.key === "Enter" && options[0]) { onChange(options[0].id); setOpen(false); trigger.current?.focus(); event.preventDefault(); }
-        }} placeholder="ابحث باسم الحساب" aria-label="ابحث باسم الحساب" />
+        }} placeholder="ابحث برقم الحساب أو الاسم أو الهاتف" aria-label="ابحث برقم الحساب أو الاسم أو الهاتف" />
     </div>
     <div role="listbox" aria-label={label} className="min-h-0 max-h-60 overflow-y-auto p-1.5">
       {options.map((account) => <button key={account.id} type="button" role="option" aria-selected={account.id === value}
         onClick={() => { onChange(account.id); setOpen(false); trigger.current?.focus(); }}
         className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-right text-sm font-bold text-brand hover:bg-brand-50">
-        <span>{account.name}</span>{account.id === value && <Check className="h-4 w-4" />}
+        <span>{account.name}<small className="block">{account.account_number} {account.phone}</small></span>{account.id === value && <Check className="h-4 w-4" />}
       </button>)}
       {options.length === 0 && <p className="p-4 text-center text-sm text-stone-500">لا توجد حسابات مطابقة.</p>}
     </div>

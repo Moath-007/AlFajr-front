@@ -1,11 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import type { AccountKind, LedgerAccount } from '@/api';
-import { formatMoney } from '@/utils/money';
-import { balanceMeaning } from './accountLabels';
 
 interface Props {
-  accounts: LedgerAccount[];
+  accounts: Array<Pick<LedgerAccount,"account_id"|"name"|"kind"> & {account_number?: string | null; code?: string; phone?:string | null}>;
   value: number | null;
   onChange: (id: number | null) => void;
   label: string;
@@ -25,7 +23,7 @@ export default function AccountPicker({ accounts, value, onChange, label, kinds,
   const chosen = accounts.find((account) => account.account_id === value);
   const options = useMemo(() => accounts.filter((account) =>
     (!kinds || kinds.includes(account.kind)) && !exclude?.includes(account.account_id) &&
-    `${account.name} ${account.code} ${account.customer_name ?? ''} ${account.customer_phone ?? ''} ${account.customer_id ?? ''}`
+    `${account.name} ${account.account_number ?? account.code ?? ''} ${account.phone ?? ''}`
       .toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())), [accounts, exclude, kinds, search]);
 
   useEffect(() => {
@@ -38,7 +36,7 @@ export default function AccountPicker({ accounts, value, onChange, label, kinds,
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
 
-  const select = (account: LedgerAccount) => {
+  const select = (account: Pick<LedgerAccount,"account_id"|"name"|"kind">) => {
     onChange(account.account_id);
     setSearch('');
     setOpen(false);
@@ -49,7 +47,7 @@ export default function AccountPicker({ accounts, value, onChange, label, kinds,
     <button type="button" disabled={disabled} aria-haspopup="listbox" aria-expanded={open} aria-labelledby={`${id}-label ${id}-value`}
       onClick={() => { setSearch(''); setActive(0); setOpen((current) => !current); }}
       className={`rep-control flex items-center justify-between gap-3 text-right ${open ? 'border-gold ring-4 ring-gold/10' : ''}`}>
-      <span id={`${id}-value`} className={`truncate ${chosen ? 'text-brand' : 'text-stone-400'}`}>{chosen?.customer_name ?? chosen?.name ?? 'اختر الحساب'}</span>
+      <span id={`${id}-value`} className={`truncate ${chosen ? 'text-brand' : 'text-stone-400'}`}>{chosen?.name ?? 'اختر الحساب'}</span>
       <ChevronDown className={`h-4 w-4 shrink-0 text-stone-400 transition-transform ${open ? 'rotate-180' : ''}`} />
     </button>
     {open && <div className="absolute inset-x-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-[0_18px_45px_-15px_rgba(22,46,33,.3)]">
@@ -68,12 +66,11 @@ export default function AccountPicker({ accounts, value, onChange, label, kinds,
         {options.map((account, index) => <button type="button" role="option" aria-selected={value === account.account_id}
           key={account.account_id} onMouseEnter={() => setActive(index)} onClick={() => select(account)}
           className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-right text-sm ${value === account.account_id ? 'bg-brand text-white' : active === index ? 'bg-brand-50 text-brand' : 'text-brand hover:bg-stone-50'}`}>
-          <span className="min-w-0 truncate font-bold">{account.customer_name ?? account.name}</span>
+          <span className="min-w-0 truncate font-bold">{account.name}</span>
           {value === account.account_id && <Check className="h-4 w-4 shrink-0" />}
         </button>)}
         {!options.length && <p className="p-4 text-center text-sm text-stone-500">لا توجد حسابات مطابقة.</p>}
       </div>
     </div>}
-    {chosen && !compact && <p className="mt-1.5 text-xs text-stone-500">{balanceMeaning(chosen, chosen.balance)}: <b className="text-brand">{formatMoney(Math.abs(Number(chosen.balance)))}</b></p>}
   </div>;
 }
