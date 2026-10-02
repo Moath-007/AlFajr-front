@@ -92,6 +92,7 @@ const ChecksReportPage = lazy(
 );
 const ProductsReportPage = lazy(() => import('@/components/owner/ProductsReportPage'));
 const RepresentativesReportPage = lazy(() => import('@/components/owner/RepresentativesReportPage'));
+const FinancialActivityReportPage = lazy(() => import('@/components/owner/FinancialActivityReportPage'));
 const AccountsPage = lazy(() => import('@/components/finance/AccountsPage'));
 const AccountStatementPage = lazy(() => import('@/components/finance/AccountStatementPage'));
 const AccountDetailsPage = lazy(() => import('@/components/finance/AccountDetailsPage'));
@@ -374,6 +375,8 @@ function OwnerLayout({ store }: { store: AppStore }) {
                 <Route path="reports" element={<AdminReportsPage />} />
                 <Route path="reports/sales" element={<SalesReportPage />} />
                 <Route path="reports/collections" element={<CollectionsReportPage />} />
+                <Route path="reports/purchases" element={<FinancialActivityReportPage type="purchases" />} />
+                <Route path="reports/disbursements" element={<FinancialActivityReportPage type="disbursements" />} />
                 <Route path="reports/account-balances" element={<AccountBalancesReportPage />} />
                 <Route path="reports/returns" element={<ReturnsReportPage />} />
                 <Route path="reports/inventory" element={<InventoryReportPage />} />

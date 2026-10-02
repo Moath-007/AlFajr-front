@@ -8,6 +8,8 @@ import { formatMoney } from '@/utils/money';
 import AccountPicker from './AccountPicker';
 import GeneralSaleAccountSelect from '@/components/orders/GeneralSaleAccountSelect';
 import { useGeneralSaleAccounts } from '@/components/orders/useGeneralSaleAccounts';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { businessToday } from './accountUiUtils';
 
 type PaymentType = 'Receipt' | 'Disbursement';
 type PaymentMethod = 'Cash' | 'Check';
@@ -43,6 +45,8 @@ export default function AccountPaymentsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [paidAt, setPaidAt] = useState(businessToday);
+  const [pending, setPending] = useState<CreatePaymentDto | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -61,7 +65,6 @@ export default function AccountPaymentsPage() {
   }, [currencyRevision]);
 
   useEffect(() => {
-    if (!admin) return;
     const controller = new AbortController();
     accountsService.allOptions({type: 'Cash'}, controller.signal).then((rows) => {
       setCashAccounts(rows); setCashError('');
@@ -80,32 +83,39 @@ export default function AccountPaymentsPage() {
 
   const currency = currencies.find((row) => row.currency_id === Number(currencyId));
   const baseCurrency = currencies.find((row) => row.is_base);
-  const selectedCash = cashAccounts.find((row) => row.account_id === cashAccountId);
-  const matchingCash = cashAccounts;
+  const selectedCash = [...cashAccounts, ...accounts].find((row) => row.account_id === cashAccountId);
+  const matchingCash = [...cashAccounts, ...accounts];
   const matchingBanks = accounts.filter((row) => row.kind === 'Bank');
 
   const submit = async () => {
     if (inFlight.current) return;
     if (!counterparty || !currency || !validAmount(amount)) { setError('اختر الحساب والعملة وأدخل مبلغًا صالحًا أكبر من صفر.'); return; }
     if (!currency.is_base && !validRate(rate)) { setError('أدخل سعر صرف صالحًا أكبر من صفر.'); return; }
-    if (type === 'Disbursement' && !admin) { setError('صرف الأموال للعملاء متاح للمدير فقط.'); return; }
+    if (type === 'Disbursement' && !admin) { setError('سند الصرف متاح للمدير فقط.'); return; }
     if (method === 'Check' && (!checkNumber.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(due))) { setError('رقم الشيك وتاريخ استحقاقه مطلوبان.'); return; }
     if (method === 'Check' && type === 'Disbursement' && !matchingBanks.some((row) => row.account_id === bankId)) {
       setError('اختر حسابًا بنكيًا للشيك الصادر.'); return;
     }
-    if (method === 'Cash' && cashAccountId !== null && (!admin || !selectedCash)) {
+    if (method === 'Cash' && cashAccountId !== null && !selectedCash) {
       setError('اختر صندوقًا نقديًا، أو استخدم الصندوق الافتراضي.'); return;
     }
     const input: CreatePaymentDto = {
       amount: Number(amount), currency_id: currency.currency_id,
       exchange_rate: currency.is_base ? 1 : Number(rate), payment_method: method,
+      paid_at: paidAt,
       ...(notes.trim() ? { notes: notes.trim() } : {}),
-      ...(method === 'Cash' && admin && selectedCash ? { cash_account_id: selectedCash.account_id } : {}),
+      ...(method === 'Cash' && selectedCash ? { money_account_id: selectedCash.account_id } : {}),
       ...(method === 'Check' ? { check: { check_number: checkNumber.trim(), due_date: due },
         ...(type === 'Disbursement' ? { bank_account_id: bankId! } : {}) } : {}),
     };
+    if (!paidAt) { setError('اختر تاريخ السند.'); return; }
+    setError(''); setPending(input);
+  };
+
+  const save = async () => {
+    if (!pending || !counterparty || inFlight.current) return;
+    const input = pending;
     const label = type === 'Receipt' ? 'سند قبض' : 'سند صرف';
-    if (!window.confirm(`اعتماد ${label} بقيمة ${formatMoney(amount, currency)} للعميل ${counterparty.name}؟`)) return;
     inFlight.current = true;
     setSaving(true); setError(''); setNotice('');
     try {
@@ -119,11 +129,11 @@ export default function AccountPaymentsPage() {
       if (reason instanceof ApiError && reason.status === 403) setError('ليست لديك صلاحية تنفيذ هذه العملية.');
       else if (reason instanceof ApiError && reason.status === 409) setError('تعارضت العملية مع طلب سابق. ' + apiMessages(reason, 'راجع السند ثم حاول مرة أخرى.').join('، '));
       else setError(apiMessages(reason, 'تعذر حفظ السند.').join('، '));
-    } finally { inFlight.current = false; setSaving(false); }
+    } finally { inFlight.current = false; setSaving(false); setPending(null); }
   };
 
   return <div className="mx-auto max-w-3xl space-y-5" dir="rtl">
-    <header className="border-b pb-4"><p className="text-xs font-black text-gold-dark">عملية مالية</p><h1 className="text-3xl font-black text-brand">قبض وصرف الجهات</h1><p className="text-sm text-stone-500">اختر العملية ثم الجهة داخل النموذج. القبض منفصل عن البيع والشراء.</p></header>
+    <header className="border-b pb-4"><p className="text-xs font-black text-gold-dark">عملية مالية</p><h1 className="text-3xl font-black text-brand">{admin ? 'قبض وصرف الحسابات' : 'سند قبض'}</h1><p className="text-sm text-stone-500">اختر الحساب داخل النموذج. القبض منفصل عن البيع والشراء.</p></header>
     <div className={`grid gap-2 ${admin ? 'grid-cols-2' : 'grid-cols-1'}`}>
       <button type="button" className={`rounded-xl border p-4 font-black ${type === 'Receipt' ? 'border-gold-dark bg-amber-50' : 'bg-white'}`} onClick={() => { setType('Receipt'); setMethod('Cash'); setError(''); }}>سند قبض</button>
       {admin && <button type="button" className={`rounded-xl border p-4 font-black ${type === 'Disbursement' ? 'border-gold-dark bg-amber-50' : 'bg-white'}`} onClick={() => { setType('Disbursement'); setMethod('Cash'); setError(''); }}>سند صرف</button>}
@@ -131,24 +141,25 @@ export default function AccountPaymentsPage() {
     <section className="space-y-4 rounded-2xl border bg-white p-5">
       <GeneralSaleAccountSelect accounts={generalAccounts.accounts} value={counterparty?.id ?? null} onChange={id => setCounterparty(generalAccounts.accounts.find(row=>row.id===id) ?? null)} loading={generalAccounts.loading} error={generalAccounts.error} onRetry={generalAccounts.reload} />
       <div className="grid gap-3 sm:grid-cols-2">
+        <label><span className="rep-label">تاريخ السند</span><input className="rep-control" type="date" value={paidAt} onChange={event => setPaidAt(event.target.value)} disabled={saving} /></label>
         <label><span className="rep-label">المبلغ</span><input className="rep-control" type="number" min="0.01" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} disabled={saving} /></label>
         <label><span className="rep-label">العملة</span><select className="rep-control" value={currencyId} onChange={(event) => { setCurrencyId(event.target.value); setRate(''); setBankId(null); setCashAccountId(null); }} disabled={currencyLoading || saving}><option value="">اختر العملة</option>{currencies.map((row) => <option key={row.currency_id} value={row.currency_id}>{row.name} ({row.code})</option>)}</select></label>
         {!currency?.is_base && <label><span className="rep-label">سعر الصرف إلى {baseCurrency?.name ?? 'العملة الأساسية'}</span><input className="rep-control" type="number" min="0.000001" step="0.000001" value={rate} onChange={(event) => setRate(event.target.value)} disabled={saving} /></label>}
         <label><span className="rep-label">طريقة الدفع</span><select className="rep-control" value={method} onChange={(event) => { setMethod(event.target.value as PaymentMethod); setError(''); }} disabled={saving}><option value="Cash">نقد</option><option value="Check">شيك</option></select></label>
       </div>
-      {method === 'Cash' && admin && <div className="space-y-1"><label className="block"><span className="rep-label">الصندوق النقدي</span><select className="rep-control" value={cashAccountId ?? ''} onChange={(event) => setCashAccountId(event.target.value ? Number(event.target.value) : null)} disabled={saving || !!cashError}><option value="">الصندوق الافتراضي</option>{matchingCash.map((row) => <option key={row.account_id} value={row.account_id}>{row.name}</option>)}</select></label><p className="text-xs text-stone-500">اختر الصندوق المناسب، أو اتركه فارغًا لاستخدام الصندوق الافتراضي.</p>{cashError && <p className="text-xs text-amber-800">{cashError} <button type="button" className="underline" onClick={() => setAccountRevision((value) => value + 1)}>إعادة المحاولة</button></p>}</div>}
-      {method === 'Cash' && !admin && <p className="text-xs text-stone-500">يُسجّل القبض النقدي في الصندوق الافتراضي.</p>}
+      {method === 'Cash' && <div className="space-y-1"><label className="block"><span className="rep-label">حساب {type === 'Receipt' ? 'الاستلام' : 'الدفع'}</span><select className="rep-control" value={cashAccountId ?? ''} onChange={(event) => setCashAccountId(event.target.value ? Number(event.target.value) : null)} disabled={saving}><option value="">الصندوق الافتراضي</option>{matchingCash.map((row) => <option key={row.account_id} value={row.account_id}>{row.account_number} — {row.name} ({row.kind === 'Bank' ? 'بنك' : 'نقد'})</option>)}</select></label><p className="text-xs text-stone-500">اختر Cash أو Bank؛ الأسماء المعروضة لا تتضمن أرصدة.</p>{(cashError || bankError) && <p className="text-xs text-amber-800">{cashError || bankError} <button type="button" className="underline" onClick={() => setAccountRevision(value => value + 1)}>إعادة المحاولة</button></p>}</div>}
       {method === 'Check' && <div className="grid gap-3 sm:grid-cols-2">
         <label><span className="rep-label">رقم الشيك</span><input className="rep-control" value={checkNumber} onChange={(event) => setCheckNumber(event.target.value)} disabled={saving} /></label>
         <label><span className="rep-label">الاستحقاق</span><input className="rep-control" type="date" value={due} onChange={(event) => setDue(event.target.value)} disabled={saving} /></label>
         {type === 'Disbursement' && admin && <div><AccountPicker accounts={matchingBanks} label="البنك المسحوب عليه" kinds={['Bank']} value={bankId} onChange={setBankId} disabled={saving || !!bankError} />{bankError && <p className="mt-1 text-xs text-amber-800">{bankError} <button type="button" className="underline" onClick={() => setAccountRevision((value) => value + 1)}>إعادة المحاولة</button></p>}</div>}
       </div>}
       <label className="block"><span className="rep-label">ملاحظات</span><textarea className="rep-control" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} disabled={saving} /></label>
-      <p className="text-xs text-stone-500">{type === 'Receipt' ? 'سند القبض يخفض المستحق من الجهة.' : 'سند الصرف يزيد المستحق للجهة أو يخفض ديننا لها.'}</p>
+      <p className="text-xs text-stone-500">{type === 'Receipt' ? 'سند القبض يخفض المستحق لنا على الحساب أو يزيد ما ندين به له.' : 'سند الصرف يخفض ما ندين به للحساب أو يزيد المستحق لنا عليه.'}</p>
     </section>
     {currencyError && <div className="rep-error" role="alert">{currencyError} <button type="button" className="underline" onClick={() => setCurrencyRevision((value) => value + 1)}>إعادة المحاولة</button></div>}
     {error && <div className="rep-error" role="alert">{error}</div>}
     {notice && <div className="rounded-xl bg-emerald-50 p-3 text-emerald-800" role="status">{notice}</div>}
     <button type="button" className="btn-primary" disabled={saving || currencyLoading || !!currencyError || !currency} onClick={() => void submit()}>{saving ? 'جارٍ الحفظ…' : 'اعتماد السند'}</button>
+    <ConfirmDialog open={pending !== null} onClose={() => setPending(null)} onConfirm={() => void save()} loading={saving} severity="normal" title={type === 'Receipt' ? 'اعتماد سند قبض' : 'اعتماد سند صرف'} message={`الحساب: ${counterparty?.name ?? ''}، المبلغ: ${formatMoney(pending?.amount ?? 0, currency)}، التاريخ: ${paidAt}`} confirmLabel="تأكيد الحفظ" />
   </div>;
 }

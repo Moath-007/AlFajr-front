@@ -96,7 +96,7 @@ export default function InvoicesList({
           className="rep-control"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="رقم الفاتورة / الحساب / الزبون"
+          placeholder="رقم الفاتورة / الحساب / جهة التواصل"
           aria-label="بحث"
         />
         <select

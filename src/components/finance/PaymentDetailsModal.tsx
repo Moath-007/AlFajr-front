@@ -5,23 +5,31 @@ import { apiMessages } from "@/components/rep/repOrderUtils";
 import Modal from "@/components/ui/Modal";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { describeConvertedMoney, formatMoney } from "@/utils/money";
+import { useAuth } from '@/auth';
+import { Link } from 'react-router-dom';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import EditPaymentModal from './EditPaymentModal';
 
 export default function PaymentDetailsModal({ paymentId, onClose, onLoaded }: { paymentId: number | null; onClose: () => void; onLoaded?: (payment: PaymentDto) => void }) {
+  const {user}=useAuth();
+  const [editing,setEditing]=useState(false),[cancelOpen,setCancelOpen]=useState(false),[saving,setSaving]=useState(false);
+  const [activeId,setActiveId]=useState(paymentId),[revision,setRevision]=useState(0);
+  useEffect(()=>{setActiveId(paymentId);setEditing(false);setCancelOpen(false);},[paymentId]);
   const [payment, setPayment] = useState<PaymentDto | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const onLoadedRef = useRef(onLoaded);
   useEffect(() => { onLoadedRef.current = onLoaded; }, [onLoaded]);
   useEffect(() => {
-    if (!paymentId) return;
+    if (!activeId) return;
     const controller = new AbortController();
     setLoading(true); setError(""); setPayment(null);
-    paymentsService.getById(paymentId, controller.signal)
+    paymentsService.getById(activeId, controller.signal)
       .then((response) => { setPayment(response.payment); onLoadedRef.current?.(response.payment); })
       .catch((reason) => { if (!controller.signal.aborted) setError(apiMessages(reason, "تعذر تحميل تفاصيل الدفعة.").join("، ")); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [paymentId]);
+  }, [activeId,revision]);
   return <Modal open={paymentId !== null} onClose={onClose} title={payment ? `تفاصيل ${payment.payment_type === "Receipt" ? "سند القبض" : "سند الصرف"} #${payment.voucher_number ?? `${payment.payment_type === "Receipt" ? "RV" : "PV"}-${payment.id}`}` : `تفاصيل السند #${paymentId ?? ""}`} size="lg">
     {loading ? <Skeleton className="h-72"/> : error ? <div className="rep-error">{error}</div> : payment ? <div className="space-y-6" dir="rtl">
       <section className="relative overflow-hidden rounded-2xl bg-brand px-5 py-5 text-white sm:px-6">
@@ -50,6 +58,15 @@ export default function PaymentDetailsModal({ paymentId, onClose, onLoaded }: { 
       </section>
 
       {payment.notes && <section className="rounded-xl bg-stone-50 px-4 py-3"><p className="text-xs font-bold text-stone-400">ملاحظات</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-stone-700">{payment.notes}</p></section>}
+      {user?.role==='Admin'&&<div className="flex flex-wrap gap-2 border-t pt-3">
+        {payment.check?.managed_check_id&&<Link className="btn-outline" to={`/owner/checks/${payment.check.managed_check_id}`}>تفاصيل الشيك وإجراءاته</Link>}
+        {payment.effective_state==='Effective'&&<>
+          {payment.payment_method==='Cash'&&<button className="btn-outline" onClick={()=>setEditing(true)}>تصحيح السند</button>}
+          {(!payment.check||['TREASURY','ISSUED'].includes(payment.check.location??''))&&<button className="btn-outline text-red-700" onClick={()=>setCancelOpen(true)}>إلغاء السند</button>}
+        </>}
+      </div>}
+      {editing&&<EditPaymentModal payment={payment} onClose={()=>setEditing(false)} onSaved={id=>{setEditing(false);setActiveId(id);setRevision(r=>r+1);}} />}
+      <ConfirmDialog open={cancelOpen} onClose={()=>setCancelOpen(false)} loading={saving} title="إلغاء السند" message="سيُعكس القيد الأصلي مع حفظ السند والتاريخ. يجب التراجع عن حركات الشيك الفعّالة أولًا." onConfirm={()=>{if(saving)return;setSaving(true);void paymentsService.cancel(payment.id).then(()=>{setCancelOpen(false);setRevision(r=>r+1);}).catch(e=>setError(apiMessages(e,'تعذر إلغاء السند.').join('، '))).finally(()=>setSaving(false));}} />
     </div> : null}
   </Modal>;
 }

@@ -25,7 +25,18 @@
 - تحقق على alfajr_accounts_runtime_qa_20261002 فقط: 188 اختبار Backend، 113 مجموعة PostgreSQL مختلفة، 9 مجموعات متصفح Accounts بما فيها الهاتف وPDF؛ الفحوص الآلية ناجحة. حفظ 44 Variant/907 و368 Variant/2765 والحالة الحالية للتكلفة والكتالوج و43 uploads والهويات والإعدادات. لا migration/cutover جديد ولا المصدر/Production/نشر.
 - التقرير: [Accounts UI & Statement](C:/Users/dweer/Desktop/alfajr-backend/alfajr-backend/docs/ACCOUNTS_UI_STATEMENT_COMPLETE_2026-10-02.md). الحالة READY FOR REVIEW؛ لا تعني اكتمال Manual QA الشاملة للوحدات الأخرى.
 
-## المشروع والبنية
+## آخر تحديث Final Business Modules — 2026-10-02
+
+- اكتملت مراجعة/تكامل Payments/Vouchers وChecks وPurchases/PurchaseReturns وReports/Dashboard وAuth/Representatives/Settings على QA المعزولة `alfajr_accounts_runtime_qa_20261002` فقط. القرار الصريح الأحدث للشيك الصادر: مدين General ودائن Bank عند الإصدار فورًا؛ CLEARED حالة فقط بلا قيد إضافي؛ الإرجاع/التراجع يعكس/يعيد أثر الإصدار مرة واحدة. لا حساب مؤجل للصادر.
+- السند النقدي من الواجهة يستخدم PaymentsService ويحفظ original amount/currency/rate/base snapshot. تصحيح Cash يعكس الأصل ويُنشئ Payment بديلًا؛ تعديل الشيك عبر ChecksService. المندوب يقبض ويختار هوية Cash/Bank دون تفاصيل مالية؛ الصرف والقيد اليدوي وإدارة الشيكات/التقارير Admin حسب الصلاحيات الحالية.
+- التجيير إلى General لا يفحص كفاية رصيد المستفيد؛ مدين المستفيد ودائن CheckHolding مع عكس صحيح. بيانات الشيك الوارد التعريفية وملاحظة السند تتعدل في TREASURY فقط؛ التصحيح المالي الصريح يحتفظ بالعكس/repost والتاريخ.
+- أضيف purchase_date بهجرة مستقلة `20261002060000_purchase_business_date` على QA فقط. قائمة /purchases مرقمة وبحث/فلاتر/إجماليات لكل المطابقات؛ التاريخ التجاري مستقل عن cost sequence. أقفال variants مرتبة للشراء ومردوده. CostService/Orders/SalesReturn لم تعاد هندستها.
+- /reports/purchases و/disbursements من القيود وعكوسها؛ Collections يتتبع reversal-of-reversal وحساب القيد الأصلي. أزيلت بطاقة WriteOff والـledger identity mutation aliases؛ إدارة الهوية عبر /accounts، وOpening عبر AccountFinancial فقط. التنقل الحالي DashboardHeader؛ الـSidebars القديمة بلا callers أزيلت. أسماء مصادر cost/journal والجداول التاريخية باقية كمعرفات تقنية وليست Customer runtime.
+- النهائي: 191 اختبار Backend/27 ملفًا، 31 مجموعة PostgreSQL جديدة +113 انحدار =144، و8 مجموعات متصفح جديدة +9 Accounts =17 PASS. Prisma validate/generate وtypecheck/build/lint وdiff check ناجحة؛ Frontend lint بلا أخطاء مع3 تحذيرات Seo موجودة. فشل rollback count أثناء تشغيل متصفح متزامن عولج بإعادة الانحدار منفردًا دون إضعاف التأكيد.
+- الحفظ الحالي لكل صف قبل المهمة في15 جدولًا PASS، مع566 Variant وcost/events/layers والهويات والمستخدمين/config و43 uploads. كذلك44/44 الأصلية بإجمالي907 و368/368 القطع بإجمالي2765 محفوظة؛ ACC597→1031 بفجوات fixtures بلا reset. المصدر/Production لم يلمسا؛ لا نشر/commit/push ولا Manual QA بشرية شاملة.
+- التقرير [Final Business Modules](C:/Users/dweer/Desktop/alfajr-backend/alfajr-backend/docs/FINAL_BUSINESS_MODULES_COMPLETE_2026-10-02.md). الحالة FINAL BUSINESS MODULES COMPLETE — READY FOR SYSTEM AUDIT.
+
+## المشروع والبنية الحالية
 
 متجر عربي مع كتالوج وسلة وطلبات عامة، لوحة Admin، لوحة Representative، مخزون ومشتريات ومردودات، حسابات وقيود وسندات وشيكات وتقارير.
 

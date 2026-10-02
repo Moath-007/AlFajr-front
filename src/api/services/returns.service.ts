@@ -39,6 +39,7 @@ export const returnsService = {
     apiClient.get<PurchaseReturnDto[]>(
       `/purchase-returns${accountId ? `?account_id=${accountId}` : ""}`,
     ),
+  purchaseDetails: (id: number, signal?: AbortSignal) => apiClient.get<PurchaseReturnDto>(`/purchase-returns/${id}`, {signal}),
   createPurchase: (
     purchaseId: number,
     data: CreateReturnDto,

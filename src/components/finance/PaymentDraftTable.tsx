@@ -32,7 +32,7 @@ export default function PaymentDraftTable({ rows, currencies, onChange, onRemove
         <td className="p-1.5"><RepSelect value={row.currencyId} options={currencies.map((item) => ({ value: String(item.currency_id), label: item.code }))} onChange={(currencyId) => onChange(index, { currencyId, ...(currencies.find((item) => item.currency_id === Number(currencyId))?.is_base ? { rate: "1" } : {}) })}/></td>
         <td className="p-1.5">{currency?.is_base ? dash : <input className={inputClass} type="number" min="0.000001" step="0.000001" value={row.rate} onChange={(event) => onChange(index, { rate: event.target.value })}/>}</td>
         <td className="p-1.5"><RepSelect value={row.method} options={[{ value: "Cash", label: "نقدًا" }, { value: "Check", label: "شيك" }]} onChange={(method) => onChange(index, { method })}/></td>
-        <td className="p-1.5"><input className={inputClass} type="datetime-local" value={row.paidAt} onChange={(event) => onChange(index, { paidAt: event.target.value })}/></td>
+        <td className="p-1.5"><input className={inputClass} type="date" aria-label={`تاريخ السند ${index + 1}`} value={row.paidAt} onChange={(event) => onChange(index, { paidAt: event.target.value })}/></td>
         <td className="p-1.5">{check ? <input className={inputClass} value={row.checkNumber} onChange={(event) => onChange(index, { checkNumber: event.target.value })}/> : dash}</td>
         <td className="p-1.5">{check ? <input className={inputClass} value={row.accountNumber} onChange={(event) => onChange(index, { accountNumber: event.target.value })}/> : dash}</td>
         <td className="p-1.5">{check ? <input className={inputClass} value={row.bankNumber} onChange={(event) => onChange(index, { bankNumber: event.target.value })}/> : dash}</td>

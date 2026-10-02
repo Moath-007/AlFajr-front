@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom';
 const reports = [
   { path: 'sales', title: 'تقرير المبيعات', description: 'نشاط المبيعات والمردودات من القيود المالية.' },
   { path: 'collections', title: 'تقرير التحصيلات', description: 'سندات القبض وعكوسها وتسويات الشيكات.' },
-  { path: 'account-balances', title: 'تقرير أرصدة الحسابات', description: 'الأرصدة الحالية لحسابات الحسابات.' },
+  { path: 'account-balances', title: 'تقرير أرصدة الحسابات', description: 'الأرصدة الحالية للحسابات العامة من دفتر اليومية.' },
+  { path: 'purchases', title: 'تقرير المشتريات', description: 'قيود الشراء وعكوسها بتاريخ الحركة المالي.' },
+  { path: 'disbursements', title: 'تقرير الصرف', description: 'سندات الصرف وعكوسها دون تكرار أثر صرف الشيك.' },
   { path: 'returns', title: 'تقرير المردودات', description: 'نشاط المردودات وعكوسها.' },
   { path: 'inventory', title: 'تقرير المخزون', description: 'الأرصدة الحالية وحركات المخزون.' },
   { path: 'checks', title: 'تقرير الشيكات', description: 'مواقع الشيكات الحالية وسجل حركاتها.' },
   { path: 'products', title: 'تقرير المنتجات', description: 'نشاط بنود المبيعات والمردودات في المستندات الحالية.' },
-  { path: 'representatives', title: 'تقرير المناديب', description: 'أداء مستندات طلبات الجملة الحالية.' },
-  { path: 'write-offs', title: 'تقرير المسامحات', description: 'قيود المسامحات وعكوسها بتاريخ النشاط.' },
+  { path: 'representatives', title: 'تقرير المناديب', description: 'أداء فواتير البيع الحالية حسب المنشئ.' },
 ];
 
 export default function AdminReportsPage() {

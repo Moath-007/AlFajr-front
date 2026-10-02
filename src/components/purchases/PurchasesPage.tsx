@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { purchasesService, currenciesService, accountsService, type CurrencyDto, type PurchaseDto, type AccountIdentityOption } from '@/api';
@@ -10,6 +10,7 @@ import { apiMessages } from '@/components/rep/repOrderUtils';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import Modal from '@/components/ui/Modal';
 import { formatMoney } from '@/utils/money';
+import { businessToday } from '@/components/finance/accountUiUtils';
 
 type DraftItem = PickedOrderItem & { unitPrice: string };
 type StatusFilter = 'all' | 'active' | 'cancelled';
@@ -32,19 +33,27 @@ export default function PurchasesPage() {
   const [notice, setNotice] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
-  const [visibleCount, setVisibleCount] = useState(30);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [summary, setSummary] = useState({active_count:0,active_amount:'0.00'});
+  const [count, setCount] = useState(0);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [params] = useSearchParams();
   const [selectedId, setSelectedId] = useState<number | null>(() => Number(params.get('purchase')) || null);
   const [revision, setRevision] = useState(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true); setError('');
-    try { setPurchases(await purchasesService.list()); }
-    catch (reason) { setError(apiMessages(reason, 'تعذر تحميل المشتريات.').join('، ')); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { void load(); }, [load, revision]);
+    try { const response = await purchasesService.list({page,limit:20,search,
+      ...(status !== 'all' && {status:status === 'active' ? 'Completed' : 'Cancelled'}),date_from:from,date_to:to}, signal);
+      if (!signal?.aborted) { setPurchases(response.items); setPages(response.pagination.total_pages); setCount(response.pagination.total); setSummary(response.summary); }
+    }
+    catch (reason) { if (!signal?.aborted) setError(apiMessages(reason, 'تعذر تحميل المشتريات.').join('، ')); }
+    finally { if (!signal?.aborted) setLoading(false); }
+  }, [page,search,status,from,to]);
+  useEffect(() => { const c=new AbortController();void load(c.signal);return()=>c.abort(); }, [load, revision]);
   useEffect(() => {
     const controller = new AbortController();
     setResourcesError('');
@@ -62,18 +71,7 @@ export default function PurchasesPage() {
     return () => controller.abort();
   }, [revision]);
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    return purchases.filter((purchase) => {
-      if (status === 'active' && purchase.status !== 'Completed') return false;
-      if (status === 'cancelled' && purchase.status !== 'Cancelled') return false;
-      if (!query) return true;
-      return [purchase.customer_purchase_id, purchaseName(purchase), purchase.notes,
-        ...purchase.customer_purchase_items.map(itemName)].some((value) => String(value ?? '').toLocaleLowerCase().includes(query));
-    });
-  }, [purchases, search, status]);
-  const active = purchases.filter((purchase) => purchase.status === 'Completed');
-  const total = active.reduce((sum, purchase) => sum + Number(purchase.total_amount), 0);
+  const filtered = purchases;
 
   return <div className="space-y-5" dir="rtl">
     <header className="flex flex-wrap items-end justify-between gap-3 border-b pb-4">
@@ -83,22 +81,24 @@ export default function PurchasesPage() {
     {error && <div className="rep-error" role="alert">{error} <button type="button" className="mr-2 underline" onClick={() => setRevision((value) => value + 1)}>إعادة المحاولة</button></div>}
     {resourcesError && <div className="rep-error" role="alert">{resourcesError} <button type="button" className="mr-2 underline" onClick={() => setRevision((value) => value + 1)}>إعادة المحاولة</button></div>}
     {notice && <div className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800" role="status">{notice}</div>}
-    <section className="grid gap-2 sm:grid-cols-3" aria-label="ملخص المشتريات"><Summary label="عمليات فعّالة" value={String(active.length)} /><Summary label="قيمة المشتريات الفعّالة" value={formatMoney(total, baseCurrency)} /><Summary label="عمليات ملغاة" value={String(purchases.length - active.length)} /></section>
+    <section className="grid gap-2 sm:grid-cols-3" aria-label="ملخص المشتريات"><Summary label="عمليات فعّالة حسب الفلاتر" value={String(summary.active_count)} /><Summary label="قيمة المشتريات الفعّالة" value={formatMoney(summary.active_amount, baseCurrency)} /><Summary label="عمليات مطابقة" value={String(count)} /></section>
     <section className="rounded-2xl border bg-white">
       <div className="flex flex-wrap items-end gap-2 border-b p-4">
-        <div className="min-w-[220px] flex-1"><label className="rep-label" htmlFor="purchase-search">البحث</label><input id="purchase-search" className="rep-control" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleCount(30); }} placeholder="رقم العملية أو الحساب أو الصنف" /></div>
-        <div className="w-full sm:w-44"><RepSelect value={status} label="الحالة" onChange={(value) => { setStatus(value); setVisibleCount(30); }} options={[{ value: 'all', label: 'كل الحالات' }, { value: 'active', label: 'فعّالة' }, { value: 'cancelled', label: 'ملغاة' }]} /></div>
+        <div className="min-w-0 w-full flex-1"><label className="rep-label" htmlFor="purchase-search">البحث</label><input id="purchase-search" className="rep-control" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="رقم العملية أو الحساب أو الصنف" /></div>
+        <div className="w-full sm:w-44"><RepSelect value={status} label="الحالة" onChange={(value) => { setStatus(value); setPage(1); }} options={[{ value: 'all', label: 'كل الحالات' }, { value: 'active', label: 'فعّالة' }, { value: 'cancelled', label: 'ملغاة' }]} /></div>
+        <label><span className="rep-label">من</span><input type="date" className="rep-control" value={from} onChange={e=>{setFrom(e.target.value);setPage(1);}} /></label>
+        <label><span className="rep-label">إلى</span><input type="date" className="rep-control" value={to} onChange={e=>{setTo(e.target.value);setPage(1);}} /></label>
       </div>
       {loading ? <p className="p-6 text-sm text-stone-500">جارٍ تحميل المشتريات…</p> : filtered.length ? <>
-        <div className="divide-y">{filtered.slice(0, visibleCount).map((purchase) => <article key={purchase.customer_purchase_id} className="grid gap-2 p-4 text-sm hover:bg-stone-50 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto] lg:items-center">
+        <div className="divide-y">{filtered.map((purchase) => <article key={purchase.customer_purchase_id} className="grid gap-2 p-4 text-sm hover:bg-stone-50 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto_auto] lg:items-center">
           <div><div className="flex flex-wrap items-center gap-2"><b className="text-brand">شراء #{purchase.customer_purchase_id}</b><span className={`rounded-full px-2 py-0.5 text-xs font-bold ${purchase.status === 'Completed' ? 'bg-emerald-50 text-emerald-800' : 'bg-stone-100 text-stone-600'}`}>{purchase.status === 'Completed' ? 'فعّالة' : 'ملغاة'}</span></div><p className="mt-1 font-bold text-stone-700">{purchaseName(purchase)}</p></div>
-          <div className="text-stone-600">{dateText(purchase.created_at)}<p className="text-xs">{purchase.customer_purchase_items.length} أصناف</p></div>
+          <div className="text-stone-600">{dateText(purchase.purchase_date)}<p className="text-xs">{purchase.customer_purchase_items.length} أصناف</p></div>
           <b className="whitespace-nowrap text-brand" dir="ltr">{formatMoney(purchase.total_amount, baseCurrency)}</b>
           <button type="button" className="btn-outline text-sm" onClick={() => setSelectedId(purchase.customer_purchase_id)}>التفاصيل</button>
         </article>)}</div>
-        {filtered.length > visibleCount && <div className="border-t p-3 text-center"><button type="button" className="btn-outline" onClick={() => setVisibleCount((value) => value + 30)}>عرض المزيد</button></div>}
       </> : <p className="p-8 text-center text-sm text-stone-500">{purchases.length ? 'لا توجد عمليات مطابقة للبحث.' : 'لا توجد مشتريات حتى الآن.'}</p>}
     </section>
+    <div className="flex items-center justify-center gap-3"><button className="btn-outline" disabled={loading || page<=1} onClick={()=>setPage(p=>p-1)}>السابق</button><span>{page} / {pages || 1}</span><button className="btn-outline" disabled={loading || page>=pages} onClick={()=>setPage(p=>p+1)}>التالي</button></div>
     <PurchaseForm open={createOpen} accounts={accounts} baseCurrency={baseCurrency} onClose={() => setCreateOpen(false)} onSaved={(id) => { setCreateOpen(false); setNotice(`سُجّل الشراء #${id} على الحساب.`); setRevision((value) => value + 1); }} />
     <PurchaseDetails id={selectedId} admin={admin} baseCurrency={baseCurrency} accounts={accounts} onClose={() => setSelectedId(null)} onChanged={() => setRevision((value) => value + 1)} />
   </div>;
@@ -115,6 +115,7 @@ function PurchaseForm({ open, purchase, accounts, baseCurrency, onClose, onSaved
   const [accountId, setAccountId] = useState<number | null>(null);
   const [items, setItems] = useState<DraftItem[]>([]);
   const [notes, setNotes] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState(businessToday);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -127,6 +128,7 @@ function PurchaseForm({ open, purchase, accounts, baseCurrency, onClose, onSaved
       label: itemName(item), unitPrice: item.unit_price,
     })) ?? []);
     setNotes(purchase?.notes ?? ''); setError('');
+    setPurchaseDate(purchase?.purchase_date.slice(0,10) ?? businessToday());
   }, [open, purchase]);
   const total = items.reduce((sum, item) => sum + item.quantity * Number(item.unitPrice || 0), 0);
   const selectedAccount = accounts.find((account) => account.account_id === accountId);
@@ -142,7 +144,7 @@ function PurchaseForm({ open, purchase, accounts, baseCurrency, onClose, onSaved
     if (saving || (!purchase && !accountId)) return;
     setSaving(true); setError('');
     try {
-      const payload = { items: items.map((item) => ({ product_variant_id: item.product_variant_id, quantity: item.quantity, unit_price: Number(item.unitPrice) })), notes: notes.trim() || undefined };
+      const payload = { purchase_date: purchaseDate, items: items.map((item) => ({ product_variant_id: item.product_variant_id, quantity: item.quantity, unit_price: Number(item.unitPrice) })), notes: notes.trim() || undefined };
       if (purchase) {
         await purchasesService.update(purchase.customer_purchase_id, payload);
         setConfirmOpen(false); onSaved(purchase.customer_purchase_id);
@@ -159,6 +161,7 @@ function PurchaseForm({ open, purchase, accounts, baseCurrency, onClose, onSaved
         {purchase ? <div className="rounded-xl bg-stone-50 p-3 text-sm">الحساب: <b className="text-brand">{purchaseName(purchase)}</b></div>
           : <AccountPicker accounts={accounts} value={accountId} onChange={setAccountId} label="الحساب" kinds={['General']} />}
         <p className="rounded-xl bg-brand-50 p-3 text-xs text-brand">تزيد الأصناف في المخزون وتُسجل قيمتها على الحساب. دفع المبلغ يتم لاحقًا بسند صرف.</p>
+        <label className="block"><span className="rep-label">تاريخ الشراء</span><input className="rep-control" type="date" value={purchaseDate} onChange={e=>setPurchaseDate(e.target.value)} required /></label>
         {error && <div className="rep-error" role="alert">{error}</div>}
         <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-black text-brand">الأصناف ({items.length})</h3><button type="button" className="btn-outline" onClick={() => setPickerOpen(true)}>إضافة صنف</button></div>
         {items.length ? <div className="max-h-[45vh] space-y-2 overflow-y-auto">{items.map((item) => <div key={item.product_variant_id} className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[minmax(0,1fr)_90px_130px_100px_auto] sm:items-end">
@@ -208,17 +211,17 @@ function PurchaseDetails({ id, admin, baseCurrency, accounts, onClose, onChanged
         {error && <div className="rep-error" role="alert">{error}</div>}
         {loading && <p className="text-sm text-stone-500">جارٍ تحميل التفاصيل…</p>}
         {purchase && !loading && <>
-          <div className="flex flex-wrap gap-2"><span className={`rounded-full px-3 py-1 text-xs font-bold ${purchase.status === 'Completed' ? 'bg-emerald-50 text-emerald-800' : 'bg-stone-100 text-stone-600'}`}>{purchase.status === 'Completed' ? 'فعّالة' : 'ملغاة'}</span>{purchase.account_id === null && <span className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-600">سجل قديم</span>}</div>
-          <dl className="grid gap-3 rounded-xl bg-stone-50 p-3 text-sm sm:grid-cols-2"><Detail label="الحساب / الجهة" value={purchaseName(purchase)} /><Detail label="تاريخ التسجيل" value={dateText(purchase.created_at)} /><Detail label="الأصناف" value={String(purchase.customer_purchase_items.length)} /><Detail label="قيمة الشراء" value={formatMoney(purchase.total_amount, baseCurrency)} />{purchase.cancelled_at && <Detail label="تاريخ الإلغاء" value={dateText(purchase.cancelled_at)} />}</dl>
+          <div className="flex flex-wrap gap-2"><span className={`rounded-full px-3 py-1 text-xs font-bold ${purchase.status === 'Completed' ? 'bg-emerald-50 text-emerald-800' : 'bg-stone-100 text-stone-600'}`}>{purchase.status === 'Completed' ? 'فعّالة' : 'ملغاة'}</span></div>
+          <dl className="grid gap-3 rounded-xl bg-stone-50 p-3 text-sm sm:grid-cols-2"><Detail label="الحساب / الجهة" value={purchaseName(purchase)} /><Detail label="تاريخ الشراء" value={dateText(purchase.purchase_date)} /><Detail label="الأصناف" value={String(purchase.customer_purchase_items.length)} /><Detail label="قيمة الشراء" value={formatMoney(purchase.total_amount, baseCurrency)} />{purchase.cancelled_at && <Detail label="تاريخ الإلغاء" value={dateText(purchase.cancelled_at)} />}</dl>
           <div><h3 className="mb-2 font-black text-brand">الأصناف</h3><div className="divide-y overflow-hidden rounded-xl border">{purchase.customer_purchase_items.map((item) => <div key={item.customer_purchase_item_id} className="grid gap-1 p-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center"><b className="text-brand">{itemName(item)}</b><span>الكمية: {item.quantity}</span><span>السعر: {formatMoney(item.unit_price, baseCurrency)}</span><b dir="ltr">{formatMoney(item.quantity * Number(item.unit_price), baseCurrency)}</b></div>)}</div></div>
           {purchase.notes && <div className="rounded-xl border p-3 text-sm"><b className="text-brand">ملاحظات</b><p className="mt-1 whitespace-pre-wrap text-stone-600">{purchase.notes}</p></div>}
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-brand-50 p-3"><b className="text-brand">إجمالي الشراء</b><b className="text-xl text-brand" dir="ltr">{formatMoney(purchase.total_amount, baseCurrency)}</b></div>
-          <div className="flex flex-wrap gap-2 border-t pt-3">{purchase.account_id && admin && <><Link className="btn-outline" to={`/owner/accounts/${purchase.account_id}`}>كشف الحساب</Link><Link className="btn-outline" to={`/owner/vouchers?account=${purchase.account_id}`}>سند صرف</Link></>}{admin && purchase.status === 'Completed' && <><button type="button" className="btn-outline" onClick={() => setEditing(true)}>تعديل</button><button type="button" className="btn-outline text-red-700" onClick={() => setCancelOpen(true)}>إلغاء الشراء</button></>}</div>
+          <div className="flex flex-wrap gap-2 border-t pt-3"><Link className="btn-outline" to={`/${admin?'owner':'rep'}/accounts/${purchase.account_id}`}>تفاصيل الحساب والكشف</Link>{admin && <><Link className="btn-outline" to={`/owner/vouchers?account=${purchase.account_id}`}>سند صرف</Link><Link className="btn-outline" to="/owner/returns">مردودات الشراء</Link></>}{admin && purchase.status === 'Completed' && <><button type="button" className="btn-outline" onClick={() => setEditing(true)}>تعديل</button><button type="button" className="btn-outline text-red-700" onClick={() => setCancelOpen(true)}>إلغاء الشراء</button></>}</div>
         </>}
       </div>
     </Modal>
     <PurchaseForm open={editing} purchase={purchase} accounts={accounts} baseCurrency={baseCurrency} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); void load(); onChanged(); }} />
-    <ConfirmDialog open={cancelOpen} onClose={() => setCancelOpen(false)} onConfirm={() => void cancel()} loading={saving} title="إلغاء الشراء" message="ستُعكس حركة المخزون والقيد المالي لهذه العملية. إذا كان لها مردود أو دفعة مرتبطة بالسجل القديم، سيمنع النظام الإلغاء حتى تُعالج." confirmLabel="تأكيد الإلغاء" details={purchase && <div className="flex justify-between gap-2"><span>{purchaseName(purchase)}</span><b>{formatMoney(purchase.total_amount, baseCurrency)}</b></div>} />
+    <ConfirmDialog open={cancelOpen} onClose={() => setCancelOpen(false)} onConfirm={() => void cancel()} loading={saving} title="إلغاء الشراء" message="ستُعكس حركة المخزون والقيد المالي. يجب إلغاء مردودات الشراء المرتبطة الفعّالة أولًا. سند الصرف مستقل عن مستند الشراء." confirmLabel="تأكيد الإلغاء" details={purchase && <div className="flex justify-between gap-2"><span>{purchaseName(purchase)}</span><b>{formatMoney(purchase.total_amount, baseCurrency)}</b></div>} />
   </>;
 }
 

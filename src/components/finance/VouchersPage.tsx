@@ -2,18 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { createPortal } from 'react-dom';
 import { CopyPlus, Plus, Trash2 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { currenciesService, ledgerService, paymentsService, type AccountKind, type CashAccountDto, type CreatePaymentDto, type CurrencyDto, type LedgerAccount, type VoucherInput } from '@/api';
+import { currenciesService, ledgerService, paymentsService, type AccountKind, type CreatePaymentDto, type CurrencyDto, type LedgerAccount, type VoucherInput } from '@/api';
 import { apiMessages } from '@/components/rep/repOrderUtils';
 import PaymentDraftTable, { type PaymentDraftTableRow } from './PaymentDraftTable';
 import { formatMoney } from '@/utils/money';
 import AccountPicker from './AccountPicker';
 import { isInternalAccount } from './accountLabels';
+import { businessToday } from './accountUiUtils';
 
 type VoucherType = 'Receipt' | 'Disbursement' | 'Journal';
 type DraftLine = { key: number; account_id: number | null; side: 'debit' | 'credit'; amount: string };
 type BatchStep =
-  | { key: PaymentDraftTableRow['key']; kind: 'voucher'; input: VoucherInput }
-  | { key: PaymentDraftTableRow['key']; kind: 'account-check'; accountId: number; type: 'Receipt' | 'Disbursement'; input: CreatePaymentDto }
+  { key: PaymentDraftTableRow['key']; accountId: number; type: 'Receipt' | 'Disbursement'; input: CreatePaymentDto }
 type Pending = { kind: 'journal'; input: VoucherInput; summary: string }
   | { kind: 'batch'; steps: BatchStep[]; summary: string };
 
@@ -33,13 +33,8 @@ const newLines = (accountId: number | null = null): DraftLine[] => [
   { key: 1, account_id: accountId, side: 'debit', amount: '' },
   { key: 2, account_id: null, side: 'credit', amount: '' },
 ];
-const localDateTime = () => {
-  const now = new Date();
-  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-};
 const newDraft = (key: number, currencyId = ''): PaymentDraftTableRow => ({
-  key, amount: '', currencyId, rate: '1', method: 'Cash', paidAt: localDateTime(), notes: '',
+  key, amount: '', currencyId, rate: '1', method: 'Cash', paidAt: businessToday(), notes: '',
   checkNumber: '', accountNumber: '', bankNumber: '', branchNumber: '', dueDate: '',
 });
 const two = (value: number) => String(value).padStart(2, '0');
@@ -58,7 +53,6 @@ export default function VouchersPage() {
   const nextLineKey = useRef(3);
   const submitting = useRef(false);
   const [accounts, setAccounts] = useState<LedgerAccount[]>([]);
-  const [cashAccounts, setCashAccounts] = useState<CashAccountDto[]>([]);
   const [currencies, setCurrencies] = useState<CurrencyDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -70,6 +64,7 @@ export default function VouchersPage() {
   const [checksToAdd, setChecksToAdd] = useState('1');
   const [lines, setLines] = useState<DraftLine[]>(() => newLines(preselected));
   const [journalNotes, setJournalNotes] = useState('');
+  const [journalDate, setJournalDate] = useState(() => new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Hebron',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -78,12 +73,12 @@ export default function VouchersPage() {
   const load = useCallback(async () => {
     setLoading(true); setLoadError('');
     try {
-      const [accountRows, cashRows, response] = await Promise.all([ledgerService.accounts(), ledgerService.cashAccounts(), currenciesService.list()]);
+      const [accountRows, response] = await Promise.all([ledgerService.accounts(), currenciesService.list()]);
       const rows = Array.isArray(response) ? response : response.items ?? response.currencies ?? [];
       const active = rows.filter((currency) => currency.is_active);
-      setAccounts(accountRows); setCashAccounts(cashRows); setCurrencies(active);
+      setAccounts(accountRows); setCurrencies(active);
       setCashId((current) => {
-        return cashRows.some((account) => account.account_id === current) ? current : null;
+        return accountRows.some((account) => ['Cash', 'Bank'].includes(account.kind) && account.account_id === current) ? current : null;
       });
       const baseId = String(active.find((currency) => currency.is_base)?.currency_id ?? '');
       setDrafts((current) => current.map((draft) => draft.currencyId ? draft : { ...draft, currencyId: baseId }));
@@ -108,7 +103,7 @@ export default function VouchersPage() {
   const selectedAccount = accounts.find((account) => account.account_id === accountId);
   const manualAccounts = accounts.filter((account) => !isInternalAccount(account));
   const baseCurrency = currencies.find((currency) => currency.is_base);
-  const cashChoices = accounts.filter((account) => account.kind === 'Cash' && cashAccounts.some((cash) => cash.account_id === account.account_id));
+  const cashChoices = accounts.filter((account) => ['Cash', 'Bank'].includes(account.kind));
   const treasuryAccountIds = accounts.filter((account) => treasuryKinds.includes(account.kind)).map((account) => account.account_id);
   const hasCash = drafts.some((draft) => draft.method === 'Cash');
   const hasCheck = drafts.some((draft) => draft.method === 'Check');
@@ -159,7 +154,8 @@ export default function VouchersPage() {
         setError('أكمل أطراف القيد بمبالغ صحيحة وتأكد من تساوي المدين والدائن.'); return;
       }
       if (!journalNotes.trim()) { setError('أدخل ملاحظة توضح سبب القيد.'); return; }
-      const input: VoucherInput = { type, notes: journalNotes.trim(), lines: lines.map((line) => ({ account_id: line.account_id!, [line.side]: Number(line.amount) })) };
+      if (!journalDate) { setError('اختر تاريخ القيد.'); return; }
+      const input: VoucherInput = { type, occurred_at: journalDate, notes: journalNotes.trim(), lines: lines.map((line) => ({ account_id: line.account_id!, [line.side]: Number(line.amount) })) };
       const summary = `سند قيد بقيمة ${formatMoney(debitCents / 100, baseCurrency)}\n${lines.map((line) => `${line.side === 'debit' ? 'مدين' : 'دائن'}: ${accounts.find((account) => account.account_id === line.account_id)?.name} — ${formatMoney(line.amount, baseCurrency)}`).join('\n')}`;
       setPending({ kind: 'journal', input, summary });
       return;
@@ -167,7 +163,7 @@ export default function VouchersPage() {
     if (!selectedAccount || isInternalAccount(selectedAccount) || treasuryKinds.includes(selectedAccount.kind)) { setError('اختر الحساب المقابل.'); return; }
     if (!drafts.length) { setError('أضف سطر قبض أو صرف واحدًا على الأقل.'); return; }
     if (!baseCurrency) { setError('العملة الأساسية غير محددة. تحقق من إعدادات العملات.'); return; }
-    const cashAccount = cashAccounts.find((account) => account.account_id === cashId);
+    const cashAccount = cashChoices.find((account) => account.account_id === cashId);
     const bankAccount = accounts.find((account) => account.account_id === bankId);
     if (hasCheck && (selectedAccount.is_system || !['General'].includes(selectedAccount.kind))) { setError('اختر حسابًا عامًا للشيك.'); return; }
     if (hasCash && !cashAccount) { setError('اختر صندوقًا نقديًا للسند.'); return; }
@@ -185,26 +181,19 @@ export default function VouchersPage() {
       if (draft.method === 'Check' && (!draft.checkNumber.trim() || !draft.dueDate)) {
         setError(`رقم الشيك وتاريخ استحقاقه مطلوبان في السطر ${index + 1}.`); return;
       }
-      if (draft.method === 'Check') {
+      {
         const input: CreatePaymentDto = {
           amount: Number(draft.amount), currency_id: currency.currency_id, exchange_rate: rate,
-          payment_method: draft.method, paid_at: draft.paidAt ? new Date(draft.paidAt).toISOString() : undefined,
+          payment_method: draft.method, paid_at: draft.paidAt || undefined,
           notes,
+          ...(draft.method === 'Cash' ? { money_account_id: cashAccount!.account_id } : {}),
           ...(draft.method === 'Check' ? { check: {
             check_number: draft.checkNumber.trim(), account_number: draft.accountNumber.trim() || undefined,
             bank_number: draft.bankNumber.trim() || undefined, branch_number: draft.branchNumber.trim() || undefined,
             due_date: draft.dueDate,
           }, ...(type === 'Disbursement' ? { bank_account_id: bankId! } : {}) } : {}),
         };
-        if (draft.method === 'Check')
-          steps.push({ key: draft.key, kind: 'account-check', accountId: selectedAccount.account_id, type, input });
-      } else if (draft.method === 'Cash') {
-        const amount = amountInBaseCents / 100;
-        const input: VoucherInput = { type, occurred_at: draft.paidAt ? new Date(draft.paidAt).toISOString() : undefined,
-          notes, lines: type === 'Receipt'
-            ? [{ account_id: cashAccount!.account_id, debit: amount }, { account_id: selectedAccount.account_id, credit: amount }]
-            : [{ account_id: selectedAccount.account_id, debit: amount }, { account_id: cashAccount!.account_id, credit: amount }] };
-        steps.push({ key: draft.key, kind: 'voucher', input });
+        steps.push({ key: draft.key, accountId: selectedAccount.account_id, type, input });
       }
     }
     const details = drafts.map((draft, index) => {
@@ -229,8 +218,8 @@ export default function VouchersPage() {
         setLines(newLines()); setJournalNotes('');
       } else {
         for (const step of pending.steps) {
-          if (step.kind === 'voucher') await ledgerService.voucher(step.input);
-          else if (step.kind === 'account-check') await paymentsService.createAccountCheck(step.accountId, step.type, step.input);
+          if (step.type === 'Receipt') await paymentsService.createReceipt(step.accountId, step.input);
+          else await paymentsService.createDisbursement(step.accountId, step.input);
           completed++;
           setDrafts((current) => current.filter((draft) => draft.key !== step.key));
         }
@@ -277,9 +266,9 @@ export default function VouchersPage() {
           <div className="border-b border-stone-100 pb-4"><h2 className="font-black text-brand">أطراف القيد</h2><p className="text-xs text-stone-500">كل حسابات الدفتر متاحة هنا. الدائن يمينًا والمدين يسارًا.</p></div>
           <div className="grid gap-4 lg:grid-cols-2">{renderJournalColumn('credit')}{renderJournalColumn('debit')}</div>
           <div className="flex flex-wrap gap-6 rounded-xl bg-brand-50 p-3 text-sm font-bold text-brand" aria-live="polite"><span>المدين: {formatMoney(debitCents / 100, baseCurrency)}</span><span>الدائن: {formatMoney(creditCents / 100, baseCurrency)}</span><span className={balanced ? 'text-emerald-700' : 'text-red-700'}>{balanced ? 'القيد متوازن' : `الفرق: ${formatMoney(Math.abs(debitCents - creditCents) / 100, baseCurrency)}`}</span></div>
-          <label className="block"><span className="rep-label">سبب القيد</span><textarea className="rep-control min-h-24" rows={3} value={journalNotes} onChange={(event) => { setJournalNotes(event.target.value); clearMessage(); }} /></label>
+          <label className="block"><span className="rep-label">تاريخ القيد</span><input type="date" className="rep-control" value={journalDate} onChange={event => setJournalDate(event.target.value)} required /></label><label className="block"><span className="rep-label">سبب القيد</span><textarea className="rep-control min-h-24" rows={3} value={journalNotes} onChange={(event) => { setJournalNotes(event.target.value); clearMessage(); }} /></label>
         </div> : <div className="space-y-5">
-          <div className="grid items-start gap-4 sm:grid-cols-2"><AccountPicker accounts={manualAccounts} label="الحساب المقابل" exclude={treasuryAccountIds} value={accountId} onChange={(id) => { setAccountId(id); clearMessage(); }} disabled={loading || !!loadError} />{hasCash && <AccountPicker accounts={cashChoices} label={type === 'Receipt' ? 'صندوق الاستلام *' : 'صندوق الدفع *'} kinds={['Cash']} value={cashId} onChange={(id) => { setCashId(id); clearMessage(); }} disabled={loading || !!loadError} />}{type === 'Disbursement' && hasCheck && <AccountPicker accounts={accounts} label="البنك المسحوب عليه الشيك" kinds={['Bank']} value={bankId} onChange={(id) => { setBankId(id); clearMessage(); }} disabled={loading || !!loadError} />}</div>
+          <div className="grid items-start gap-4 sm:grid-cols-2"><AccountPicker accounts={manualAccounts} label="الحساب المقابل" exclude={treasuryAccountIds} value={accountId} onChange={(id) => { setAccountId(id); clearMessage(); }} disabled={loading || !!loadError} />{hasCash && <AccountPicker accounts={cashChoices} label={type === 'Receipt' ? 'حساب الاستلام *' : 'حساب الدفع *'} kinds={['Cash', 'Bank']} value={cashId} onChange={(id) => { setCashId(id); clearMessage(); }} disabled={loading || !!loadError} />}{type === 'Disbursement' && hasCheck && <AccountPicker accounts={accounts} label="البنك المسحوب عليه الشيك" kinds={['Bank']} value={bankId} onChange={(id) => { setBankId(id); clearMessage(); }} disabled={loading || !!loadError} />}</div>
           <div><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-black text-brand">جدول الدفعات</h2><p className="text-xs text-stone-500">العملات النشطة تُحمّل من قاعدة البيانات. أدخل سعر الصرف إذا اخترت عملة غير أساسية.</p></div><button type="button" className="btn-outline" onClick={() => { setDrafts((current) => [...current, newDraft(nextKey.current++, String(baseCurrency?.currency_id ?? ''))]); clearMessage(); }}><Plus className="h-4 w-4" /> إضافة دفعة</button></div><PaymentDraftTable rows={drafts} currencies={currencies} onChange={editDraft} onRemove={(index) => { setDrafts((current) => current.filter((_, i) => i !== index)); clearMessage(); }} /></div>
           <div className="flex flex-wrap items-center gap-2"><div className="flex items-center overflow-hidden rounded-lg border border-brand/15 bg-white"><input aria-label="عدد الشيكات المراد إضافتها" className="h-10 w-16 border-0 px-2 text-center text-sm font-bold outline-none" type="number" min="1" value={checksToAdd} onChange={(event) => setChecksToAdd(event.target.value)} /><button type="button" className="inline-flex h-10 items-center gap-2 bg-brand-50 px-3 text-xs font-black text-brand hover:bg-brand-100" onClick={addChecks}><CopyPlus className="h-4 w-4" /> إضافة شيكات</button></div><span className="text-xs text-stone-500">تُنسخ بيانات آخر شيك مع زيادة الرقم والاستحقاق، دون حد ثابت لعدد الشيكات.</span></div>
           <div className="rounded-xl bg-brand-50 p-3 font-black text-brand">الإجمالي بالعملة الأساسية: {formatMoney(total, baseCurrency)}</div>

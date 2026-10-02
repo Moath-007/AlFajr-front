@@ -1,31 +1,37 @@
-import { useEffect, useState } from "react";
-import { currenciesService, paymentsService, type CurrencyDto, type PaymentDto, type PaymentMethod } from "@/api";
-import { apiMessages } from "@/components/rep/repOrderUtils";
-import Modal from "@/components/ui/Modal";
-import Select from "@/components/ui/Select";
-import { Skeleton } from "@/components/ui/Skeleton";
-import { StyledDatePicker } from "@/components/ui/StyledDatePicker";
-import { describeConvertedMoney } from "@/utils/money";
+import { useEffect, useState } from 'react';
+import { currenciesService, paymentsService, type CurrencyDto, type PaymentDto } from '@/api';
+import { apiMessages } from '@/components/rep/repOrderUtils';
+import Modal from '@/components/ui/Modal';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
-export default function EditPaymentModal({ paymentId, onClose, onSaved }: { paymentId: number | null; orderId?: number; onClose: () => void; onSaved: (message: string) => void }) {
-  const [payment, setPayment] = useState<PaymentDto | null>(null), [currencies, setCurrencies] = useState<CurrencyDto[]>([]);
-  const [amount, setAmount] = useState(""), [currencyId, setCurrencyId] = useState(""), [rate, setRate] = useState("1"), [method, setMethod] = useState<PaymentMethod>("Cash"), [notes, setNotes] = useState("");
-  const [checkNumber, setCheckNumber] = useState(""), [accountNumber, setAccountNumber] = useState(""), [bankNumber, setBankNumber] = useState(""), [branchNumber, setBranchNumber] = useState(""), [dueDate, setDueDate] = useState("");
-  const [loading, setLoading] = useState(false), [saving, setSaving] = useState(false), [errors, setErrors] = useState<string[]>([]);
-  useEffect(() => { if (paymentId === null) return; const controller = new AbortController(); setLoading(true); setErrors([]); Promise.all([paymentsService.getById(paymentId, controller.signal), currenciesService.list(controller.signal)]).then(([response, currencyResponse]) => { const item = response.payment; const list = Array.isArray(currencyResponse) ? currencyResponse : currencyResponse.items ?? currencyResponse.currencies ?? []; setPayment(item); setCurrencies(list.filter((currency) => currency.is_active || currency.currency_id === item.currency?.currency_id)); setAmount(item.amount); setCurrencyId(String(item.currency?.currency_id ?? "")); setRate(item.exchange_rate ?? "1"); setMethod(item.payment_method); setNotes(item.notes ?? ""); setCheckNumber(item.check?.check_number ?? ""); setAccountNumber(item.check?.account_number ?? ""); setBankNumber(item.check?.bank_number ?? ""); setBranchNumber(item.check?.branch_number ?? ""); setDueDate(item.check?.due_date?.slice(0, 10) ?? ""); }).catch((error) => { if (!controller.signal.aborted) setErrors(apiMessages(error, "تعذر تحميل الدفعة.")); }).finally(() => { if (!controller.signal.aborted) setLoading(false); }); return () => controller.abort(); }, [paymentId]);
-  if (paymentId === null) return null;
-  const currency = currencies.find((item) => item.currency_id === Number(currencyId));
-  const save = async () => {
-    const value = Number(amount), exchangeRate = currency?.is_base ? 1 : Number(rate);
-    if (!Number.isFinite(value) || value <= 0) return setErrors(["أدخل مبلغًا صحيحًا."]);
-    if (!currency) return setErrors(["اختر العملة."]);
-    if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) return setErrors(["أدخل سعر صرف صحيحًا."]);
-    if (method === "Check" && !checkNumber.trim()) return setErrors(["رقم الشيك مطلوب."]);
-    setSaving(true); setErrors([]);
-    try { const response = await paymentsService.update(paymentId, { amount: value, currency_id: currency.currency_id, exchange_rate: exchangeRate, payment_method: method, paid_at: payment?.paid_at, notes: notes.trim() || undefined, check: method === "Check" ? { check_number: checkNumber.trim(), account_number: accountNumber.trim() || undefined, bank_number: bankNumber.trim() || undefined, branch_number: branchNumber.trim() || undefined, due_date: dueDate || undefined } : undefined }); onSaved(response.message); }
-    catch (error) { setErrors(apiMessages(error, "تعذر تعديل الدفعة.")); }
-    finally { setSaving(false); }
-  };
-  return <Modal open onClose={onClose} title={`تعديل الدفعة #${paymentId}`} size="lg">{loading ? <Skeleton className="h-72"/> : <div className="space-y-4">{errors.length > 0 && <div className="rep-error">{errors.join("، ")}</div>}{payment && <p className="rounded-xl bg-stone-50 p-3 text-sm">القيمة الحالية: <b>{describeConvertedMoney(payment.amount, payment.base_amount, payment.exchange_rate, payment.currency)}</b></p>}<div className="grid gap-3 sm:grid-cols-2"><Field label="المبلغ" type="number" value={amount} onChange={setAmount}/><Select label="العملة" value={currencyId} onChange={(value) => { setCurrencyId(value); if (currencies.find((item) => item.currency_id === Number(value))?.is_base) setRate("1"); }} options={currencies.map((item) => ({ value: String(item.currency_id), label: `${item.code} — ${item.name} (${item.symbol})` }))}/>{!currency?.is_base && <Field label="سعر الصرف" type="number" value={rate} onChange={setRate}/>}<Select label="طريقة الدفع" value={method} onChange={setMethod} options={[{ value: "Cash", label: "نقدًا" }, { value: "Check", label: "شيك" }]}/>{method === "Check" && <><Field label="رقم الشيك" value={checkNumber} onChange={setCheckNumber}/><Field label="رقم الحساب" value={accountNumber} onChange={setAccountNumber}/><Field label="رقم البنك" value={bankNumber} onChange={setBankNumber}/><Field label="رقم الفرع" value={branchNumber} onChange={setBranchNumber}/><StyledDatePicker label="تاريخ الاستحقاق" value={dueDate} onChange={setDueDate}/></>}</div><label><span className="rep-label">ملاحظات</span><textarea className="rep-control" rows={2} value={notes} onChange={(event) => setNotes(event.target.value)}/></label><p className="text-xs text-stone-500">عند الحفظ تُلغى الدفعة القديمة ويُنشئ النظام دفعة بديلة ثم يعيد ترحيل أثرها على الحساب.</p><button className="btn-primary w-full" disabled={saving} onClick={() => void save()}>{saving ? "جاري الحفظ…" : "حفظ تعديل الدفعة"}</button></div>}</Modal>;
+// Check corrections use ChecksService and its state/history rules, not Payment replacement.
+export default function EditPaymentModal({payment,onClose,onSaved}:{payment:PaymentDto;onClose:()=>void;onSaved:(id:number)=>void}) {
+  const [currencies,setCurrencies]=useState<CurrencyDto[]>([]),[error,setError]=useState('');
+  const [amount,setAmount]=useState(payment.amount),[rate,setRate]=useState(payment.exchange_rate??'1');
+  const [currencyId,setCurrencyId]=useState(payment.currency?.currency_id??0);
+  const [date,setDate]=useState(()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Hebron',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(payment.paid_at))),[notes,setNotes]=useState(payment.notes??'');
+  const [review,setReview]=useState(false),[saving,setSaving]=useState(false);
+  useEffect(()=>{const c=new AbortController();currenciesService.list(c.signal).then(r=>{
+    const rows=Array.isArray(r)?r:r.items??r.currencies??[];setCurrencies(rows.filter(x=>x.is_active||x.currency_id===currencyId));
+  }).catch(e=>{if(!c.signal.aborted)setError(apiMessages(e,'تعذر تحميل العملات.').join('، '));});return()=>c.abort();},[currencyId]);
+  const currency=currencies.find(c=>c.currency_id===currencyId);
+  const validate=()=>{if(!currency||!date||!/^\d+(?:\.\d{1,2})?$/.test(amount)||Number(amount)<=0||
+    !currency.is_base&&(!/^\d+(?:\.\d{1,6})?$/.test(rate)||Number(rate)<=0)){setError('راجع التاريخ والمبلغ والعملة وسعر الصرف.');return;}setError('');setReview(true);};
+  const save=async()=>{if(!currency||saving)return;setSaving(true);setError('');try{
+    const result=await paymentsService.update(payment.id,{amount:Number(amount),currency_id:currencyId,
+      exchange_rate:currency.is_base?1:Number(rate),payment_method:'Cash',paid_at:date,notes:notes.trim()});
+    onSaved(result.payment_id);
+  }catch(e){setError(apiMessages(e,'تعذر تصحيح السند.').join('، '));setReview(false);}finally{setSaving(false);}};
+  return <><Modal open onClose={saving?()=>undefined:onClose} title={`تصحيح السند #${payment.voucher_number}`} size="lg">
+    <div className="space-y-4" dir="rtl"><p className="text-sm text-stone-600">يُعكس السند الأصلي ويُنشأ سند بديل على نفس General وحساب النقد/البنك، مع حفظ التاريخ.</p>
+      {error&&<p className="rep-error" role="alert">{error}</p>}
+      <div className="grid gap-3 sm:grid-cols-2"><label><span className="rep-label">المبلغ</span><input className="rep-control" value={amount} onChange={e=>setAmount(e.target.value)} inputMode="decimal" /></label>
+        <label><span className="rep-label">العملة</span><select className="rep-control" value={currencyId} onChange={e=>setCurrencyId(Number(e.target.value))}>{currencies.map(c=><option key={c.currency_id} value={c.currency_id}>{c.code} — {c.name}</option>)}</select></label>
+        {!currency?.is_base&&<label><span className="rep-label">سعر الصرف</span><input className="rep-control" value={rate} onChange={e=>setRate(e.target.value)} inputMode="decimal" /></label>}
+        <label><span className="rep-label">تاريخ السند</span><input className="rep-control" type="date" value={date} onChange={e=>setDate(e.target.value)} /></label></div>
+      <label className="block"><span className="rep-label">ملاحظات</span><textarea className="rep-control" value={notes} onChange={e=>setNotes(e.target.value)} /></label>
+      <button className="btn-primary" disabled={saving||!currency} onClick={validate}>مراجعة التصحيح</button>
+    </div></Modal>
+    <ConfirmDialog open={review} onClose={()=>setReview(false)} onConfirm={()=>void save()} loading={saving} severity="normal" title="تأكيد تصحيح السند" message="سيُعكس الأثر الأصلي ويُرحّل السند البديل مرة واحدة." />
+  </>;
 }
-function Field({ label, value, onChange, type = "text", placeholder }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string }) { return <label><span className="rep-label">{label}</span><input className="rep-control" type={type} min={type === "number" ? "0.000001" : undefined} step={type === "number" ? "0.000001" : undefined} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)}/></label>; }

@@ -37,11 +37,8 @@ export default function AccountSourcePage() {
       if (kind === 'Discount')
         setDiscount(await accountsService.discount(sourceId, c.signal));
       else if (kind === 'PurchaseReturn') {
-        const rows = await returnsService.listPurchase();
-        if (c.signal.aborted) return;
-        const r = rows.find((r) => r.customer_return_id === sourceId);
-        if (!r) throw new Error('missing');
-        setPurchaseReturn(r);
+        const r = await returnsService.purchaseDetails(sourceId,c.signal);
+        if (!c.signal.aborted) setPurchaseReturn(r);
       } else throw new Error('unsupported');
     };
     load()

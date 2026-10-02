@@ -52,7 +52,6 @@ export default function StatementSourceDetailsView({ details }: { details: State
         <Detail label="المبلغ الأصلي" value={details.amount ? `${formatMoney(details.amount)} ${details.currency?.code ?? ''}` : null} />
         <Detail label="سعر الصرف" value={details.exchange_rate} />
         <Detail label="بالعملة الأساسية" value={details.base_amount ? formatMoney(details.base_amount) : null} />
-        <Detail label="العملية المرتبطة" value={details.purchase_id ? `شراء #${details.purchase_id}` : null} />
         {details.check && <><Detail label="رقم الشيك" value={details.check.number} /><Detail label="بنك الشيك" value={details.check.bank_name} /><Detail label="تاريخ الاستحقاق" value={details.check.due_date.slice(0, 10)} /><Detail label="موقع الشيك الحالي" value={checkLocations[details.check.location] ?? details.check.location} /></>}
       </>}
       {details.kind === 'CheckMovement' && <>
@@ -64,7 +63,6 @@ export default function StatementSourceDetailsView({ details }: { details: State
         <Detail label="المبلغ الأصلي" value={details.amount ? `${formatMoney(details.amount)} ${details.currency?.code ?? ''}` : null} />
         <Detail label="بالعملة الأساسية" value={details.base_amount ? formatMoney(details.base_amount) : null} />
       </>}
-      {details.kind === 'Opening' && <><Detail label="المبلغ" value={details.amount ? formatMoney(details.amount) : null} /><Detail label="السبب" value={details.reason} /><Detail label="التاريخ" value={details.debt_date?.slice(0, 10)} /><Detail label="الاتجاه" value={details.direction === 'Debit' ? 'مدين' : details.direction === 'Credit' ? 'دائن' : details.direction} /></>}
     </div>
     {details.notes && <p className="whitespace-pre-wrap text-stone-600"><b>ملاحظات:</b> {details.notes}</p>}
     {items.length > 0 && <p className="text-xs text-stone-500">تفاصيل المستند كما هي الآن؛ أثر الحركة والرصيد مأخوذان من القيد بتاريخها.</p>}
