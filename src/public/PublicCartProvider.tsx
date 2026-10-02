@@ -13,7 +13,6 @@ export function PublicCartProvider({ children }: { children: ReactNode }) {
     const index = items.findIndex((item) => item.product_variant_id === incoming.product_variant_id);
     const existingQuantity = index >= 0 ? items[index].quantity : 0;
     const nextQuantity = existingQuantity + incoming.quantity;
-    if (nextQuantity > incoming.stock_quantity) return { ok: false, message: 'الكمية المطلوبة تتجاوز المخزون المتاح.' };
     setItems(index < 0 ? [...items, incoming] : items.map((item, itemIndex) => itemIndex === index ? { ...incoming, quantity: nextQuantity } : item));
     return { ok: true, message: 'تمت إضافة المنتج إلى السلة.' };
   }, [items]);
@@ -22,7 +21,6 @@ export function PublicCartProvider({ children }: { children: ReactNode }) {
     const item = items.find((candidate) => candidate.product_variant_id === productVariantId);
     if (!item) return { ok: false, message: 'هذا المنتج غير موجود في السلة.' };
     if (!Number.isInteger(quantity) || quantity < 1) return { ok: false, message: 'الحد الأدنى للكمية هو قطعة واحدة.' };
-    if (quantity > item.stock_quantity) return { ok: false, message: 'الكمية المطلوبة تتجاوز المخزون المتاح.' };
     setItems((current) => current.map((candidate) => candidate.product_variant_id === productVariantId ? { ...candidate, quantity } : candidate));
     return { ok: true, message: '' };
   }, [items]);
@@ -66,7 +64,7 @@ function isPublicCartItem(value: unknown): value is PublicCartItem {
     && (typeof item.image_url === 'string' || item.image_url === null)
     && typeof item.size === 'string' && typeof item.color === 'string'
     && Number.isInteger(item.quantity) && (item.quantity ?? 0) >= 1
-    && Number.isInteger(item.stock_quantity) && (item.stock_quantity ?? 0) >= (item.quantity ?? 1)
+    && Number.isInteger(item.stock_quantity)
     && isFiniteNumber(item.display_price) && isFiniteNumber(item.display_discount)
     && isFiniteNumber(item.display_effective_price);
 }

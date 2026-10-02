@@ -138,7 +138,7 @@ export default function ProductDetailsPage({ productId, backTo }: ProductDetails
           {selectedVariant && <div className="mt-5 rounded-2xl bg-stone-50 p-4"><p className="text-xs font-bold text-stone-500">السعر للخيار المحدد</p><div className="mt-1.5 flex flex-wrap items-baseline gap-2.5">{hasDiscount && originalPrice !== null && <><span className="text-sm font-bold text-stone-400 line-through">{formatPrice(originalPrice)}</span><span className="rounded-md bg-[#C2A66D]/10 px-1.5 py-0.5 text-xs font-black text-[#C2A66D]">خصم {formatPrice(Number(selectedVariant.discount))}</span></>}<span className="text-2xl font-black text-[#C2A66D]">{effectivePrice !== null ? formatPrice(effectivePrice) : '—'}</span></div></div>}
 
           <div className="mt-5 flex flex-col gap-2.5 sm:flex-row">
-            <QuantityInput value={quantity} max={selectedVariant?.stock_quantity ?? 0} allowOverMax disabled={!selectedVariant} onChange={setQuantity} showStock={false} className="sm:w-fit" />
+            <QuantityInput value={quantity} disabled={!selectedVariant} onChange={setQuantity} className="sm:w-fit" />
             <button onClick={addToCart} disabled={!canAdd} className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#162E21] px-5 py-2.5 text-sm font-black text-white transition hover:bg-[#21452f] disabled:cursor-not-allowed disabled:opacity-45">{added ? <><Check className="h-4 w-4" /> تمت الإضافة</> : <><ShoppingBag className="h-4 w-4" /> إضافة إلى السلة</>}</button>
           </div>
           {cartMessage && <p className={`mt-3 text-sm font-bold ${added ? 'text-green-700' : 'text-red-700'}`} role="status">{cartMessage}</p>}

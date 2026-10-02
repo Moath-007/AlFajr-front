@@ -7,24 +7,9 @@ import {
 } from "@/api";
 import { formatOrderDateTime } from "@/components/rep/repOrderUtils";
 import { printThermalReceipt } from "@/utils/printDocument";
-const labels = {
-  Retail: "أونلاين",
-  Wholesale: "جملة",
-  StoreSale: "بيع مفرق",
-} as const;
 const money = (value: string | number) =>
   `₪${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-export default function OrderReceipt({
-  order,
-  customerCurrentDebt,
-  customerDebtLoading = false,
-  customerDebtFailed = false,
-}: {
-  order: OrderResponseDto;
-  customerCurrentDebt?: string | null;
-  customerDebtLoading?: boolean;
-  customerDebtFailed?: boolean;
-}) {
+export default function OrderReceipt({ order }: { order: OrderResponseDto }) {
   const [company, setCompany] = useState<CompanyProfileDataDto | null>(null);
   const [printError, setPrintError] = useState("");
   const receiptRef = useRef<HTMLElement>(null);
@@ -50,12 +35,16 @@ export default function OrderReceipt({
   return (
     <>
       <div className="flex flex-wrap gap-2 print:hidden">
-        <button type="button" disabled={customerDebtLoading} onClick={() => void print()} className="btn-outline">
+        <button
+          type="button"
+          onClick={() => void print()}
+          className="btn-outline"
+        >
           <Printer className="h-4 w-4" /> طباعة الفاتورة
         </button>
         <button
           type="button"
-          disabled={customerDebtLoading}
+
           onClick={() => void print()}
           className="btn-outline"
           title="اختر حفظ كملف PDF من نافذة الطباعة"
@@ -63,12 +52,23 @@ export default function OrderReceipt({
           <Download className="h-4 w-4" /> تحميل PDF
         </button>
       </div>
-      {customerDebtLoading ? <p className="text-xs text-stone-500">جاري تحميل إجمالي الدين الحالي قبل الطباعة…</p> : null}
-      {customerDebtFailed ? <p role="alert" className="text-xs font-bold text-amber-800">تعذر تحميل إجمالي الدين الحالي؛ لن يتم تخمينه من بيانات ناقصة.</p> : null}
-      {printError ? <p role="alert" className="text-sm font-bold text-red-700">{printError}</p> : null}
-      <section ref={receiptRef} className="receipt-print-root receipt-print-source" dir="rtl" aria-hidden="true">
+      {printError ? (
+        <p role="alert" className="text-sm font-bold text-red-700">
+          {printError}
+        </p>
+      ) : null}
+      <section
+        ref={receiptRef}
+        className="receipt-print-root receipt-print-source"
+        dir="rtl"
+        aria-hidden="true"
+      >
         <header className="receipt-header">
-          <img className="receipt-logo" src="/assets/al-fajr-logo.webp" alt="" />
+          <img
+            className="receipt-logo"
+            src="/assets/al-fajr-logo.webp"
+            alt=""
+          />
           <h1>{company?.company_name || "شركة الفجر للصناعة والتجارة"}</h1>
           {company?.phones.length ? <p>{company.phones.join(" · ")}</p> : null}
           {(company?.address || company?.city) && (
@@ -77,27 +77,49 @@ export default function OrderReceipt({
         </header>
         <div className="receipt-meta">
           <ReceiptRow label="رقم الطلب" value={`#${order.id}`} />
-          <ReceiptRow label="المصدر" value={labels[order.order_type]} />
+          <ReceiptRow
+            label="حساب البيع"
+            value={order.sale_account?.name ?? "يُحدد عند التأكيد"}
+          />
+          <ReceiptRow
+            label="الحالة"
+            value={
+              { Pending: "معلق", Completed: "مكتمل", Cancelled: "ملغى" }[
+                order.status
+              ]
+            }
+          />
           <ReceiptRow
             label="تاريخ إنشاء الطلب"
             value={formatOrderDateTime(order.created_at)}
           />
-          {order.customer ? <>
-            <ReceiptRow label="الزبون" value={order.customer.name} />
-            <ReceiptRow label="الهاتف" value={order.customer.phone} />
-          </> : <ReceiptRow label="الحساب" value={order.sale_account?.name ?? "—"} />}
-          {order.representative && (
-            <ReceiptRow label="المندوب" value={order.representative.name} />
+          {order.customer ? (
+            <>
+              <ReceiptRow label="الزبون" value={order.customer.name} />
+              <ReceiptRow label="الهاتف" value={order.customer.phone} />
+            </>
+          ) : null}
+          {order.contact_name && (
+            <ReceiptRow label="جهة التواصل" value={order.contact_name} />
+          )}
+          {order.contact_phone && (
+            <ReceiptRow label="هاتف التواصل" value={order.contact_phone} />
+          )}
+          {order.creator && (
+            <ReceiptRow label="المنشئ" value={order.creator.name} />
           )}
         </div>
         <div className="receipt-items">
           <h2>تفاصيل المنتجات</h2>
           {order.items.map((item) => {
             const discount = Number(item.product_discount);
-            const finalUnit = item.is_bonus ? 0 : Number(item.unit_price);
+            const finalUnit = Number(item.unit_price) - discount;
             return (
               <article key={item.id} className="receipt-item">
-                <strong>{item.variant.product.name}{item.is_bonus ? " — بونص" : ""}</strong>
+                <strong>
+                  {item.variant.product.name}
+                  {item.is_bonus ? " — بونص" : ""}
+                </strong>
                 <span className="receipt-variant">
                   {item.variant.size} · {item.variant.color.name}
                 </span>
@@ -108,13 +130,14 @@ export default function OrderReceipt({
                   <b>{money(item.line_total)}</b>
                 </div>
                 {item.is_bonus ? (
-                  <small>بونص — القيمة المالية صفر والكمية محسوبة من المخزون</small>
+                  <small>
+                    بونص — القيمة المالية صفر والكمية محسوبة من المخزون
+                  </small>
                 ) : (
                   <>
-                    {Number(item.base_unit_price) !== Number(item.unit_price) && (
-                      <small>السعر الأساسي: {money(item.base_unit_price)} · السعر الفعلي: {money(item.unit_price)}</small>
+                    {discount > 0 && (
+                      <small>خصم المنتج: {money(discount)}</small>
                     )}
-                    {discount > 0 && <small>خصم المنتج: {money(discount)}</small>}
                   </>
                 )}
               </article>
@@ -129,7 +152,6 @@ export default function OrderReceipt({
             value={money(order.total_amount)}
             strong
           />
-          {customerCurrentDebt != null && <ReceiptRow label="رصيد الحساب الحالي" value={money(customerCurrentDebt)} strong />}
         </div>
         <footer className="receipt-footer">شكرًا لتعاملكم معنا</footer>
       </section>

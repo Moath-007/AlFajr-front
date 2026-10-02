@@ -1,5 +1,5 @@
 import type { DecimalString, IsoDateTimeString, NumericId } from './common';
-import type { ApiOrderStatus, OrderType } from './orders';
+import type { ApiOrderStatus } from './orders';
 
 export interface AdminDashboardQuery {
   range?: 'current_month' | 'all_time';
@@ -15,7 +15,7 @@ export interface AdminDashboardResponseDto {
     scope: 'current_document_state' };
   stock_alerts: { low: number; out: number; negative: number; low_threshold: 5 };
   check_alerts: { due_today: number; overdue: number; scope: 'incoming_in_treasury_bank_collection' };
-  recent_orders: Array<{ order_id: NumericId; order_type: OrderType; status: ApiOrderStatus;
+  recent_orders: Array<{ order_id: NumericId; status: ApiOrderStatus;
     total_amount: DecimalString; created_at: IsoDateTimeString; customer: { id: NumericId; name: string } | null;
     sale_account: { id: NumericId; name: string } | null }>;
 }

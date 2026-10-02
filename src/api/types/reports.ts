@@ -10,10 +10,9 @@ export interface GroupedReportQuery extends DateReportQuery {
 }
 
 export interface SalesReportQuery extends GroupedReportQuery {
-  source?: "Online" | "Direct" | "Representative";
   sale_account_id?: NumericId;
   customer_id?: NumericId;
-  representative_id?: NumericId;
+  created_by?: NumericId;
   page?: number;
   limit?: number;
 }
@@ -22,14 +21,13 @@ export interface SalesReportSummaryDto {
   returns: DecimalString;
   net_sales: DecimalString;
 }
-export interface SalesReportBreakdownDto extends SalesReportSummaryDto { source?: "Online" | "Direct" | "Representative" | "Unknown"; sale_account_id?: NumericId | null; sale_account_name?: string | null }
+export interface SalesReportBreakdownDto extends SalesReportSummaryDto { sale_account_id?: NumericId | null; sale_account_name?: string | null }
 export interface SalesReportSeriesItemDto extends SalesReportSummaryDto { period: string }
-export interface SalesReportActivityDto { journal_entry_id: NumericId; occurred_at: string; kind: "Sale" | "SaleReversal" | "SalesReturn" | "ReturnReversal"; order_id: NumericId | null; return_id: NumericId | null; source: "Online" | "Direct" | "Representative" | "Unknown"; sale_account_id: NumericId | null; sale_account_name: string | null; customer: { id: NumericId; name: string | null } | null; representative: { id: NumericId; name: string | null } | null; gross_effect: DecimalString; returns_effect: DecimalString; net_effect: DecimalString }
+export interface SalesReportActivityDto { journal_entry_id: NumericId; occurred_at: string; kind: "Sale" | "SaleReversal" | "SalesReturn" | "ReturnReversal"; order_id: NumericId | null; return_id: NumericId | null; sale_account_id: NumericId | null; sale_account_name: string | null; customer: { id: NumericId; name: string | null } | null; creator: { id: NumericId; name: string | null } | null; gross_effect: DecimalString; returns_effect: DecimalString; net_effect: DecimalString }
 export interface SalesReportResponseDto {
   period: { date_from: string; date_to: string; timezone: "Asia/Hebron" };
   filter_scope: "ledger_activity" | "known_metadata_only";
   summary: SalesReportSummaryDto;
-  by_source: SalesReportBreakdownDto[];
   by_sale_account: SalesReportBreakdownDto[];
   time_series: SalesReportSeriesItemDto[];
   activity: { items: SalesReportActivityDto[]; pagination: PaginationResponseDto };
@@ -276,10 +274,10 @@ export interface RepresentativeReportRowDto {
   pending_orders_count: number;
   cancelled_orders_count: number;
   completed_sales_document_amount: DecimalString;
-  returns_document_amount: DecimalString;
+
 }
 export interface RepresentativesReportResponseDto {
-  semantics: 'current_wholesale_order_documents';
+  semantics: 'current_invoice_documents';
   representatives: RepresentativeReportRowDto[];
   pagination: ReportPaginationDto;
 }

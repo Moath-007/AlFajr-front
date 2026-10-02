@@ -67,7 +67,7 @@ export default function CollectionsReportPage() {
       check_number: draft.check.trim() || undefined,
       recorded_by: draft.actor ? Number(draft.actor) : undefined, page: 1, limit: 20 });
   };
-  const reset = () => { setDraft(blank); setCustomerSearch(''); setQuery({ page: 1, limit: 20 }); };
+  const reset = () => { setDraft(blank); setAccountSearch(''); setQuery({ page: 1, limit: 20 }); };
   const page = data?.activity.pagination;
   const selectedAccount = accounts.find((row) => String(row.account_id) === draft.account);
   const period = data ? `${data.period.date_from} — ${data.period.date_to}` : '';

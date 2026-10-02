@@ -47,7 +47,6 @@ export default function RepProductPicker({
   onClose,
   onAdd,
   priceMode = "wholesale",
-  allowOutOfStock = true,
   purpose = "الطلب",
 }: {
   open: boolean;
@@ -55,7 +54,6 @@ export default function RepProductPicker({
   onClose: () => void;
   onAdd: (item: PickedOrderItem) => void;
   priceMode?: "retail" | "wholesale";
-  allowOutOfStock?: boolean;
   purpose?: "الطلب" | "المردود" | "الشراء";
 }) {
   const stockVisibility = useOptionalWholesaleStockVisibility();
@@ -156,10 +154,7 @@ export default function RepProductPicker({
           : productsService.getWholesaleById;
       const product = (await getProduct(id)).product;
       setDetails(product);
-      const available = product.variants.find(
-        (variant) => allowOutOfStock || variant.stock_quantity > 0,
-      );
-      setVariantId(available?.id ?? null);
+      setVariantId(product.variants[0]?.id ?? null);
       setQuantity(1);
     } catch (error) {
       setErrors(apiMessages(error, "تعذر تحميل خيارات المنتج."));
@@ -171,9 +166,6 @@ export default function RepProductPicker({
   const current = variant
     ? existing.find((item) => item.product_variant_id === variant.id)
     : undefined;
-  const availableToAdd = variant
-    ? allowOutOfStock ? Number.MAX_SAFE_INTEGER : Math.max(0, variant.stock_quantity - (current?.quantity ?? 0))
-    : 0;
   const closePicker = () => {
     setDetails(null);
     setVariantId(null);
@@ -181,7 +173,7 @@ export default function RepProductPicker({
     onClose();
   };
   const add = () => {
-    if (!details || !variant || quantity < 1 || quantity > availableToAdd)
+    if (!details || !variant || !Number.isInteger(quantity) || quantity < 1)
       return;
     onAdd({
       product_variant_id: variant.id,
@@ -256,13 +248,10 @@ export default function RepProductPicker({
                     const exists = existing.find(
                       (entry) => entry.product_variant_id === item.id,
                     );
-                    const unavailable = !allowOutOfStock &&
-                      item.stock_quantity <= (exists?.quantity ?? 0);
                     return (
                       <button
                         type="button"
                         key={item.id}
-                        disabled={unavailable}
                         onClick={() => {
                           setVariantId(item.id);
                           setQuantity(1);
@@ -283,7 +272,7 @@ export default function RepProductPicker({
                           </span>
                         </span>
                         <span className="mt-2 flex items-center justify-between text-xs text-stone-500">
-                          <span>{showWholesaleStock ? `المتوفر: ${item.stock_quantity}` : item.stock_quantity > 0 ? "متوفر" : "غير متوفر"}</span>
+                          <span>{showWholesaleStock ? `الرصيد الحالي: ${item.stock_quantity}` : "متاح للطلب"}</span>
                           {Number(item.discount) > 0 && (
                             <span className="rounded bg-red-50 px-1.5 py-0.5 font-bold text-red-700">
                               خصم {formatMoney(item.discount)}
@@ -308,14 +297,13 @@ export default function RepProductPicker({
                     {variant.size} — {variant.color.name}
                   </strong>
                   <p className="text-xs text-stone-500">
-                    {allowOutOfStock ? "يمكن إدخال الكمية المطلوبة دون تقييدها بالرصيد الحالي" : `متاح للإضافة: ${availableToAdd}`}
+                    يمكن إدخال الكمية المطلوبة دون تقييدها بالرصيد الحالي
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <QuantityInput value={quantity} max={availableToAdd} disabled={availableToAdd < 1} onChange={setQuantity} showStock={showWholesaleStock} />
+                  <QuantityInput value={quantity} onChange={setQuantity} />
                   <button
                     type="button"
-                    disabled={availableToAdd < 1}
                     onClick={add}
                     className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-5 text-sm font-black text-white disabled:opacity-45"
                   >
@@ -413,9 +401,9 @@ export default function RepProductPicker({
                         </span>
                       )}
                       <span
-                        className={`absolute right-2 top-2 rounded-md px-2 py-0.5 text-[10px] font-black ${product.in_stock ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}
+                        className="absolute right-2 top-2 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-800"
                       >
-                        {product.in_stock ? "متوفر" : "غير متوفر"}
+                        متاح للطلب
                       </span>
                       {product.has_discount && (
                         <span className="absolute left-0 top-2 rounded-r-md bg-red-600 px-2 py-1 text-[10px] font-black text-white">

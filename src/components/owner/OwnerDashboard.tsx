@@ -14,7 +14,6 @@ const quickLinks = [
   { path: 'checks', label: 'الشيكات', icon: Banknote },
   { path: 'inventory', label: 'المخزون', icon: Boxes },
 ];
-const orderType = (value: string) => value === 'Retail' ? 'أونلاين' : value === 'Wholesale' ? 'جملة' : 'بيع مفرق';
 
 export default function OwnerDashboard({ onNavigate }: { onNavigate: (page: string) => void }) {
   const [data, setData] = useState<AdminDashboardResponseDto | null>(null);
@@ -74,7 +73,7 @@ export default function OwnerDashboard({ onNavigate }: { onNavigate: (page: stri
       </div>
       <nav aria-label="روابط سريعة" className="flex flex-wrap gap-2">{quickLinks.map(({ path, label, icon: Icon }) => <button key={path} className="btn-outline inline-flex items-center gap-2" onClick={() => onNavigate(path)}><Icon className="h-4 w-4" />{label}</button>)}<button className="btn-primary" onClick={() => onNavigate('reports')}>كل التقارير ←</button></nav>
       <section className="rounded-2xl border bg-white"><div className="flex justify-between border-b p-5"><div><h2 className="font-black text-brand">آخر الطلبات</h2><p className="text-xs text-stone-500">أحدث المستندات المسجلة، لا نشاط Ledger.</p></div><button className="text-sm font-bold text-gold-dark" onClick={() => onNavigate('orders')}>عرض الكل ←</button></div>
-        {data.recent_orders.length ? <div className="divide-y">{data.recent_orders.map((order) => <div key={order.order_id} className="grid gap-2 p-4 text-sm sm:grid-cols-[auto_1fr_auto_auto] sm:items-center"><b>#{order.order_id}</b><span>{order.customer?.name ?? order.sale_account?.name ?? "—"} · {orderType(order.order_type)} · {formatOrderDate(order.created_at)}</span><OrderStatusBadge status={order.status} /><b>{formatMoney(order.total_amount)}</b></div>)}</div> : <p className="p-5 text-sm text-stone-500">لا توجد طلبات.</p>}
+        {data.recent_orders.length ? <div className="divide-y">{data.recent_orders.map((order) => <div key={order.order_id} className="grid gap-2 p-4 text-sm sm:grid-cols-[auto_1fr_auto_auto] sm:items-center"><b>#{order.order_id}</b><span>{order.customer?.name ?? order.sale_account?.name ?? "—"} · {formatOrderDate(order.created_at)}</span><OrderStatusBadge status={order.status} /><b>{formatMoney(order.total_amount)}</b></div>)}</div> : <p className="p-5 text-sm text-stone-500">لا توجد طلبات.</p>}
       </section>
     </>}
   </main>;

@@ -42,7 +42,7 @@ const direct = [
   { path: "/owner", label: "لوحة التحكم", icon: LayoutDashboard, exact: true },
   { path: "/owner/reports", label: "التقارير", icon: BarChart3 },
 ];
-const groups = [
+const groups: Array<{ id: string; label: string; icon: Icon; children: GroupChild[] }> = [
   {
     id: "sales",
     label: "المبيعات",
@@ -110,7 +110,7 @@ const groups = [
       },
     ],
   },
-] satisfies Array<{ id: string; label: string; icon: Icon; children: GroupChild[] }>;
+];
 const matches = (current: string, path: string, exact = false) =>
   exact ? current === path : current === path || current.startsWith(`${path}/`);
 const childActive = (current: string, child: GroupChild): boolean =>

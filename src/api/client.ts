@@ -16,18 +16,24 @@ export interface ApiRequestOptions {
 const retryKeys = new Map<string, string>();
 const pendingCreates = new Map<string, Promise<unknown>>();
 const idempotentCreate = (path: string) => [
-  /^\/orders\/(retail|wholesale|store-sale)$/,
-  /^\/orders\/\d+\/(payments|returns)$/,
+  /^\/orders(?:\/online)?$/,
+  /^\/inventory\/\d+\/opening-stock$/,
   /^\/customer-purchases(?:\/\d+\/(?:payments|returns))?$/,
-  /^\/customers\/\d+\/(payments|disbursements|returns)$/,
+  /^\/returns(?:\/\d+\/(?:cancel|restore))?$/,
+  /^\/purchase-returns\/(?:account|customer\/\d+)$/,
+  /^\/customers\/\d+\/(payments|disbursements)$/,
   /^\/ledger\/vouchers$/,
+  /^\/accounts\/\d+\/(?:opening-balance(?:\/cancel)?|discounts)$/,
+  /^\/account-discounts\/\d+\/cancel$/,
   /^\/managed-checks\/\d+\/movements\/(DEPOSITED|SENT_TO_COLLECTION|RETURNED_FROM_BANK|ENDORSED|ENDORSEMENT_RETURNED|RETURNED_TO_SOURCE|RETRIEVED_FROM_SOURCE|CASHED)$/,
     /^\/managed-checks\/\d+\/events\/\d+\/cancel$/,
     /^\/managed-checks\/\d+\/(clear-outgoing|return-outgoing)$/,
 ].some((pattern) => pattern.test(normalizePath(path)));
 
 async function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  if (options.method !== 'POST' || !idempotentCreate(path)) return performRequest<T>(path, options);
+  const returnMutation = (options.method === 'PUT' || options.method === 'DELETE') && /^\/returns\/\d+(?:\/permanent)?$/.test(normalizePath(path));
+  const accountMutation = (options.method === 'PUT' || options.method === 'DELETE') && /^(?:\/accounts\/\d+\/opening-balance|\/account-discounts\/\d+(?:\/permanent)?)$/.test(normalizePath(path));
+  if (!(options.method === 'POST' && idempotentCreate(path)) && !returnMutation && !accountMutation) return performRequest<T>(path, options);
   const intent = `${normalizePath(path)}|${JSON.stringify(options.body ?? null)}`;
   const active = pendingCreates.get(intent);
   if (active) return active as Promise<T>;

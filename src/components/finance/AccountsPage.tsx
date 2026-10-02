@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router-dom';
-import { companyProfileService, ledgerService, type AccountKind, type AccountStatement, type CompanyProfileDataDto, type LedgerAccount } from '@/api';
+import { accountsService, companyProfileService, ledgerService, type AccountKind, type AccountStatement, type CompanyProfileDataDto, type LedgerAccount } from '@/api';
 import { ApiError } from '@/api/errors';
 import { apiMessages, formatOrderDate } from '@/components/rep/repOrderUtils';
 import { RepDateInput, RepSelect } from '@/components/rep/RepFormControls';
@@ -40,7 +40,11 @@ const accountError = (reason: unknown, fallback: string) => {
   if (code === 'ACCOUNT_UPDATE_NOT_ALLOWED') return 'تعديل اسم هذا الحساب غير مسموح.';
   return apiMessages(reason, fallback).join('، ');
 };
-type AccountDialog = { mode: 'create' | 'opening' } | { mode: 'edit' | 'delete'; account: LedgerAccount };
+type AccountDialog =
+  | { mode: 'create' }
+  | { mode: 'opening' }
+  | { mode: 'edit'; account: LedgerAccount }
+  | { mode: 'delete'; account: LedgerAccount };
 
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<LedgerAccount[]>([]);
@@ -56,6 +60,8 @@ export default function AccountsPage() {
   const [openingAccountId, setOpeningAccountId] = useState<number | null>(null);
   const [openingAmount, setOpeningAmount] = useState('');
   const [openingNotes, setOpeningNotes] = useState('');
+  const [openingDirection, setOpeningDirection] = useState<'Debit' | 'Credit'>('Debit');
+  const [openingDate, setOpeningDate] = useState('');
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -74,7 +80,7 @@ export default function AccountsPage() {
     setName(''); setKind('General'); setDialogError(''); setDialog({ mode: 'create' });
   };
   const openOpening = () => {
-    setOpeningAccountId(null); setOpeningAmount(''); setOpeningNotes(''); setDialogError(''); setDialog({ mode: 'opening' });
+    setOpeningAccountId(null); setOpeningAmount(''); setOpeningNotes(''); setOpeningDirection('Debit'); setOpeningDate(''); setDialogError(''); setDialog({ mode: 'opening' });
   };
   const openEdit = (account: LedgerAccount) => {
     setName(account.name); setDialogError(''); setDialog({ mode: 'edit', account });
@@ -104,8 +110,8 @@ export default function AccountsPage() {
     }
     if (dialog.mode === 'opening') {
       if (openingAccountId === null) { setDialogError('اختر الحساب أولًا.'); return; }
-      if (!/^-?\d+(?:\.\d{1,2})?$/.test(openingAmount.trim()) || Number(openingAmount) === 0) {
-        setDialogError('أدخل مبلغًا غير صفري بمنزلتين عشريتين كحد أقصى.'); return;
+      if (!/^\d+(?:\.\d{1,2})?$/.test(openingAmount.trim()) || !openingDate) {
+        setDialogError('أدخل مبلغًا غير سالب بمنزلتين عشريتين كحد أقصى وحدد تاريخ الحركة.'); return;
       }
     }
     setSaving(true); setDialogError('');
@@ -113,7 +119,7 @@ export default function AccountsPage() {
       if (dialog.mode === 'create') {
         await ledgerService.createAccount({ name: name.trim(), kind });
       } else if (dialog.mode === 'opening') {
-        await ledgerService.opening(openingAccountId!, Number(openingAmount), openingNotes.trim() || undefined);
+        await accountsService.createOpening(openingAccountId!, { amount: Number(openingAmount), direction: openingDirection, business_date: openingDate, notes: openingNotes.trim() || undefined });
       } else if (dialog.mode === 'edit') {
         await ledgerService.renameAccount(dialog.account.account_id, name.trim());
       } else {
@@ -143,7 +149,7 @@ export default function AccountsPage() {
         <h2 id="account-dialog-title" className="text-xl font-black text-brand">{dialog.mode === 'create' ? 'إضافة حساب' : dialog.mode === 'edit' ? 'تعديل اسم الحساب' : dialog.mode === 'opening' ? 'تسجيل رصيد افتتاحي' : 'حذف الحساب'}</h2>
         {dialog.mode === 'create' && <RepSelect label="نوع الحساب" value={kind} options={accountKindOptions} onChange={(value) => { setKind(value); setDialogError(''); }} disabled={saving} />}
         {(dialog.mode === 'create' || dialog.mode === 'edit') && <label className="block"><span className="rep-label">اسم الحساب</span><input className="rep-control" autoFocus value={name} onChange={(event) => setName(event.target.value)} required maxLength={200} disabled={saving} /></label>}
-        {dialog.mode === 'opening' && <><p className="text-sm text-stone-600">حدد الحساب ورصيده عند بدء استخدام النظام. يُسجّل مرة واحدة فقط، والمبلغ الموجب مدين والسالب دائن.</p><AccountPicker accounts={accounts.filter((account) => !isInternalAccount(account))} value={openingAccountId} onChange={(value) => { setOpeningAccountId(value); setDialogError(''); }} label="الحساب" disabled={saving} /><label className="block"><span className="rep-label">الرصيد الافتتاحي بالعملة الأساسية</span><input className="rep-control" type="text" inputMode="decimal" dir="ltr" value={openingAmount} onChange={(event) => { setOpeningAmount(event.target.value); setDialogError(''); }} placeholder="مثال: 1000 أو ‎-1000" disabled={saving} /></label><label className="block"><span className="rep-label">ملاحظة (اختياري)</span><input className="rep-control" value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} disabled={saving} /></label></>}
+        {dialog.mode === 'opening' && <><p className="text-sm text-stone-600">حدد الحساب والمبلغ واتجاه الرصيد وتاريخ الحركة. يوجد مستند افتتاحي واحد لكل حساب، والصفر مسموح.</p><AccountPicker accounts={accounts.filter((account) => !account.is_system && ['General', 'Cash', 'Bank'].includes(account.kind))} value={openingAccountId} onChange={(value) => { setOpeningAccountId(value); setDialogError(''); }} label="الحساب" disabled={saving} /><label className="block"><span className="rep-label">الرصيد الافتتاحي بالعملة الأساسية</span><input className="rep-control" type="text" inputMode="decimal" dir="ltr" value={openingAmount} onChange={(event) => { setOpeningAmount(event.target.value); setDialogError(''); }} placeholder="مثال: 1000 أو 0" disabled={saving} /></label><label className="block"><span className="rep-label">اتجاه الرصيد</span><select className="rep-control" value={openingDirection} onChange={(event) => setOpeningDirection(event.target.value === 'Credit' ? 'Credit' : 'Debit')} disabled={saving}><option value="Debit">مدين</option><option value="Credit">دائن</option></select></label><label className="block"><span className="rep-label">تاريخ الحركة</span><input className="rep-control" type="date" value={openingDate} onChange={(event) => setOpeningDate(event.target.value)} disabled={saving} required /></label><label className="block"><span className="rep-label">ملاحظة (اختياري)</span><input className="rep-control" value={openingNotes} onChange={(event) => setOpeningNotes(event.target.value)} disabled={saving} /></label></>}
         {dialog.mode === 'edit' && <p className="text-sm text-stone-500">سيبقى معرف الحساب ورمزه ونوعه كما هي.</p>}
         {dialog.mode === 'delete' && <p className="text-sm text-stone-600">هل تريد حذف «{dialog.account.customer_name ?? dialog.account.name}»؟ لا يمكن حذف حساب مرتبط بحركات مالية أو شيكات أو طلبات بيع.{(dialog.account.is_system || dialog.account.customer_id !== null) && ' قد يُنشأ هذا الحساب تلقائيًا من جديد عند استخدامه لاحقًا.'}</p>}
         {dialog.mode === 'delete' && deleteCountdown > 0 && <p className="text-sm text-stone-600" role="status">يمكن تأكيد الحذف بعد {deleteCountdown} ثوانٍ.</p>}
@@ -174,6 +180,6 @@ export function AccountStatementPage() {
   return <div className="space-y-6" dir="rtl"><Link className="text-sm font-bold text-gold-dark" to="/owner/accounts">← جميع الحسابات</Link><header className="border-b pb-5"><p className="text-xs font-black text-gold-dark">وثيقة مالية كاملة</p><h1 className="mt-1 text-3xl font-black text-brand">كشف حساب {accountName}</h1><p className="mt-2 text-sm text-stone-500">اختر الفترة لعرض الكشف وطباعته أو حفظه PDF.</p></header>
     <section className="rounded-2xl border bg-white p-5"><form onSubmit={apply} className="grid items-end gap-4 sm:grid-cols-[180px_180px_auto]"><RepDateInput label="من تاريخ" value={from} max={to || undefined} disabled={allPeriod} onChange={setFrom} /><RepDateInput label="إلى تاريخ" value={to} min={from || undefined} disabled={allPeriod} onChange={setTo} /><button className="btn-primary min-h-11">عرض الكشف</button><label className="flex min-h-11 items-center gap-3 rounded-xl border px-4 py-2.5 sm:col-span-full"><input type="checkbox" checked={allPeriod} onChange={(event) => setAllPeriod(event.target.checked)} /><b className="text-sm">كل الفترة</b></label></form></section>
     {error && <div className="rep-error">{error}</div>}
-    <article ref={printRef} className="print-document rounded-2xl border bg-white p-5 sm:p-8"><PrintHeader company={company} title="كشف حساب" subtitle={`الفترة: ${period}`} /><div className="mb-5 flex flex-wrap justify-end gap-2" data-print-ignore><Link className="btn-outline" to={`/owner/vouchers?account=${id}`}>سند</Link><button className="btn-primary" onClick={() => printRef.current && void printA4Element({ element: printRef.current, title: `كشف حساب ${accountName}`, orientation: 'portrait' })}>طباعة / حفظ PDF</button></div><header className="report-print-hide border-b pb-5"><h2 className="text-2xl font-black text-brand">كشف حساب</h2><p>الفترة: {period}</p></header><section className="my-5 rounded-xl bg-stone-50 p-4"><b className="text-brand">{accountName}</b>{account.customer_phone && <p className="text-sm text-stone-600">{account.customer_phone}</p>}</section><section className="print-summary grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-stone-50 p-4"><p className="text-sm text-stone-500">رصيد أول المدة</p><b className="text-xl text-brand">{formatMoney(Math.abs(Number(statement.opening_balance)))} {balanceLabel(statement.opening_balance)}</b></div><div className="rounded-xl bg-stone-50 p-4"><p className="text-sm text-stone-500">الرصيد النهائي</p><b className="text-xl text-brand">{formatMoney(Math.abs(Number(statement.closing_balance)))} {balanceLabel(statement.closing_balance)}</b></div></section><section className="statement-section mt-8"><h2 className="border-b-2 border-brand pb-2 text-xl font-black text-brand">سجل الحساب</h2><div className="mt-4 overflow-x-auto"><table className="statement-table w-full min-w-[760px] border-collapse text-sm"><thead><tr className="bg-stone-100">{['التاريخ', 'البيان', 'مدين', 'دائن', 'الرصيد', 'المرجع'].map((label) => <th key={label} className="border p-3 text-right">{label}</th>)}</tr></thead><tbody>{statement.entries.map((line) => <Fragment key={line.journal_line_id}><tr><td className="whitespace-nowrap border p-3">{formatOrderDate(line.journal_entries.occurred_at)}</td><td className="border p-3"><b>{statementMovementName[line.journal_entries.voucher_type] ?? line.journal_entries.voucher_type}</b>{line.journal_entries.notes && <small className="block whitespace-pre-wrap text-stone-600">{line.journal_entries.notes}</small>}</td><td className="border p-3">{formatMoney(line.debit)}</td><td className="border p-3">{formatMoney(line.credit)}</td><td className="border p-3 font-black">{formatMoney(Math.abs(Number(line.balance)))} {balanceLabel(line.balance)}</td><td className="border p-3">#{line.journal_entry_id}</td></tr>{(line.source_details || line.counterpart_lines?.length > 0) && <tr><td colSpan={6} className="border p-2">{line.source_details && <StatementSourceDetailsView details={line.source_details} />}<StatementCounterparts lines={line.counterpart_lines ?? []} /></td></tr>}</Fragment>)}</tbody></table>{!statement.entries.length && <p className="p-6 text-center text-stone-500">لا توجد حركات ضمن الفترة المحددة.</p>}</div></section></article>
+    <article ref={printRef} className="print-document rounded-2xl border bg-white p-5 sm:p-8"><PrintHeader company={company} title="كشف حساب" subtitle={`الفترة: ${period}`} /><div className="mb-5 flex flex-wrap justify-end gap-2" data-print-ignore><Link className="btn-outline" to={`/owner/vouchers?account=${id}`}>سند</Link><button className="btn-primary" onClick={() => printRef.current && void printA4Element({ element: printRef.current, title: `كشف حساب ${accountName}`, orientation: 'portrait' })}>طباعة / حفظ PDF</button></div><header className="report-print-hide border-b pb-5"><h2 className="text-2xl font-black text-brand">كشف حساب</h2><p>الفترة: {period}</p></header><section className="my-5 rounded-xl bg-stone-50 p-4"><b className="text-brand">{accountName}</b>{account.customer_phone && <p className="text-sm text-stone-600">{account.customer_phone}</p>}</section><section className="print-summary grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-stone-50 p-4"><p className="text-sm text-stone-500">رصيد أول المدة</p><b className="text-xl text-brand">{formatMoney(Math.abs(Number(statement.opening_balance)))} {balanceLabel(statement.opening_balance)}</b></div><div className="rounded-xl bg-stone-50 p-4"><p className="text-sm text-stone-500">الرصيد النهائي</p><b className="text-xl text-brand">{formatMoney(Math.abs(Number(statement.closing_balance)))} {balanceLabel(statement.closing_balance)}</b></div></section><section className="statement-section mt-8"><h2 className="border-b-2 border-brand pb-2 text-xl font-black text-brand">سجل الحساب</h2><div className="mt-4 overflow-x-auto"><table className="statement-table w-full min-w-[760px] border-collapse text-sm"><thead><tr className="bg-stone-100">{['التاريخ', 'البيان', 'مدين', 'دائن', 'الرصيد', 'المرجع'].map((label) => <th key={label} className="border p-3 text-right">{label}</th>)}</tr></thead><tbody>{statement.entries.map((line) => <Fragment key={line.journal_line_id}><tr><td className="whitespace-nowrap border p-3">{formatOrderDate(line.journal_entries.occurred_at)}</td><td className="border p-3"><b>{statementMovementName[line.journal_entries.voucher_type] ?? line.journal_entries.voucher_type}</b>{line.journal_entries.notes && <small className="block whitespace-pre-wrap text-stone-600">{line.journal_entries.notes}</small>}</td><td className="border p-3">{formatMoney(line.debit)}</td><td className="border p-3">{formatMoney(line.credit)}</td><td className="border p-3 font-black">{formatMoney(Math.abs(Number(line.balance)))} {balanceLabel(line.balance)}</td><td className="border p-3">{line.source_details?.return_number ?? `#${line.journal_entry_id}`}</td></tr>{(line.source_details || line.counterpart_lines?.length > 0) && <tr><td colSpan={6} className="border p-2">{line.source_details && <StatementSourceDetailsView details={line.source_details} />}<StatementCounterparts lines={line.counterpart_lines ?? []} /></td></tr>}</Fragment>)}</tbody></table>{!statement.entries.length && <p className="p-6 text-center text-stone-500">لا توجد حركات ضمن الفترة المحددة.</p>}</div></section></article>
   </div>;
 }

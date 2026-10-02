@@ -1,11 +1,10 @@
-import type { ApiOrderStatus, OrderType } from "@/api";
-
+import type { ApiOrderStatus } from "@/api";
 export function canEditOrder(
-  order: { order_type: OrderType; status: ApiOrderStatus },
+  order: { status: ApiOrderStatus },
   role: "Admin" | "Representative",
-): boolean {
-  if (order.status === "Cancelled") return false;
-  if (role === "Representative") return order.order_type === "Wholesale";
-  if (order.order_type === "StoreSale") return order.status === "Completed";
-  return order.order_type === "Retail" || order.order_type === "Wholesale";
+) {
+  return (
+    order.status === "Completed" ||
+    (order.status === "Pending" && role === "Admin")
+  );
 }

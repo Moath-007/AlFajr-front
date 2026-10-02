@@ -81,7 +81,7 @@ const businessToday = () => {
   return `${value('year')}-${value('month')}-${value('day')}`;
 };
 const firstValidOperationDate = (check: ManagedCheck, action?: IncomingCheckMovementAction) =>
-  [businessToday(), lastBusinessDate(check) ?? '', action === 'DEPOSITED' ? check.due_date.slice(0, 10) : ''].sort().at(-1)!;
+  [businessToday(), lastBusinessDate(check) ?? '', action === 'DEPOSITED' ? check.due_date.slice(0, 10) : ''].reduce((latest, date) => date > latest ? date : latest, '');
 const bankIdentifiers = (check: ManagedCheck) => {
   const received = check.events.find((event) => ['RECEIVED', 'OUTGOING_ISSUED'].includes(event.action));
   const initial = received?.details && typeof received.details === 'object' && !Array.isArray(received.details)

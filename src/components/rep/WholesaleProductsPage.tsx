@@ -342,9 +342,9 @@ function ProductCard({
           </span>
         )}
         {showStock && <span
-          className={`absolute right-2 top-2 rounded-md px-2 py-0.5 text-[10px] font-black shadow-sm ${product.in_stock ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}
+          className="absolute right-2 top-2 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-800 shadow-sm"
         >
-          {product.in_stock ? "متوفر" : "غير متوفر"}
+          متاح للطلب
         </span>}
         {product.has_discount && (
           <span className="absolute left-0 top-2.5 rounded-r-md bg-red-600 px-2.5 py-1 text-[10px] font-black text-white shadow-sm">
@@ -370,7 +370,7 @@ function ProductCard({
         <span className="mt-2.5 block border-t border-stone-100 pt-2.5 text-sm font-black text-gold-dark">
           يبدأ من {formatMoney(product.price)}
         </span>
-        {showStock && variants && <span className="mt-2 block space-y-1 rounded-lg bg-stone-50 p-2 text-xs text-stone-700">{variants.map((variant) => <span key={variant.id} className="flex justify-between gap-2"><span>{variant.color.name} / {variant.size}</span><b>المتوفر: {variant.stock_quantity}</b></span>)}</span>}
+        {showStock && variants && <span className="mt-2 block space-y-1 rounded-lg bg-stone-50 p-2 text-xs text-stone-700">{variants.map((variant) => <span key={variant.id} className="flex justify-between gap-2"><span>{variant.color.name} / {variant.size}</span><b>الرصيد الحالي: {variant.stock_quantity}</b></span>)}</span>}
       </span>
     </button>
   );

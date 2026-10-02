@@ -26,6 +26,7 @@ import { apiMessages } from "@/components/rep/repOrderUtils";
 
 type VariantDraft = {
   key: string;
+  is_active: string;
   product_variant_id?: number;
   size: string;
   color_id: string;
@@ -36,6 +37,7 @@ type VariantDraft = {
 };
 const blankVariant = (): VariantDraft => ({
   key: crypto.randomUUID(),
+  is_active: "true",
   size: "",
   color_id: "",
   retail_price: "",
@@ -174,6 +176,7 @@ export default function AdminProductFormPage({
     };
     const nextVariants = p.variants.map((v) => ({
       key: `existing-${v.id}`,
+      is_active: String(v.is_active),
       product_variant_id: v.id,
       size: v.size,
       color_id: String(v.color.id),
@@ -279,12 +282,14 @@ export default function AdminProductFormPage({
         v.wholesale_price,
         v.wholesale_discount,
       ].map(Number);
-      if (
-        nums.some((x) => !Number.isFinite(x) || x < 0)
-      )
+      if (nums.some((x) => !Number.isFinite(x) || x < 0))
         messages.push(
           `الأسعار والخصومات يجب ألا تكون سالبة في الخيار ${i + 1}.`,
         );
+      if (nums[1] > nums[0] || nums[3] > nums[2])
+        messages.push(`الخصم يتجاوز السعر في الخيار ${i + 1}.`);
+      if (nums.some((n) => Math.abs(n * 100 - Math.round(n * 100)) > 1e-7))
+        messages.push("الأسعار والخصومات تقبل منزلتين فقط.");
     });
     const keys = variants.map(
       (v) => `${v.size.trim().toLocaleLowerCase()}:${v.color_id}`,
@@ -311,6 +316,7 @@ export default function AdminProductFormPage({
   const payloadVariants = (): UpdateProductVariantDto[] =>
     variants.map((v) => ({
       product_variant_id: v.product_variant_id,
+      ...(editing ? { is_active: v.is_active === "true" } : {}),
       size: v.size.trim(),
       color_id: Number(v.color_id),
       retail_price: Number(v.retail_price),
@@ -560,12 +566,56 @@ export default function AdminProductFormPage({
                 onCreateColor={createColor}
                 onChange={(field, value) => setVariant(v.key, field, value)}
                 onRemove={() =>
-                  setVariants((all) => all.filter((x) => x.key !== v.key))
+                  setVariants((all) =>
+                    v.product_variant_id
+                      ? all.map((x) =>
+                          x.key === v.key
+                            ? {
+                                ...x,
+                                is_active:
+                                  x.is_active === "true" ? "false" : "true",
+                              }
+                            : x,
+                        )
+                      : all.filter((x) => x.key !== v.key),
+                  )
                 }
               />
             ))}
           </div>
         </section>
+        {editing && productId && (
+          <button
+            type="button"
+            className="btn-outline text-red-700"
+            disabled={saving}
+            onClick={() => {
+              if (
+                !window.confirm(
+                  "حذف المنتج نهائيًا؟ يرفض النظام حذف أي منتج له مخزون أو تاريخ أعمال. التغييرات غير المحفوظة لن تُحفظ.",
+                )
+              )
+                return;
+              setSaving(true);
+              void productsService
+                .permanentDelete(productId)
+                .then((result) => {
+                  initialSnapshot.current = "";
+                  onDirtyChange(false);
+                  onNotify(result.message, "success");
+                  onNavigate("/owner/products");
+                })
+                .catch((error) =>
+                  setErrors(
+                    apiMessages(error, "تعذر الحذف؛ استخدم تعطيل المنتج"),
+                  ),
+                )
+                .finally(() => setSaving(false));
+            }}
+          >
+            حذف نهائي لمنتج غير مستخدم
+          </button>
+        )}
         <div className="sticky bottom-3 z-20 flex gap-3 rounded-2xl border bg-white/95 p-3 shadow-xl backdrop-blur">
           <button
             disabled={saving}
@@ -612,6 +662,7 @@ function Field({
       <input
         type={type}
         min={type === "number" ? 0 : undefined}
+        step={type === "number" ? "0.01" : undefined}
         className="rep-control"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -647,11 +698,30 @@ function VariantEditor({
           type="button"
           onClick={onRemove}
           className="text-red-600"
-          aria-label="إزالة الخيار"
+          aria-label={
+            value.product_variant_id
+              ? value.is_active === "true"
+                ? "تعطيل الخيار"
+                : "تفعيل الخيار"
+              : "إزالة الخيار الجديد"
+          }
         >
-          <Trash2 className="h-4 w-4" />
+          {value.product_variant_id ? (
+            value.is_active === "true" ? (
+              "تعطيل"
+            ) : (
+              "تفعيل"
+            )
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
         </button>
       </div>
+      {value.is_active === "false" && (
+        <p className="text-sm text-amber-700">
+          الخيار معطّل؛ يحتفظ بمخزونه وتاريخه ولا يظهر للاختيار في الكتالوج.
+        </p>
+      )}
       <div className="grid gap-4 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,1.2fr)_minmax(0,1.2fr)]">
         <div className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-1">
           <Field
@@ -660,7 +730,7 @@ function VariantEditor({
             onChange={(v) => onChange("size", v)}
           />
           <Select
-            label="اللون *"
+            label="اللون * (اختر بلا لون عند عدم انطباق اللون)"
             searchable
             value={value.color_id}
             onChange={(colorId) => onChange("color_id", colorId)}

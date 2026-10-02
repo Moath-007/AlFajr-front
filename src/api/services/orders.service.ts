@@ -1,48 +1,54 @@
-import { apiClient } from '../client';
+import { apiClient } from "../client";
 import type {
-  CreateRetailOrderDto,
-  CreateStoreSaleOrderDto,
-  CreateWholesaleOrderDto,
-  OrderMessageResponseDto,
+  CreateInvoiceDto,
+  CreateOnlineOrderDto,
   OrderActionResponseDto,
   OrderDetailsResponseDto,
+  OrderMessageResponseDto,
   OrdersQuery,
   OrdersSummaryListResponseDto,
   RepresentativeOrderStatsResponseDto,
   UpdateOrderDto,
-  UpdateOrderStatusDto,
-} from '../types';
-
+} from "../types";
+const queryPath = (path: string, query: OrdersQuery) => {
+  const params = new URLSearchParams();
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  });
+  return params.size ? `${path}?${params}` : path;
+};
 export const ordersService = {
-  createRetail: (data: CreateRetailOrderDto, signal?: AbortSignal) =>
-    apiClient.post<OrderActionResponseDto>('/orders/retail', data, { signal }),
-  createWholesale: (data: CreateWholesaleOrderDto, signal?: AbortSignal) =>
-    apiClient.post<OrderActionResponseDto>('/orders/wholesale', data, { signal }),
-  createStoreSale: (data: CreateStoreSaleOrderDto, signal?: AbortSignal) =>
-    apiClient.post<OrderActionResponseDto>('/orders/store-sale', data, { signal }),
+  createInvoice: (data: CreateInvoiceDto, signal?: AbortSignal) =>
+    apiClient.post<OrderActionResponseDto>("/orders", data, { signal }),
+  createOnline: (data: CreateOnlineOrderDto, signal?: AbortSignal) =>
+    apiClient.post<OrderActionResponseDto>("/orders/online", data, { signal }),
   list: (query: OrdersQuery = {}, signal?: AbortSignal) =>
-    apiClient.get<OrdersSummaryListResponseDto>(withOrdersQuery('/orders', query), { signal }),
+    apiClient.get<OrdersSummaryListResponseDto>(queryPath("/orders", query), {
+      signal,
+    }),
   listMine: (query: OrdersQuery = {}, signal?: AbortSignal) =>
-    apiClient.get<OrdersSummaryListResponseDto>(withOrdersQuery('/orders/my', query), { signal }),
+    apiClient.get<OrdersSummaryListResponseDto>(
+      queryPath("/orders/my", query),
+      { signal },
+    ),
   getMyStats: (signal?: AbortSignal) =>
-    apiClient.get<RepresentativeOrderStatsResponseDto>('/orders/my/stats', { signal }),
+    apiClient.get<RepresentativeOrderStatsResponseDto>("/orders/my/stats", {
+      signal,
+    }),
   getById: (id: number, signal?: AbortSignal) =>
     apiClient.get<OrderDetailsResponseDto>(`/orders/${id}`, { signal }),
   update: (id: number, data: UpdateOrderDto, signal?: AbortSignal) =>
     apiClient.put<OrderActionResponseDto>(`/orders/${id}`, data, { signal }),
-  updateStatus: (id: number, data: UpdateOrderStatusDto, signal?: AbortSignal) =>
-    apiClient.patch<OrderActionResponseDto>(`/orders/${id}/status`, data, { signal }),
+  confirm: (id: number, sale_account_id: number, signal?: AbortSignal) =>
+    apiClient.post<OrderActionResponseDto>(
+      `/orders/${id}/confirm`,
+      { sale_account_id },
+      { signal },
+    ),
   cancel: (id: number, signal?: AbortSignal) =>
     apiClient.delete<OrderMessageResponseDto>(`/orders/${id}`, { signal }),
   deletePermanent: (id: number, signal?: AbortSignal) =>
-    apiClient.delete<OrderMessageResponseDto>(`/orders/${id}/permanent`, { signal }),
+    apiClient.delete<OrderMessageResponseDto>(`/orders/${id}/permanent`, {
+      signal,
+    }),
 };
-
-function withOrdersQuery(path: string, query: OrdersQuery): string {
-  const params = new URLSearchParams();
-  Object.entries(query).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') params.set(key, String(value));
-  });
-  const search = params.toString();
-  return search ? `${path}?${search}` : path;
-}

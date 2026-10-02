@@ -171,7 +171,7 @@ function PurchaseForm({ open, purchase, accounts, baseCurrency, onClose, onSaved
         <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3"><p className="font-bold text-brand">الإجمالي: <b dir="ltr">{formatMoney(total, baseCurrency)}</b></p><div className="flex gap-2"><button type="button" className="btn-outline" onClick={onClose}>إغلاق</button><button type="button" className="btn-primary" disabled={saving} onClick={review}>مراجعة وحفظ</button></div></div>
       </div>
     </Modal>
-    <RepProductPicker open={pickerOpen && open} existing={items} onClose={() => setPickerOpen(false)} onAdd={(item) => { setItems((rows) => rows.some((row) => row.product_variant_id === item.product_variant_id) ? rows : [...rows, { ...item, unitPrice: '' }]); setPickerOpen(false); }} allowOutOfStock purpose="الشراء" />
+    <RepProductPicker open={pickerOpen && open} existing={items} onClose={() => setPickerOpen(false)} onAdd={(item) => { setItems((rows) => rows.some((row) => row.product_variant_id === item.product_variant_id) ? rows : [...rows, { ...item, unitPrice: '' }]); setPickerOpen(false); }} purpose="الشراء" />
     <ConfirmDialog open={confirmOpen && open} onClose={() => setConfirmOpen(false)} onConfirm={() => void save()} loading={saving} severity="normal" title={purchase ? 'حفظ تعديل المشتريات' : 'اعتماد الشراء'} message={`سيُسجل الشراء على حساب ${purchase ? purchaseName(purchase) : selectedAccount?.name ?? '—'}، مع تحديث المخزون والدفتر المالي.`} confirmLabel={purchase ? 'حفظ التعديلات' : 'تسجيل الشراء'} details={<div className="flex justify-between gap-2"><span>{items.length} أصناف</span><b>{formatMoney(total, baseCurrency)}</b></div>} />
   </>;
 }

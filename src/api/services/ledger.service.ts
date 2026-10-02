@@ -14,7 +14,6 @@ export const ledgerService = {
     if (to) query.set('to', `${to}T23:59:59.999Z`);
     return apiClient.get<AccountStatement>(`/ledger/accounts/${id}/statement${query.size ? `?${query}` : ''}`, { signal });
   },
-  opening: (id: number, amount: number, notes?: string) => apiClient.post(`/ledger/accounts/${id}/opening-balance`, { amount, notes }),
   treasury: (signal?: AbortSignal) => apiClient.get<TreasuryOverview>('/ledger/treasury', { signal }),
   treasuryStatement: (signal?: AbortSignal) => apiClient.get<TreasuryStatement>('/ledger/treasury/statement', { signal }),
   voucher: (input: VoucherInput) => apiClient.post('/ledger/vouchers', input),

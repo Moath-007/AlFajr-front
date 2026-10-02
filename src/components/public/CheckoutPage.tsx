@@ -78,7 +78,7 @@ export default function CheckoutPage({
     submissionLock.current = true;
     setSubmitting(true);
     try {
-      const response = await ordersService.createRetail({
+      const response = await ordersService.createOnline({
         customer_name: fields.customer_name.trim(),
         phone: fields.phone.trim(),
         items: items.map((item) => ({

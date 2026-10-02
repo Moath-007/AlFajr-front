@@ -1,140 +1,449 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { returnsService, type CustomerReturnDto, type ReturnType } from '@/api';
-import { useAuth } from '@/auth';
-import AccountReturnLauncher from './AccountReturnLauncher';
-import { apiMessages } from '@/components/rep/repOrderUtils';
-import { RepSelect } from '@/components/rep/RepFormControls';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import Modal from '@/components/ui/Modal';
-import { formatMoney } from '@/utils/money';
+import { useCallback, useEffect, useState } from "react";
+import {
+  returnsService,
+  type SalesReturnDto,
+  type ReturnVariant,
+  type PurchaseReturnDto,
+} from "@/api";
+import { useAuth } from "@/auth";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { apiMessages } from "@/components/rep/repOrderUtils";
+import { formatMoney } from "@/utils/money";
+import SalesReturnEditor from "./SalesReturnEditor";
+import AccountReturnLauncher from "./AccountReturnLauncher";
 
-type StatusFilter = 'all' | 'active' | 'cancelled';
-type TypeFilter = 'all' | ReturnType;
-const returnTypeLabel = (type: ReturnType) => type === 'SalesReturn' ? 'مردود بيع' : 'مردود شراء';
-const returnSource = (row: CustomerReturnDto) => row.order_id ? `طلب #${row.order_id}` : row.customer_purchase_id ? `مشتريات #${row.customer_purchase_id}` : 'مردود مباشر';
-const partyName = (row: CustomerReturnDto) => row.account?.name ?? row.orders?.sale_account?.name ?? row.customers?.name ?? 'الحساب غير متاح';
-const dateText = (value: string) => new Date(value).toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' });
-const itemName = (item: CustomerReturnDto['items'][number]) => item.product_variants?.products?.name ?? item.product_variants?.products?.product_name ?? `صنف #${item.product_variant_id}`;
-
+type Action = "cancel" | "restore" | "delete";
 export default function ReturnsOperationsPage() {
   const { user } = useAuth();
-  const [items, setItems] = useState<CustomerReturnDto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
-  const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [visibleCount, setVisibleCount] = useState(30);
-  const [selected, setSelected] = useState<CustomerReturnDto | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<CustomerReturnDto | null>(null);
+  const [rows, setRows] = useState<SalesReturnDto[]>([]);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(0);
+  const [accounts, setAccounts] = useState<
+    Array<{ account_id: number; name: string }>
+  >([]);
+  const [variants, setVariants] = useState<ReturnVariant[]>([]);
+  const [search, setSearch] = useState("");
+  const [account, setAccount] = useState(0);
+  const [status, setStatus] = useState<"" | "Completed" | "Cancelled">("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<SalesReturnDto | null>(null);
+  const [editor, setEditor] = useState(false);
+  const [editing, setEditing] = useState<SalesReturnDto | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [launcherOpen, setLauncherOpen] = useState(false);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      setItems(await returnsService.list());
-    } catch (reason) {
-      setError(apiMessages(reason, 'تعذر تحميل المردودات.').join('، '));
-    } finally {
-      setLoading(false);
-    }
+  const [action, setAction] = useState<Action | null>(null);
+  const [note, setNote] = useState("");
+  const [purchaseOpen, setPurchaseOpen] = useState(false);
+  const [purchaseRows, setPurchaseRows] = useState<PurchaseReturnDto[]>([]);
+  const [purchaseCancel, setPurchaseCancel] = useState<number | null>(null);
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      try {
+        const r = await returnsService.list(
+          {
+            page,
+            limit: 20,
+            search,
+            account_id: account || undefined,
+            status: status || undefined,
+            date_from: from || undefined,
+            date_to: to || undefined,
+          },
+          signal,
+        );
+        if (signal?.aborted) return;
+        setRows(r.items);
+        setTotal(r.pagination.total);
+        setPages(r.pagination.total_pages);
+        setError("");
+      } catch (e) {
+        if (!signal?.aborted)
+          setError(apiMessages(e, "تعذر تحميل المردودات.").join("، "));
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [page, search, account, status, from, to],
+  );
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
+  useEffect(() => {
+    const c = new AbortController();
+    Promise.all([
+      returnsService.accounts(c.signal),
+      returnsService.variants(c.signal),
+      returnsService.listPurchase(),
+    ])
+      .then(([a, v, p]) => {
+        if (!c.signal.aborted) {
+          setAccounts(a);
+          setVariants(v);
+          setPurchaseRows(p);
+        }
+      })
+      .catch((e) => {
+        if (!c.signal.aborted)
+          setError(apiMessages(e, "تعذر تحميل الحسابات والأصناف.").join("، "));
+      });
+    return () => c.abort();
   }, []);
-  useEffect(() => { void load(); }, [load]);
-
-  const filtered = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    return items.filter((row) => {
-      if (typeFilter !== 'all' && row.return_type !== typeFilter) return false;
-      if (statusFilter === 'active' && row.cancelled_at) return false;
-      if (statusFilter === 'cancelled' && !row.cancelled_at) return false;
-      if (!query) return true;
-      return [row.customer_return_id, partyName(row), returnSource(row), row.notes, ...row.items.map(itemName)]
-        .some((value) => String(value ?? '').toLocaleLowerCase().includes(query));
-    });
-  }, [items, search, typeFilter, statusFilter]);
-  const active = items.filter((row) => !row.cancelled_at);
-  const salesTotal = active.filter((row) => row.return_type === 'SalesReturn').reduce((sum, row) => sum + Number(row.total_amount), 0);
-  const purchasesTotal = active.filter((row) => row.return_type === 'PurchaseReturn').reduce((sum, row) => sum + Number(row.total_amount), 0);
-  const visible = filtered.slice(0, visibleCount);
-  const basePath = user?.role === 'Admin' ? '/owner' : '/rep';
-
-  const cancel = async () => {
-    if (!cancelTarget || saving) return;
-    const id = cancelTarget.customer_return_id;
-    setSaving(true);
-    setError('');
+  const details = async (id: number) => {
     try {
-      await returnsService.cancel(id);
-      setCancelTarget(null);
-      setSelected(null);
-      setNotice(`أُلغي المردود #${id} وعُكس أثره المالي والمخزني.`);
+      setSelected(await returnsService.details(id));
+      setNote("");
+    } catch (e) {
+      setError(apiMessages(e, "تعذر فتح المردود.").join("، "));
+    }
+  };
+  const mutate = async () => {
+    if (!selected || !action || saving) return;
+    setSaving(true);
+    try {
+      if (action === "delete") {
+        await returnsService.permanentDelete(selected.customer_return_id);
+        setSelected(null);
+      } else {
+        if (action === "cancel")
+          await returnsService.cancel(
+            selected.customer_return_id,
+            note || undefined,
+          );
+        else
+          await returnsService.restore(
+            selected.customer_return_id,
+            note || undefined,
+          );
+        await details(selected.customer_return_id);
+      }
+      setAction(null);
       await load();
-    } catch (reason) {
-      setError(apiMessages(reason, 'تعذر إلغاء المردود.').join('، '));
+    } catch (e) {
+      setError(apiMessages(e, "تعذر تنفيذ العملية.").join("، "));
+      setAction(null);
     } finally {
       setSaving(false);
     }
   };
-
-  return <div className="space-y-5" dir="rtl">
-    <header className="flex flex-wrap items-end justify-between gap-3 border-b pb-4">
-      <div><p className="text-xs font-black text-gold-dark">المبيعات والمشتريات</p><h1 className="text-3xl font-black text-brand">المردودات</h1><p className="text-sm text-stone-500">راجع الأصناف والمبالغ ومرجع كل مردود، وتابع حالته من مكان واحد.</p></div>
-      <div className="flex flex-wrap gap-2"><button type="button" className="btn-outline" onClick={() => void load()} disabled={loading}>تحديث</button>{user?.role === 'Admin' && <button type="button" className="btn-primary" onClick={() => setLauncherOpen(true)}>إنشاء مردود</button>}</div>
-    </header>
-
-
-    {error && <div className="rep-error" role="alert">{error} <button type="button" className="mr-2 underline" onClick={() => void load()}>إعادة المحاولة</button></div>}
-    {notice && <div className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800" role="status">{notice}</div>}
-
-    <section className="grid gap-2 sm:grid-cols-3" aria-label="ملخص المردودات">
-      <Summary label="مردودات فعّالة" value={String(active.length)} />
-      <Summary label="مردودات البيع" value={formatMoney(salesTotal)} />
-      <Summary label="مردودات الشراء" value={formatMoney(purchasesTotal)} />
-    </section>
-
-    <section className="rounded-2xl border bg-white">
-      <div className="space-y-3 border-b p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-black text-brand">سجل المردودات <span className="text-sm font-normal text-stone-500">({filtered.length})</span></h2>{user?.role === 'Admin' && <Link className="text-sm font-bold text-gold-dark underline" to="/owner/reports/returns">تقرير المردودات</Link>}</div>
-        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_170px_170px]">
-          <label className="block"><span className="sr-only">البحث في المردودات</span><input className="rep-control" value={search} onChange={(event) => { setSearch(event.target.value); setVisibleCount(30); }} placeholder="ابحث برقم المردود أو الجهة أو الصنف" /></label>
-          <RepSelect value={typeFilter} onChange={(value) => { setTypeFilter(value); setVisibleCount(30); }} options={[{ value: 'all', label: 'كل الأنواع' }, { value: 'SalesReturn', label: 'مردود بيع' }, { value: 'PurchaseReturn', label: 'مردود شراء' }]} />
-          <RepSelect value={statusFilter} onChange={(value) => { setStatusFilter(value); setVisibleCount(30); }} options={[{ value: 'all', label: 'كل الحالات' }, { value: 'active', label: 'فعّال' }, { value: 'cancelled', label: 'ملغى' }]} />
-        </div>
-      </div>
-      {loading ? <p className="p-6 text-sm text-stone-500">جارٍ تحميل المردودات…</p> : visible.length ? <div className="divide-y">
-        {visible.map((row) => <article key={row.customer_return_id} className="grid gap-2 p-4 text-sm hover:bg-stone-50 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_auto] lg:items-center">
-          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="text-brand">مردود #{row.customer_return_id}</b><span className={`rounded-full px-2 py-0.5 text-xs font-bold ${row.cancelled_at ? 'bg-stone-100 text-stone-600' : 'bg-emerald-50 text-emerald-800'}`}>{row.cancelled_at ? 'ملغى' : 'فعّال'}</span><span className="text-stone-500">{returnTypeLabel(row.return_type)}</span></div><p className="mt-1 text-stone-600">{partyName(row)}</p></div>
-          <div className="text-stone-600"><p>{returnSource(row)}</p><p className="text-xs">{dateText(row.created_at)} · {row.items.length} {row.items.length === 1 ? 'صنف' : 'أصناف'}</p></div>
-          <b className="whitespace-nowrap text-brand" dir="ltr">{formatMoney(row.total_amount)}</b>
-          <button type="button" className="btn-outline text-sm" onClick={() => setSelected(row)}>التفاصيل</button>
-        </article>)}
-      </div> : <p className="p-8 text-center text-sm text-stone-500">{items.length ? 'لا توجد مردودات مطابقة للبحث.' : 'لا توجد مردودات حتى الآن.'}</p>}
-      {!loading && filtered.length > visibleCount && <div className="border-t p-3 text-center"><button type="button" className="btn-outline" onClick={() => setVisibleCount((count) => count + 30)}>عرض المزيد</button></div>}
-    </section>
-
-    <Modal open={!!selected} onClose={() => setSelected(null)} title={selected ? `تفاصيل المردود #${selected.customer_return_id}` : 'تفاصيل المردود'} size="lg" mobileFullscreen>
-      {selected && <div className="space-y-4" dir="rtl">
-        <div className="flex flex-wrap gap-2 text-sm"><span className="rounded-full bg-brand-50 px-3 py-1 font-bold text-brand">{returnTypeLabel(selected.return_type)}</span><span className={`rounded-full px-3 py-1 font-bold ${selected.cancelled_at ? 'bg-stone-100 text-stone-600' : 'bg-emerald-50 text-emerald-800'}`}>{selected.cancelled_at ? 'ملغى' : 'فعّال'}</span></div>
-        <dl className="grid gap-2 rounded-xl bg-stone-50 p-3 text-sm sm:grid-cols-2"><Detail label="الجهة / الحساب" value={partyName(selected)} /><Detail label="تاريخ التسجيل" value={dateText(selected.created_at)} /><Detail label="المصدر" value={returnSource(selected)} /><Detail label="عدد الأصناف" value={String(selected.items.length)} />{selected.cancelled_at && <Detail label="تاريخ الإلغاء" value={dateText(selected.cancelled_at)} />}</dl>
-        <div><h3 className="mb-2 font-black text-brand">الأصناف</h3><div className="overflow-hidden rounded-xl border"><div className="divide-y">{selected.items.map((item, index) => <div key={item.customer_return_item_id ?? index} className="grid gap-1 p-3 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:items-center"><span className="font-bold text-brand">{itemName(item)}{item.product_variants?.size && <small className="block font-normal text-stone-500">المقاس: {item.product_variants.size}</small>}</span><span className="text-stone-600">الكمية: {item.quantity}</span><span className="text-stone-600">السعر: {formatMoney(item.unit_price)}</span><b dir="ltr">{formatMoney(Number(item.unit_price ?? 0) * item.quantity)}</b></div>)}</div></div></div>
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-brand-50 p-3"><span className="font-bold text-brand">إجمالي المردود</span><b className="text-xl text-brand" dir="ltr">{formatMoney(selected.total_amount)}</b></div>
-        {selected.notes && <div className="rounded-xl border p-3 text-sm"><b className="text-brand">ملاحظات</b><p className="mt-1 whitespace-pre-wrap text-stone-600">{selected.notes}</p></div>}
-        <div className="flex flex-wrap gap-2 border-t pt-3">{selected.account_id && user?.role === 'Admin' && <Link className="btn-outline" to={`/owner/accounts/${selected.account_id}`}>كشف الحساب</Link>}{selected.order_id && <Link className="btn-outline" to={`${basePath}/orders/${selected.order_id}`}>فتح الطلب الأصلي</Link>}{selected.customer_purchase_id && user?.role === 'Admin' && <Link className="btn-outline" to="/owner/customer-purchases">فتح المشتريات</Link>}{user?.role === 'Admin' && !selected.cancelled_at && <button type="button" className="btn-outline text-red-700" onClick={() => setCancelTarget(selected)}>إلغاء المردود</button>}</div>
-      </div>}
-    </Modal>
-    <ConfirmDialog open={!!cancelTarget} onClose={() => setCancelTarget(null)} onConfirm={() => void cancel()} loading={saving} title={cancelTarget ? `إلغاء المردود #${cancelTarget.customer_return_id}` : 'إلغاء المردود'} message="سيُلغى المردود وتُعكس حركاته المالية والمخزنية. راجع المبلغ والأصناف قبل التأكيد." confirmLabel="تأكيد إلغاء المردود" details={cancelTarget && <div className="flex justify-between gap-2"><span>{returnTypeLabel(cancelTarget.return_type)} · {cancelTarget.items.length} أصناف</span><b>{formatMoney(cancelTarget.total_amount)}</b></div>} />
-    <AccountReturnLauncher open={launcherOpen} onClose={() => setLauncherOpen(false)} onSaved={(id) => { setLauncherOpen(false); setNotice(`سُجل المردود #${id} على الحساب.`); void load(); }} />
-  </div>;
-}
-
-function Summary({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border bg-white p-3"><p className="text-sm text-stone-600">{label}</p><b className="mt-1 block text-xl text-brand">{value}</b></div>;
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return <div><dt className="text-xs text-stone-500">{label}</dt><dd className="font-bold text-brand">{value}</dd></div>;
+  return (
+    <div dir="rtl" className="space-y-5">
+      <header className="flex flex-wrap justify-between gap-3">
+        <h1 className="text-3xl font-black text-brand">مردودات البيع</h1>
+        <button
+          className="btn-primary"
+          onClick={() => {
+            setEditing(null);
+            setEditor(true);
+          }}
+          disabled={!accounts.length || !variants.length}
+        >
+          إنشاء مردود بيع
+        </button>
+      </header>
+      {error && (
+        <p role="alert" className="rep-error">
+          {error}
+        </p>
+      )}
+      {selected ? (
+        <section className="space-y-4 rounded-2xl border p-4">
+          <button className="btn-outline" onClick={() => setSelected(null)}>
+            العودة للقائمة
+          </button>
+          <h2 className="text-2xl font-bold">{selected.return_number}</h2>
+          <p>
+            {selected.return_date.slice(0, 10)} · {selected.account.name} ·{" "}
+            {selected.status === "Completed" ? "مكتمل" : "ملغى"} ·{" "}
+            {formatMoney(selected.total_amount)} ₪
+          </p>
+          <p>{selected.notes}</p>
+          <div className="space-y-2">
+            {selected.items.map((i) => (
+              <div
+                key={i.customer_return_item_id}
+                className="rounded border p-3"
+              >
+                {i.product_variants.products.name} ·{" "}
+                {i.product_variants.colors.name} · {i.product_variants.size} —{" "}
+                {i.quantity} × {formatMoney(i.unit_price)} ₪ ={" "}
+                {formatMoney(i.quantity * Number(i.unit_price))} ₪
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {selected.status === "Completed" ? (
+              <>
+                <button
+                  className="btn-outline"
+                  onClick={() => {
+                    setEditing(selected);
+                    setEditor(true);
+                  }}
+                >
+                  تعديل
+                </button>
+                <button
+                  className="btn-outline"
+                  onClick={() => setAction("cancel")}
+                >
+                  إلغاء المردود
+                </button>
+              </>
+            ) : (
+              <button
+                className="btn-outline"
+                onClick={() => setAction("restore")}
+              >
+                استعادة المردود
+              </button>
+            )}
+            <button
+              className="btn-outline text-red-700"
+              onClick={() => setAction("delete")}
+            >
+              حذف نهائي
+            </button>
+          </div>
+          <label className="block">
+            ملاحظة الإلغاء أو الاستعادة (اختيارية)
+            <input
+              className="rep-control"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </label>
+          <h3 className="text-lg font-bold">تاريخ المردود</h3>
+          {selected.history?.map((h) => (
+            <details className="rounded border p-3" key={h.audit_log_id}>
+              <summary>
+                {(
+                  {
+                    Created: "إنشاء",
+                    Edited: "تعديل",
+                    Cancelled: "إلغاء",
+                    Restored: "استعادة",
+                  } as Record<string, string>
+                )[h.action] ?? h.action}{" "}
+                · {h.users?.name ?? "النظام"} ·{" "}
+                {new Date(h.created_at).toLocaleString("ar-EG")}
+              </summary>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {!!h.before_data && (
+                  <pre className="overflow-x-auto whitespace-pre-wrap text-xs">
+                    قبل:{" "}
+                    {JSON.stringify(
+                      h.before_data,
+                      (key, value: unknown) =>
+                        key === "layers" ? undefined : value,
+                      2,
+                    )}
+                  </pre>
+                )}
+                {!!h.after_data && (
+                  <pre className="overflow-x-auto whitespace-pre-wrap text-xs">
+                    بعد:{" "}
+                    {JSON.stringify(
+                      h.after_data,
+                      (key, value: unknown) =>
+                        key === "layers" ? undefined : value,
+                      2,
+                    )}
+                  </pre>
+                )}
+              </div>
+            </details>
+          ))}
+        </section>
+      ) : (
+        <>
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+            <input
+              className="rep-control"
+              aria-label="بحث"
+              placeholder="رقم المردود أو الحساب"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+            <select
+              className="rep-control"
+              aria-label="حساب"
+              value={account}
+              onChange={(e) => {
+                setAccount(Number(e.target.value));
+                setPage(1);
+              }}
+            >
+              <option value={0}>كل الحسابات</option>
+              {accounts.map((a) => (
+                <option key={a.account_id} value={a.account_id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className="rep-control"
+              aria-label="الحالة"
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value as typeof status);
+                setPage(1);
+              }}
+            >
+              <option value="">كل الحالات</option>
+              <option value="Completed">مكتمل</option>
+              <option value="Cancelled">ملغى</option>
+            </select>
+            <label>
+              من
+              <input
+                type="date"
+                className="rep-control"
+                value={from}
+                onChange={(e) => {
+                  setFrom(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </label>
+            <label>
+              إلى
+              <input
+                type="date"
+                className="rep-control"
+                value={to}
+                onChange={(e) => {
+                  setTo(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </label>
+          </div>
+          <p>{loading ? "جارٍ التحميل…" : `${total} مردود`}</p>
+          <div className="space-y-2">
+            {rows.map((r) => (
+              <button
+                key={r.customer_return_id}
+                className="flex w-full flex-wrap justify-between gap-3 rounded-xl border bg-white p-4 text-right"
+                onClick={() => void details(r.customer_return_id)}
+              >
+                <b>{r.return_number}</b>
+                <span>{r.return_date.slice(0, 10)}</span>
+                <span>{r.account.name}</span>
+                <span>{r.created_by_user.name}</span>
+                <span>{r.status === "Completed" ? "مكتمل" : "ملغى"}</span>
+                <b>{formatMoney(r.total_amount)} ₪</b>
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <button
+              className="btn-outline"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              السابق
+            </button>
+            <span>
+              {page} / {pages || 1}
+            </span>
+            <button
+              className="btn-outline"
+              disabled={page >= pages || loading}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              التالي
+            </button>
+          </div>
+        </>
+      )}
+      <details className="rounded-xl border p-3">
+        <summary>مردودات الشراء — مسار مستقل</summary>
+        {user?.role === "Admin" && (
+          <button className="btn-outline" onClick={() => setPurchaseOpen(true)}>
+            إنشاء مردود شراء
+          </button>
+        )}
+        {purchaseRows.map((r) => (
+          <div
+            className="flex justify-between gap-2 border-b py-2"
+            key={r.customer_return_id}
+          >
+            <span>
+              #{r.customer_return_id} ·{" "}
+              {r.account?.name ?? `جهة #${r.customer_id}`} ·{" "}
+              {formatMoney(r.total_amount)} ₪ ·{" "}
+              {r.cancelled_at ? "ملغى" : "فعال"}
+            </span>
+            {user?.role === "Admin" && !r.cancelled_at && (
+              <button onClick={() => setPurchaseCancel(r.customer_return_id)}>
+                إلغاء
+              </button>
+            )}
+          </div>
+        ))}
+      </details>
+      {editor && (
+        <SalesReturnEditor
+          key={editing?.customer_return_id ?? "new"}
+          document={editing}
+          accounts={accounts}
+          variants={variants}
+          onClose={() => setEditor(false)}
+          onSaved={(id) => {
+            setEditor(false);
+            void load();
+            void details(id);
+          }}
+        />
+      )}
+      <ConfirmDialog
+        open={!!action}
+        onClose={() => setAction(null)}
+        onConfirm={() => void mutate()}
+        loading={saving}
+        title="تأكيد العملية"
+        message={`تأكيد ${action === "cancel" ? "إلغاء" : action === "restore" ? "استعادة" : "الحذف النهائي لـ"} ${selected?.return_number ?? ""} وآثاره المالية والمخزنية؟`}
+      />
+      <AccountReturnLauncher
+        open={purchaseOpen}
+        onClose={() => setPurchaseOpen(false)}
+        onSaved={() => {
+          setPurchaseOpen(false);
+          void returnsService.listPurchase().then(setPurchaseRows);
+        }}
+      />
+      <ConfirmDialog
+        open={purchaseCancel !== null}
+        onClose={() => setPurchaseCancel(null)}
+        onConfirm={() => {
+          if (purchaseCancel !== null) {
+            setSaving(true);
+            void returnsService
+              .cancelPurchase(purchaseCancel)
+              .then(() => {
+                setPurchaseCancel(null);
+                return returnsService.listPurchase();
+              })
+              .then(setPurchaseRows)
+              .catch((e) =>
+                setError(apiMessages(e, "تعذر إلغاء مردود الشراء.").join("، ")),
+              )
+              .finally(() => setSaving(false));
+          }
+        }}
+        loading={saving}
+        title="إلغاء مردود الشراء"
+        message="تأكيد عكس أثر مردود الشراء المالي والمخزني؟"
+      />
+    </div>
+  );
 }

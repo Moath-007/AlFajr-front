@@ -1,7 +1,6 @@
 import type { StatementCounterpartLine, StatementSourceDetails } from '@/api/types/ledger';
 import { formatMoney } from '@/utils/money';
 
-const orderTypes: Record<string, string> = { Retail: 'طلب أونلاين', Wholesale: 'طلب جملة', StoreSale: 'بيع محل' };
 const statuses: Record<string, string> = { Pending: 'معلّق', Completed: 'مكتمل', Cancelled: 'ملغى' };
 const checkActions: Record<string, string> = {
   DEPOSITED: 'إيداع في البنك', SENT_TO_COLLECTION: 'إرسال للتحصيل',
@@ -45,11 +44,11 @@ export default function StatementSourceDetailsView({ details }: { details: State
   const items = details.items ?? [];
   return <div className="mt-3 space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm" style={{ breakInside: 'avoid' }}>
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-      <b className="text-brand">{details.kind === 'Order' ? orderTypes[details.order_type ?? ''] ?? 'طلب بيع' :
+      <b className="text-brand">{details.kind === 'Order' ? 'فاتورة بيع' :
         details.kind === 'Purchase' ? 'عملية شراء' : details.kind === 'Return' ? details.return_type === 'SalesReturn' ? 'مردود مبيعات' : 'مردود مشتريات' :
         details.kind === 'Payment' ? details.payment_type === 'Receipt' ? 'سند قبض' : 'سند صرف' :
         details.kind === 'Debt' ? 'دين يدوي' : details.kind === 'WriteOff' ? 'مسامحة' :
-        details.kind === 'CheckMovement' ? 'حركة شيك' : 'رصيد افتتاحي'} #{details.reference_id}</b>
+        details.kind === 'CheckMovement' ? 'حركة شيك' : 'رصيد افتتاحي'} {details.return_number ?? `#${details.reference_id}`}</b>
       {details.is_reversal && <span className="font-bold text-red-700">حركة معكوسة</span>}
       {details.status && <span>{statuses[details.status] ?? details.status}</span>}
       {details.cancelled && <span>ملغى حاليًا</span>}
@@ -60,7 +59,7 @@ export default function StatementSourceDetailsView({ details }: { details: State
         <td className="border p-2"><b>{item.product_name}</b><small className="block text-stone-500">{item.product_code}{item.is_bonus ? ' · بونص' : ''}</small></td>
         <td className="border p-2">{item.size} · {item.color}</td>
         <td className="border p-2">{item.quantity}</td>
-        <td className="border p-2">{formatMoney(item.unit_price)}{item.base_unit_price && Number(item.base_unit_price) !== Number(item.unit_price) && <small className="block text-stone-500">السعر الأساسي: {formatMoney(item.base_unit_price)}</small>}</td>
+        <td className="border p-2">{formatMoney(item.unit_price)}</td>
         <td className="border p-2">{item.unit_discount && Number(item.unit_discount) > 0 ? formatMoney(item.unit_discount) : '—'}</td>
         <td className="border p-2 font-bold">{formatMoney(item.line_total)}</td>
       </tr>)}</tbody>
@@ -68,13 +67,13 @@ export default function StatementSourceDetailsView({ details }: { details: State
     <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
       {details.kind === 'Order' && <><Detail label="مجموع المنتجات بعد خصم البنود" value={details.subtotal ? formatMoney(details.subtotal) : null} /><Detail label="إجمالي خصومات المنتجات" value={details.product_discount_total ? formatMoney(details.product_discount_total) : null} /><Detail label="خصم الطلب" value={details.order_discount ? formatMoney(details.order_discount) : null} /></>}
       {(details.kind === 'Order' || details.kind === 'Purchase' || details.kind === 'Return') && <Detail label="الإجمالي النهائي" value={details.total ? formatMoney(details.total) : null} />}
-      {details.kind === 'Return' && <Detail label="العملية الأصلية" value={details.order_id ? `طلب #${details.order_id}` : details.purchase_id ? `شراء #${details.purchase_id}` : null} />}
+      {details.kind === 'Return' && <><Detail label="تاريخ المردود" value={details.return_date?.slice(0,10)} /><Detail label="العملية الأصلية" value={details.purchase_id ? `شراء #${details.purchase_id}` : null} /></>}
       {details.kind === 'Payment' && <>
         <Detail label="الطريقة" value={details.method === 'Check' ? 'شيك' : 'نقد'} />
         <Detail label="المبلغ الأصلي" value={details.amount ? `${formatMoney(details.amount)} ${details.currency?.code ?? ''}` : null} />
         <Detail label="سعر الصرف" value={details.exchange_rate} />
         <Detail label="بالعملة الأساسية" value={details.base_amount ? formatMoney(details.base_amount) : null} />
-        <Detail label="العملية المرتبطة" value={details.order_id ? `طلب #${details.order_id}` : details.purchase_id ? `شراء #${details.purchase_id}` : null} />
+        <Detail label="العملية المرتبطة" value={details.purchase_id ? `شراء #${details.purchase_id}` : null} />
         {details.check && <><Detail label="رقم الشيك" value={details.check.number} /><Detail label="بنك الشيك" value={details.check.bank_name} /><Detail label="تاريخ الاستحقاق" value={details.check.due_date.slice(0, 10)} /><Detail label="موقع الشيك الحالي" value={checkLocations[details.check.location] ?? details.check.location} /></>}
       </>}
       {details.kind === 'CheckMovement' && <>

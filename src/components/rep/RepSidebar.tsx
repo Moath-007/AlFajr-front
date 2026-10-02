@@ -34,11 +34,11 @@ const groups = [
       { path: "/rep/products", label: "منتجات الجملة", icon: Boxes },
       {
         path: "/rep/orders/new",
-        label: "إنشاء طلب",
+        label: "إنشاء فاتورة",
         icon: ShoppingCart,
         badge: true,
       },
-      { path: "/rep/orders", label: "الطلبات", icon: ClipboardList },
+      { path: "/rep/orders", label: "جميع الفواتير", icon: ClipboardList },
     ],
   },
   {

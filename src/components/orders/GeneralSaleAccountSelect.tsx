@@ -19,7 +19,7 @@ export default function GeneralSaleAccountSelect({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const root = useRef<HTMLDivElement>(null);
-  const input = useRef<HTMLInputElement>(null);
+  const input = useRef<HTMLInputElement | null>(null);
   const focusInput = useCallback((node: HTMLInputElement | null) => {
     input.current = node;
     node?.focus();

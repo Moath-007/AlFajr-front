@@ -95,7 +95,7 @@ export default function RepDashboard({
           </p>
           <h1 className="mt-2 text-3xl font-black">لوحة تحكم المندوب</h1>
           <p className="mt-2 text-sm text-stone-300">
-            إحصائيات طلباتك أنت، مع وصولك إلى سجل طلبات الجملة المشترك.
+            إحصائيات الفواتير التي أنشأتها أنت، مع وصولك إلى سجل الفواتير المشترك.
           </p>
         </div>
         <button
@@ -132,7 +132,7 @@ export default function RepDashboard({
             ))}
             <article className="rounded-2xl border border-gold/30 bg-gold/10 p-5">
               <p className="text-sm font-bold text-stone-600">
-              قيمة طلبات الجملة المكتملة حاليًا
+              قيمة الفواتير المكتملة حاليًا
               </p>
               <p className="mt-5 text-2xl font-black text-brand">
                 {formatMoney(stats.completed_sales_total)}
@@ -177,7 +177,7 @@ export default function RepDashboard({
               >
                 <strong className="text-brand">#{order.id}</strong>
                 <span>
-                  <b className="block text-sm">{order.customer.name}</b>
+                  <b className="block text-sm">{order.customer?.name ?? "—"}</b>
                   <small className="text-stone-400">
                     {formatOrderDate(order.created_at)}
                   </small>

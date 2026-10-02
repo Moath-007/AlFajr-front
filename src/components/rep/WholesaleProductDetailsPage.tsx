@@ -201,7 +201,7 @@ export default function WholesaleProductDetailsPage({
               </div>
               <div className="mt-5 flex items-center justify-between">
                 <span className="text-sm font-bold text-stone-600">الكمية</span>
-                <QuantityInput value={quantity} max={variant.stock_quantity} allowOverMax onChange={setQuantity} showStock={showWholesaleStock} />
+                <QuantityInput value={quantity} onChange={setQuantity} />
               </div>
             </div>
           )}

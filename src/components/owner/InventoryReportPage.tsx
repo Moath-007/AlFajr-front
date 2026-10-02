@@ -22,7 +22,8 @@ const movementLabels: Record<string, string> = {
   SalesReturn: 'مردود مبيعات', PurchaseReturn: 'مردود مشتريات زبون',
   ReturnCancelled: 'إلغاء مردود', CustomerPurchase: 'شراء من زبون',
   CustomerPurchaseEdit: 'تعديل شراء من زبون', CustomerPurchaseCancelled: 'إلغاء شراء من زبون',
-  ManualAdjustment: 'تعديل يدوي',
+  OpeningStockCorrected: 'تصحيح مخزون افتتاحي',
+  OpeningStockCancelled: 'إلغاء مخزون افتتاحي',
 };
 const number = (value: number) => new Intl.NumberFormat('en-US').format(value);
 const snapshotTime = (value: string) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Hebron',

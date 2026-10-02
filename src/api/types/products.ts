@@ -29,6 +29,7 @@ export interface ProductVariantResponseDto {
   wholesale_price: DecimalString;
   wholesale_discount: DecimalString;
   stock_quantity: number;
+  is_active: boolean;
   color: ProductColorResponseDto;
 }
 
@@ -107,7 +108,6 @@ export interface CatalogProductSummaryDto {
   primary_image?: CatalogPrimaryImageResponseDto | null;
   price: DecimalString;
   has_discount: boolean;
-  in_stock: boolean;
   total_stock_quantity?: number;
 }
 
@@ -161,6 +161,7 @@ export interface ProductVariantWriteDto {
 
 export interface UpdateProductVariantDto extends ProductVariantWriteDto {
   product_variant_id?: NumericId;
+  is_active?: boolean;
 }
 
 export interface CreateProductDto {
