@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import {
   useCallback,
   useEffect,
@@ -5,7 +6,16 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { KeyRound, Pencil, Plus, RefreshCw, Search } from "lucide-react";
+import {
+  KeyRound,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Power,
+  PowerOff,
+  X,
+} from "lucide-react";
 import { representativesService, type RepresentativeResponseDto } from "@/api";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
@@ -13,6 +23,8 @@ import EmptyState from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { RepSelect } from "@/components/rep/RepFormControls";
 import { apiMessages, formatOrderDate } from "@/components/rep/repOrderUtils";
+
+import "./AdminRepresentativesPage.css";
 
 type FormState = {
   item: RepresentativeResponseDto | null;
@@ -29,6 +41,7 @@ export default function AdminRepresentativesPage({
   const [representatives, setRepresentatives] = useState<
     RepresentativeResponseDto[]
   >([]);
+  const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -76,6 +89,12 @@ export default function AdminRepresentativesPage({
         )
       : representatives;
   }, [representatives, search]);
+  const pages = Math.max(1, Math.ceil(shown.length / 20));
+  const visible = shown.slice((page - 1) * 20, page * 20);
+  useEffect(() => setPage(1), [search, status]);
+  useEffect(() => {
+    if (page > pages) setPage(pages);
+  }, [page, pages]);
   const openCreate = () => {
     setFormErrors([]);
     setForm({ item: null, name: "", phone: "", email: "", password: "" });
@@ -165,14 +184,13 @@ export default function AdminRepresentativesPage({
     }
   };
   return (
-    <div className="space-y-6">
+    <div className="representatives-page space-y-4" dir="rtl">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b pb-5">
         <div>
           <p className="text-xs font-black text-gold-dark">إدارة الفريق</p>
           <h1 className="mt-1 text-3xl font-black text-brand">المناديب</h1>
           <p className="mt-2 text-sm text-stone-500">
-            إدارة الحسابات والحالة وكلمات المرور دون التأثير في الطلبات
-            التاريخية.
+            إدارة بيانات المندوبين وحسابات الدخول.
           </p>
         </div>
         <button
@@ -183,9 +201,9 @@ export default function AdminRepresentativesPage({
           إضافة مندوب
         </button>
       </header>
-      <section className="grid gap-3 rounded-2xl border bg-white p-4 md:grid-cols-2">
+      <section className="representatives-filters">
         <label>
-          <span className="rep-label">بحث محلي</span>
+          <span className="rep-label">البحث</span>
           <span className="relative block">
             <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2" />
             <input
@@ -207,8 +225,38 @@ export default function AdminRepresentativesPage({
           ]}
         />
       </section>
+      {(search || status) && (
+        <div className="representatives-chips">
+          {search && (
+            <button onClick={() => setSearch("")} aria-label="إزالة فلتر البحث">
+              البحث: {search}
+              <X size={14} />
+            </button>
+          )}
+          {status && (
+            <button
+              onClick={() => setStatus("")}
+              aria-label="إزالة فلتر الحالة"
+            >
+              {status === "true" ? "فعال" : "غير فعال"}
+              <X size={14} />
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setSearch("");
+              setStatus("");
+            }}
+          >
+            مسح الكل
+          </button>
+        </div>
+      )}
+      <p className="text-xs text-stone-500">
+        {shown.length} مندوب · صفحة {page} من {pages}
+      </p>
       {errors.length > 0 && (
-        <div className="rep-error text-center">
+        <div role="alert" className="rep-error text-center">
           {errors.join("، ")}
           <button
             onClick={() => setRetry((v) => v + 1)}
@@ -221,16 +269,23 @@ export default function AdminRepresentativesPage({
       )}
       {loading ? (
         <Skeleton className="h-80" />
-      ) : shown.length === 0 ? (
-        <EmptyState title="لا يوجد مناديب مطابقون" />
+      ) : errors.length > 0 ? null : shown.length === 0 ? (
+        <EmptyState
+          title={
+            search || status
+              ? "لا يوجد مندوبون مطابقون"
+              : "لا يوجد مندوبون حتى الآن"
+          }
+        />
       ) : (
         <>
-          <div className="hidden overflow-hidden rounded-2xl border bg-white md:block">
-            <table className="w-full text-sm">
+          <div className="representatives-table-wrap hidden overflow-hidden rounded-2xl border bg-white lg:block">
+            <table className="representatives-table">
               <thead className="bg-stone-50">
                 <tr>
                   {[
                     "المندوب",
+                    "البريد الإلكتروني",
                     "الهاتف",
                     "الحالة",
                     "تاريخ الإنشاء",
@@ -243,14 +298,30 @@ export default function AdminRepresentativesPage({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {shown.map((x) => (
-                  <tr key={x.user_id}>
+                {visible.map((x) => (
+                  <tr
+                    key={x.user_id}
+                    tabIndex={0}
+                    aria-label={`تعديل ${x.name}`}
+                    onClick={() => openEdit(x)}
+                    onKeyDown={(e) => {
+                      if (
+                        e.target === e.currentTarget &&
+                        (e.key === "Enter" || e.key === " ")
+                      ) {
+                        e.preventDefault();
+                        openEdit(x);
+                      }
+                    }}
+                  >
                     <td className="px-4 py-4">
                       <b className="block text-brand">{x.name}</b>
-                      <small>{x.email}</small>
                     </td>
-                    <td className="px-4" dir="ltr">
-                      {x.phone || "—"}
+                    <td className="representative-email">
+                      <span dir="ltr">{x.email}</span>
+                    </td>
+                    <td className="representative-phone">
+                      <span dir="ltr">{x.phone || "—"}</span>
                     </td>
                     <td className="px-4">
                       <Status active={x.is_active} />
@@ -275,13 +346,13 @@ export default function AdminRepresentativesPage({
               </tbody>
             </table>
           </div>
-          <div className="space-y-3 md:hidden">
-            {shown.map((x) => (
+          <div className="representatives-cards lg:hidden">
+            {visible.map((x) => (
               <article
                 key={x.user_id}
                 className="rounded-2xl border bg-white p-4"
               >
-                <div className="flex justify-between gap-3">
+                <div className="flex items-start justify-between gap-3">
                   <div>
                     <b className="text-brand">{x.name}</b>
                     <p className="text-xs text-stone-500">{x.email}</p>
@@ -308,6 +379,33 @@ export default function AdminRepresentativesPage({
           </div>
         </>
       )}
+      {pages > 1 &&
+        createPortal(
+          <nav
+            className="representatives-pagination"
+            dir="rtl"
+            aria-label="صفحات المندوبين"
+          >
+            <button
+              className="btn-ghost"
+              disabled={loading || page <= 1}
+              onClick={() => setPage(page - 1)}
+            >
+              السابق
+            </button>
+            <span aria-current="page">
+              صفحة {page} من {pages}
+            </span>
+            <button
+              className="btn-ghost"
+              disabled={loading || page >= pages}
+              onClick={() => setPage(page + 1)}
+            >
+              التالي
+            </button>
+          </nav>,
+          document.body,
+        )}
       <Modal
         open={form !== null}
         onClose={() => setForm(null)}
@@ -419,7 +517,7 @@ function Field({
 function Status({ active }: { active: boolean }) {
   return (
     <span
-      className={`rounded-full px-2.5 py-1 text-xs font-black ${active ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-600"}`}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${active ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-600"}`}
     >
       {active ? "فعال" : "غير فعال"}
     </span>
@@ -437,26 +535,29 @@ function Actions({
   status: () => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
-      <button
-        onClick={edit}
-        className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-brand-50 px-3 font-bold text-brand"
-      >
+    <div
+      className="representative-actions"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button onClick={edit} className="representative-edit">
         <Pencil className="h-3.5 w-3.5" />
         تعديل
       </button>
       <button
         onClick={password}
-        className="inline-flex min-h-9 items-center gap-1 rounded-lg border px-3 font-bold"
+        className="representative-password"
+        title="تغيير كلمة المرور"
+        aria-label={`تغيير كلمة مرور ${item.name}`}
       >
         <KeyRound className="h-3.5 w-3.5" />
-        كلمة المرور
       </button>
       <button
         onClick={status}
-        className={`min-h-9 rounded-lg px-3 font-bold ${item.is_active ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}
+        className={`representative-status ${item.is_active ? "is-active" : ""}`}
+        title={item.is_active ? "تعطيل" : "تفعيل"}
+        aria-label={`${item.is_active ? "تعطيل" : "تفعيل"} ${item.name}`}
       >
-        {item.is_active ? "تعطيل" : "تفعيل"}
+        {item.is_active ? <PowerOff size={16} /> : <Power size={16} />}
       </button>
     </div>
   );

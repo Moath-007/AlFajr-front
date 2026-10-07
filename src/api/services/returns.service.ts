@@ -1,4 +1,4 @@
-import { accountsService } from './accounts.service';
+import { accountsService } from "./accounts.service";
 import { apiClient } from "../client";
 import type {
   CreateAccountReturnDto,
@@ -10,6 +10,8 @@ import type {
   PaginationResponseDto,
 } from "../types";
 export const returnsService = {
+  permanentDeletePurchase: (id: number) =>
+    apiClient.delete<{ message: string }>(`/purchase-returns/${id}/permanent`),
   list: (query: ReturnsQuery = {}, signal?: AbortSignal) => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(query))
@@ -21,9 +23,13 @@ export const returnsService = {
   },
   details: (id: number, signal?: AbortSignal) =>
     apiClient.get<SalesReturnDto>(`/returns/${id}`, { signal }),
-  accounts: (signal?: AbortSignal) => accountsService.allOptions({ type: 'General' }, signal),
-  variants: (signal?: AbortSignal) =>
-    apiClient.get<ReturnVariant[]>("/returns/variants", { signal }),
+  accounts: (signal?: AbortSignal) =>
+    accountsService.allOptions({ type: "General" }, signal),
+  variants: (query: { search?: string; page?: number; limit?: number } = {}, signal?: AbortSignal) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) if (value !== undefined) params.set(key, String(value));
+    return apiClient.get<{ items: ReturnVariant[]; page: number; has_more: boolean }>(`/returns/variants?${params}`, { signal });
+  },
   create: (data: SalesReturnInput) =>
     apiClient.post<SalesReturnDto>("/returns", data),
   edit: (id: number, data: SalesReturnInput) =>
@@ -34,11 +40,21 @@ export const returnsService = {
     apiClient.post<SalesReturnDto>(`/returns/${id}/restore`, { note }),
   permanentDelete: (id: number) =>
     apiClient.delete<{ message: string }>(`/returns/${id}/permanent`),
-  listPurchase: (accountId?: number) =>
-    apiClient.get<PurchaseReturnDto[]>(
-      `/purchase-returns${accountId ? `?account_id=${accountId}` : ""}`,
-    ),
-  purchaseDetails: (id: number, signal?: AbortSignal) => apiClient.get<PurchaseReturnDto>(`/purchase-returns/${id}`, {signal}),
+  listPurchase: (query: ReturnsQuery = {}, signal?: AbortSignal) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query))
+      if (value !== undefined && value !== "") params.set(key, String(value));
+    return apiClient.get<{
+      items: PurchaseReturnDto[];
+      pagination: PaginationResponseDto;
+    }>(`/purchase-returns?${params}`, { signal });
+  },
+  editPurchase: (id: number, data: CreateAccountReturnDto) =>
+    apiClient.put<PurchaseReturnDto>(`/purchase-returns/${id}`, data),
+  restorePurchase: (id: number) =>
+    apiClient.post<PurchaseReturnDto>(`/purchase-returns/${id}/restore`),
+  purchaseDetails: (id: number, signal?: AbortSignal) =>
+    apiClient.get<PurchaseReturnDto>(`/purchase-returns/${id}`, { signal }),
   createPurchaseForAccount: (
     data: CreateAccountReturnDto,
     signal?: AbortSignal,
@@ -49,5 +65,5 @@ export const returnsService = {
       total_amount: string;
     }>("/purchase-returns/account", data, { signal }),
   cancelPurchase: (id: number) =>
-    apiClient.post<{ message: string }>(`/purchase-returns/${id}/cancel`),
+    apiClient.post<PurchaseReturnDto>(`/purchase-returns/${id}/cancel`),
 };

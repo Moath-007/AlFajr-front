@@ -1,4 +1,8 @@
 import { useEffect, useState } from "react";
+import { RepDateInput } from "@/components/rep/RepFormControls";
+import Select from "@/components/ui/Select";
+import EmptyState from "@/components/ui/EmptyState";
+import { Loader2 } from "lucide-react";
 import {
   ordersService,
   type ApiOrderStatus,
@@ -38,6 +42,14 @@ export default function InvoicesList({
   const [message] = useState(() => takeOrderDeletedMessage(mode));
   const path = mode === "admin" ? "/owner/orders" : "/rep/orders";
   useEffect(() => {
+    if (search.trim() === submitted) return;
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setSubmitted(search.trim());
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [search, submitted]);
+  useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError("");
@@ -68,9 +80,11 @@ export default function InvoicesList({
       });
     return () => controller.abort();
   }, [page, submitted, status, from, to, retry]);
+  const filtered = Boolean(submitted || status || from || to);
+  const reset = () => { setSearch(""); setSubmitted(""); setStatus(""); setFrom(""); setTo(""); setPage(1); };
   return (
-    <div className="space-y-5">
-      <header className="flex flex-wrap justify-between gap-3">
+    <div className="orders-page space-y-5 min-w-0" dir="rtl">
+      <header className="rep-page-header">
         <h1 className="text-2xl font-black">جميع فواتير البيع</h1>
         <button
           className="btn-primary"
@@ -85,65 +99,24 @@ export default function InvoicesList({
       </header>
       {message && <p role="status">{message}</p>}
       <form
-        className="grid gap-3 rounded-2xl border bg-white p-4 sm:grid-cols-4"
+        className="rep-section grid items-end gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4"
         onSubmit={(e) => {
           e.preventDefault();
           setPage(1);
           setSubmitted(search.trim());
         }}
       >
-        <input
+        <label className="min-w-0"><span className="rep-label">بحث عن فاتورة</span><input
           className="rep-control"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="رقم الفاتورة / الحساب / جهة التواصل"
           aria-label="بحث"
-        />
-        <select
-          className="rep-control"
-          value={status}
-          onChange={(e) => {
-            setPage(1);
-            const value = e.target.value;
-            setStatus(
-              value === "Pending" ||
-                value === "Completed" ||
-                value === "Cancelled"
-                ? value
-                : "",
-            );
-          }}
-        >
-          <option value="">كل الحالات</option>
-          <option value="Pending">معلق</option>
-          <option value="Completed">مكتمل</option>
-          <option value="Cancelled">ملغى</option>
-        </select>
-        <label>
-          من
-          <input
-            className="rep-control"
-            type="date"
-            value={from}
-            onChange={(e) => {
-              setPage(1);
-              setFrom(e.target.value);
-            }}
-          />
-        </label>
-        <label>
-          إلى
-          <input
-            className="rep-control"
-            type="date"
-            value={to}
-            onChange={(e) => {
-              setPage(1);
-              setTo(e.target.value);
-            }}
-          />
-        </label>
-        <button className="btn-outline">بحث</button>
+        /></label>
+        <Select<ApiOrderStatus | ""> label="الحالة" value={status} options={[{value:"",label:"كل الحالات"},{value:"Pending",label:"قيد الانتظار"},{value:"Completed",label:"مكتمل"},{value:"Cancelled",label:"ملغي"}]} onChange={(value) => { setPage(1); setStatus(value); }} />
+        <RepDateInput label="من تاريخ" value={from} max={to || undefined} onChange={(value) => { setPage(1); setFrom(value); }} />
+        <RepDateInput label="إلى تاريخ" value={to} min={from || undefined} onChange={(value) => { setPage(1); setTo(value); }} />
+        <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3 sm:col-span-2 xl:col-span-4"><span className="text-xs text-stone-500">البحث يتحدّث تلقائياً أثناء الكتابة</span>{(filtered || search) && <button type="button" className="btn-ghost" onClick={reset}>مسح الفلاتر</button>}{!loading && !error && <span className="ms-auto text-sm text-stone-500" role="status">{pagination.total} فاتورة</span>}</div>
       </form>
       {error && (
         <p role="alert" className="rep-error">
@@ -156,24 +129,23 @@ export default function InvoicesList({
           </button>
         </p>
       )}
-      {loading ? (
-        <p>جاري التحميل…</p>
+      {error ? null : loading ? (
+        <div role="status" className="rep-section flex min-h-64 items-center justify-center gap-3 text-sm text-stone-500"><Loader2 aria-hidden className="h-5 w-5 animate-spin" />جاري تحميل الفواتير…</div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border bg-white">
-          <table className="w-full min-w-[700px] text-right">
-            <thead>
+        <div className="rep-section overflow-hidden">
+          <table className="orders-table w-full table-fixed text-right">
+            <thead className="bg-stone-50 text-xs text-stone-500">
               <tr>
                 {[
                   "الفاتورة",
-                  "الحساب",
-                  "المرجع / التواصل",
+                  "الحساب / التواصل",
                   "المنشئ",
                   "الحالة",
                   "الإجمالي",
                   "التاريخ",
                   "",
                 ].map((label, n) => (
-                  <th className="p-3" key={n}>
+                  <th className={`p-3 ${n === 1 ? "md:w-[28%]" : n === 6 ? "md:w-24" : ""}`} key={n}>
                     {label}
                   </th>
                 ))}
@@ -181,20 +153,20 @@ export default function InvoicesList({
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="p-3">#{row.id}</td>
-                  <td>{row.sale_account?.name ?? "يُحدد عند التأكيد"}</td>
-                  <td>{row.sale_account?.name ?? row.contact_text ?? "—"}</td>
-                  <td>{row.creator?.name ?? "طلب عام"}</td>
-                  <td>
+                <tr key={row.id} tabIndex={0} aria-label={`فتح فاتورة رقم ${row.id}`} onClick={(e) => { if (!(e.target as Element).closest("button,a,input,select")) onNavigate(`${path}/${row.id}`); }} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onNavigate(`${path}/${row.id}`); } }} className="cursor-pointer border-t border-stone-100 transition-colors hover:bg-brand-50 focus-visible:bg-brand-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold">
+                  <td data-label="الفاتورة" className="p-3 font-black text-brand">#{row.id}</td>
+                  <td data-label="الحساب / التواصل" className="p-3"><span className="line-clamp-2 font-bold" title={row.sale_account?.name ?? row.contact_text ?? undefined}>{row.sale_account?.name ?? row.contact_text ?? "يُحدد عند التأكيد"}</span>{row.sale_account && row.contact_text && <span className="mt-1 line-clamp-1 text-xs text-stone-500" title={row.contact_text}>{row.contact_text}</span>}</td>
+                  <td data-label="المنشئ" className="p-3 text-xs text-stone-500"><span className="line-clamp-2" title={row.creator?.name}>{row.creator?.name ?? "طلب عام"}</span></td>
+                  <td data-label="الحالة" className="p-3">
                     <OrderStatusBadge status={row.status} />
                   </td>
-                  <td>{formatMoney(row.total_amount)}</td>
-                  <td>{formatOrderDate(row.created_at)}</td>
+                  <td data-label="الإجمالي" className="p-3 font-black tabular-nums">{formatMoney(row.total_amount)}</td>
+                  <td data-label="التاريخ" className="p-3 text-xs text-stone-500">{formatOrderDate(row.created_at)}</td>
                   <td>
                     <button
-                      className="btn-outline"
-                      onClick={() => onNavigate(`${path}/${row.id}`)}
+                      className="btn-ghost"
+                      aria-label={`تفاصيل فاتورة ${row.id}`}
+                      onClick={(e) => { e.stopPropagation(); onNavigate(`${path}/${row.id}`); }}
                     >
                       التفاصيل
                     </button>
@@ -203,29 +175,28 @@ export default function InvoicesList({
               ))}
             </tbody>
           </table>
-          {!rows.length && <p className="p-5">لا توجد فواتير مطابقة.</p>}
+          {!rows.length && <EmptyState title={filtered ? "لا توجد نتائج مطابقة" : "لا توجد فواتير بعد"} description={filtered ? "جرّب تغيير البحث أو مسح الفلاتر." : "ستظهر فواتير البيع هنا."} action={filtered ? <button className="btn-outline" onClick={reset}>مسح الفلاتر</button> : undefined} />}
         </div>
       )}
-      <div className="flex items-center gap-3">
+      {!error && pagination.total > 0 && <nav aria-label="صفحات الفواتير" className="flex justify-center"><div className="flex flex-wrap items-center justify-center gap-1 rounded-2xl border border-stone-200 bg-white p-2 shadow-sm">
         <button
-          className="btn-outline"
+          className="btn-ghost"
           disabled={page <= 1 || loading}
           onClick={() => setPage((n) => n - 1)}
         >
           السابق
         </button>
-        <span>
-          {page} / {Math.max(1, pagination.total_pages)} — {pagination.total}{" "}
-          فاتورة
+        <span aria-current="page" className="rounded-xl bg-brand-50 px-3 py-2 text-sm font-bold">
+          {page} من {Math.max(1, pagination.total_pages)}
         </span>
         <button
-          className="btn-outline"
+          className="btn-ghost"
           disabled={page >= pagination.total_pages || loading}
           onClick={() => setPage((n) => n + 1)}
         >
           التالي
         </button>
-      </div>
+      </div></nav>}
     </div>
   );
 }

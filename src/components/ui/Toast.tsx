@@ -20,17 +20,17 @@ const styleMap = {
 
 export default function Toast({ notifications, onDismiss }: ToastProps) {
   return (
-    <div className="fixed bottom-4 left-4 z-[60] flex flex-col gap-2 animate-slide-in">
+    <div aria-live="polite" aria-atomic="false" className="fixed bottom-4 left-4 right-4 z-[60] flex flex-col items-start gap-2 animate-slide-in sm:right-auto sm:max-w-md">
       {notifications.map((n) => {
         const Icon = iconMap[n.type];
         return (
           <div
             key={n.id}
-            className={`flex items-center gap-3 rounded-xl px-4 py-3 text-white shadow-lg ${styleMap[n.type]} min-w-[280px] max-w-md`}
+            className={`flex w-full min-w-0 items-center gap-3 rounded-xl px-4 py-3 text-white shadow-lg ${styleMap[n.type]} sm:min-w-[280px] sm:max-w-md`}
           >
             <Icon className="h-5 w-5 shrink-0" />
-            <span className="text-sm font-bold flex-1">{n.message}</span>
-            <button onClick={() => onDismiss(n.id)} className="shrink-0 opacity-80 hover:opacity-100">
+            <span className="min-w-0 flex-1 break-words text-sm font-bold">{n.message}</span>
+            <button type="button" aria-label="إغلاق الإشعار" onClick={() => onDismiss(n.id)} className="shrink-0 opacity-80 hover:opacity-100">
               <X className="h-4 w-4" />
             </button>
           </div>

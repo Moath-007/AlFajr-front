@@ -93,22 +93,10 @@ export interface OrdersQuery {
   sort_order?: "asc" | "desc";
 }
 export type OrdersPaginationDto = PaginationResponseDto;
-export type OrderListItemResponseDto = OrderResponseDto;
 export interface OrdersSummaryListResponseDto {
   message: string;
   orders: OrderResponseDto[];
   pagination: OrdersPaginationDto;
-}
-export interface RepresentativeOrderStatsDto {
-  total_orders: number;
-  pending_orders: number;
-  completed_orders: number;
-  cancelled_orders: number;
-  completed_sales_total: DecimalString;
-}
-export interface RepresentativeOrderStatsResponseDto {
-  message: string;
-  stats: RepresentativeOrderStatsDto;
 }
 export interface OrderMessageResponseDto {
   message: string;

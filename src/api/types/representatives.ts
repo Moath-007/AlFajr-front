@@ -32,11 +32,6 @@ export interface RepresentativesListResponseDto {
   representatives: RepresentativeResponseDto[];
 }
 
-export interface RepresentativeDetailsResponseDto {
-  message: string;
-  representative: RepresentativeResponseDto;
-}
-
 export interface UpdateRepresentativeDto {
   name: string;
   phone: string;

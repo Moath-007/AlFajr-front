@@ -1,10 +1,13 @@
+import ProductImage from '@/components/ui/ProductImage';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, Check, PackageOpen, RefreshCw, ShoppingBag } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ApiError, productsService, resolveApiAssetUrl, type CatalogProductDetailsDto, type CatalogVariantResponseDto } from '@/api';
 import { usePublicCart } from '@/public';
+import { formatPrice } from '@/public/formatPrice';
 import QuantityInput from '@/components/ui/QuantityInput';
-import Seo, { SITE_NAME, SITE_URL } from '@/components/seo/Seo';
+import Seo from '@/components/seo/Seo';
+import { SITE_NAME, SITE_URL } from '@/components/seo/site';
 
 interface ProductDetailsPageProps {
   productId: number;
@@ -120,7 +123,7 @@ export default function ProductDetailsPage({ productId, backTo }: ProductDetails
       <Link to={backTo} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-stone-500 transition hover:text-[#162E21]"><ArrowRight className="h-4 w-4" /> العودة إلى المنتجات</Link>
       <div className="grid gap-7 lg:grid-cols-2 lg:items-start">
         <section>
-          <div className="mx-auto aspect-square w-full max-w-[520px] overflow-hidden rounded-2xl border border-stone-200 bg-stone-100">{imageUrl ? <img src={imageUrl} alt={product.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><PackageOpen className="h-14 w-14 text-stone-300" /></div>}</div>
+          <div className="mx-auto aspect-square w-full max-w-[520px] overflow-hidden rounded-2xl border border-stone-200 bg-stone-100">{imageUrl ? <ProductImage src={imageUrl} alt={product.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><PackageOpen className="h-14 w-14 text-stone-300" /></div>}</div>
           {product.images.length > 1 && <div className="mt-4 grid grid-cols-5 gap-3">{product.images.map((image) => { const thumbnail = resolveApiAssetUrl(image.url); return <button key={image.id} onClick={() => setSelectedImageId(image.id)} aria-label={`عرض صورة ${product.name}`} className={`aspect-square overflow-hidden rounded-xl border-2 bg-stone-100 transition ${selectedImage?.id === image.id ? 'border-[#C2A66D]' : 'border-transparent hover:border-stone-300'}`}>{thumbnail ? <img src={thumbnail} alt="" className="h-full w-full object-cover" loading="lazy" /> : <PackageOpen className="m-auto h-full w-6 text-stone-300" />}</button>; })}</div>}
         </section>
 
@@ -151,4 +154,3 @@ export default function ProductDetailsPage({ productId, backTo }: ProductDetails
 
 function StatePage({ title, description, backTo, onRetry }: { title: string; description: string; backTo: string; onRetry?: () => void }) { return <main className="mx-auto grid min-h-[60vh] max-w-xl place-items-center px-4 py-16 text-center"><div><PackageOpen className="mx-auto h-12 w-12 text-stone-300" /><h1 className="mt-5 text-2xl font-black text-[#162E21]">{title}</h1><p className="mt-3 text-sm leading-7 text-stone-500">{description}</p><div className="mt-6 flex justify-center gap-3">{onRetry && <button onClick={onRetry} className="inline-flex items-center gap-2 rounded-xl bg-[#162E21] px-4 py-2.5 text-sm font-black text-white"><RefreshCw className="h-4 w-4" /> إعادة المحاولة</button>}<Link to={backTo} className="rounded-xl border border-stone-200 px-4 py-2.5 text-sm font-bold text-stone-600">العودة للمنتجات</Link></div></div></main>; }
 function DetailsSkeleton() { return <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" aria-label="جاري تحميل المنتج"><div className="grid gap-10 lg:grid-cols-2"><div className="aspect-square animate-pulse rounded-3xl bg-stone-200" /><div className="space-y-5 pt-6"><div className="h-4 w-24 animate-pulse rounded bg-stone-200" /><div className="h-10 w-3/4 animate-pulse rounded bg-stone-200" /><div className="h-24 animate-pulse rounded bg-stone-100" /></div></div></main>; }
-function formatPrice(value: number) { return `${new Intl.NumberFormat('ar-EG-u-nu-latn', { maximumFractionDigits: 2 }).format(value)} ₪`; }

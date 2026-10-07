@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { ApiError, ordersService, type OrderActionResponseDto } from "@/api";
 import { usePublicCart } from "@/public";
+import { formatPrice } from '@/public/formatPrice';
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 interface CheckoutFields {
@@ -340,7 +341,4 @@ function SuccessState({
       </div>
     </main>
   );
-}
-function formatPrice(value: number) {
-  return `${new Intl.NumberFormat("ar-EG-u-nu-latn", { maximumFractionDigits: 2 }).format(value)} ₪`;
 }

@@ -2,7 +2,6 @@ import { apiClient } from '../client';
 import type {
   CreateRepresentativeDto,
   RepresentativeActionResponseDto,
-  RepresentativeDetailsResponseDto,
   RepresentativesListResponseDto,
   UpdateRepresentativeDto,
   UpdateRepresentativePasswordDto,
@@ -17,8 +16,6 @@ export const representativesService = {
     const query = isActive === undefined ? '' : `?is_active=${isActive}`;
     return apiClient.get<RepresentativesListResponseDto>(`/representatives${query}`, { signal });
   },
-  getById: (id: number, signal?: AbortSignal) =>
-    apiClient.get<RepresentativeDetailsResponseDto>(`/representatives/${id}`, { signal }),
   create: (data: CreateRepresentativeDto, signal?: AbortSignal) =>
     apiClient.post<RepresentativeActionResponseDto>('/representatives', data, { signal }),
   update: (id: number, data: UpdateRepresentativeDto, signal?: AbortSignal) =>

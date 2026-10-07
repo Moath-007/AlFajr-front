@@ -84,6 +84,7 @@ export interface CollectionsReportResponseDto {
   activity: { items: CollectionsReportActivityDto[]; pagination: PaginationResponseDto };
 }
 export interface AccountBalancesReportQuery {
+  account_id?: number;
   search?: string;
   balance_side?: 'All' | 'Debit' | 'Credit' | 'Zero';
   page?: number;
@@ -104,6 +105,7 @@ export interface AccountBalancesReportResponseDto {
     balance_base: DecimalString;
     balance_side: 'Debit' | 'Credit' | 'Zero';
     pending_checks_base: DecimalString;
+    bank_checks_base: DecimalString;
   }>;
   pagination: PaginationResponseDto;
 }

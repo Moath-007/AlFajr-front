@@ -11,4 +11,6 @@ export const purchasesService = {
   createForAccount: (data: CreateAccountPurchaseDto) => apiClient.post<CreatePurchaseResponseDto>('/purchases', data),
   update: (id: number, data: UpdatePurchaseDto) => apiClient.put<{ message: string }>(`/purchases/${id}`, data),
   cancel: (id: number) => apiClient.post<{ message: string }>(`/purchases/${id}/cancel`),
+  restore: (id: number) => apiClient.post<{ message: string }>(`/purchases/${id}/restore`),
+  permanentDelete: (id: number) => apiClient.delete<{ message: string }>(`/purchases/${id}/permanent`),
 };

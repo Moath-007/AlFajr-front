@@ -9,6 +9,7 @@ import {
 } from '@/api';
 import { usePublicCatalog } from '@/public/usePublicCatalog';
 import { usePublicCompany } from '@/public/usePublicCompany';
+import { formatCatalogPrice as formatPrice } from '@/public/formatPrice';
 
 type ResourceState<T> =
   | { status: 'loading'; data: T }
@@ -196,5 +197,4 @@ function EmptyState({ title }: { title: string }) { return <div className="round
 function CategorySkeleton() { return <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 lg:grid-cols-4 lg:gap-6" aria-label="جاري تحميل التصنيفات">{Array.from({ length: 8 }, (_, index) => <div key={index} className="aspect-[4/3] animate-pulse rounded-2xl bg-stone-200/70" />)}</div>; }
 function ProductSkeleton() { return <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4" aria-label="جاري تحميل المنتجات">{Array.from({ length: 4 }, (_, index) => <div key={index} className="overflow-hidden rounded-xl border border-stone-200"><div className="aspect-[5/3] animate-pulse bg-stone-200" /><div className="space-y-2 p-3 sm:p-4"><div className="h-3.5 w-3/4 animate-pulse rounded bg-stone-200" /><div className="h-3.5 w-1/2 animate-pulse rounded bg-stone-100" /></div></div>)}</div>; }
 function getErrorMessages(error: unknown, fallback: string) { return error instanceof ApiError ? error.messages : [fallback]; }
-function formatPrice(value: string) { const parsed = Number(value); return Number.isFinite(parsed) ? `${new Intl.NumberFormat('ar-EG-u-nu-latn', { maximumFractionDigits: 2 }).format(parsed)} ₪` : 'السعر غير متاح'; }
 function normalizeCategoryName(value: string) { return value.trim().toLocaleLowerCase().replace(/[أإآ]/g, 'ا').replace(/ـ/g, '').replace(/[\u064B-\u065F\u0670]/g, '').replace(/\s+/g, ' '); }

@@ -1,40 +1,29 @@
 import {
+  categoriesService,
+  colorsService,
+  productsService,
+  type CategoryResponseDto,
+  type ColorResponseDto,
+  type ProductImageResponseDto,
+  type ProductResponseDto
+} from "@/api";
+import { apiMessages } from "@/components/rep/repOrderUtils";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import Select from "@/components/ui/Select";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { ArrowRight, Plus, RefreshCw } from "lucide-react";
+import {
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type DragEvent,
-  type FormEvent,
+  type FormEvent
 } from "react";
-import { ArrowRight, ImagePlus, Plus, RefreshCw, Trash2 } from "lucide-react";
-import {
-  categoriesService,
-  colorsService,
-  productsService,
-  resolveApiAssetUrl,
-  type CategoryResponseDto,
-  type ColorResponseDto,
-  type ProductImageResponseDto,
-  type ProductResponseDto,
-  type UpdateProductVariantDto,
-} from "@/api";
-import { Skeleton } from "@/components/ui/Skeleton";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import Select from "@/components/ui/Select";
-import { apiMessages } from "@/components/rep/repOrderUtils";
+import "./AdminProductFormPage.css";
+import { productVariantPayload, validateProductDraft } from './productDraft';
+import { Field, ImageEditor, VariantEditor, type VariantDraft } from './ProductEditorSections';
 
-type VariantDraft = {
-  key: string;
-  is_active: string;
-  product_variant_id?: number;
-  size: string;
-  color_id: string;
-  retail_price: string;
-  retail_discount: string;
-  wholesale_price: string;
-  wholesale_discount: string;
-};
 const blankVariant = (): VariantDraft => ({
   key: crypto.randomUUID(),
   is_active: "true",
@@ -258,80 +247,22 @@ export default function AdminProductFormPage({
       throw new Error(apiMessages(error, "تعذر إضافة اللون.").join("، "));
     }
   };
-  const validate = () => {
-    const messages: string[] = [];
-    if (!fields.name.trim() || !fields.code.trim() || !fields.category_id)
-      messages.push("اسم المنتج والكود والتصنيف مطلوبة.");
-    if (!variants.length) messages.push("يجب إضافة خيار واحد على الأقل.");
-    variants.forEach((v, i) => {
-      const colorId = Number(v.color_id);
-      if (!v.size.trim() || !v.color_id)
-        messages.push(`بيانات الحجم واللون مطلوبة للخيار ${i + 1}.`);
-      else if (!Number.isInteger(colorId) || colorId <= 0)
-        messages.push("يرجى اختيار لون صحيح لكل خيار.");
-      else if (
-        colorsLoaded &&
-        !colors.some((color) => color.color_id === colorId)
-      )
-        messages.push(
-          `لون الخيار ${i + 1} غير موجود في قائمة الألوان الحالية. يرجى اختيار لون صحيح.`,
-        );
-      const nums = [
-        v.retail_price,
-        v.retail_discount,
-        v.wholesale_price,
-        v.wholesale_discount,
-      ].map(Number);
-      if (nums.some((x) => !Number.isFinite(x) || x < 0))
-        messages.push(
-          `الأسعار والخصومات يجب ألا تكون سالبة في الخيار ${i + 1}.`,
-        );
-      if (nums[1] > nums[0] || nums[3] > nums[2])
-        messages.push(`الخصم يتجاوز السعر في الخيار ${i + 1}.`);
-      if (nums.some((n) => Math.abs(n * 100 - Math.round(n * 100)) > 1e-7))
-        messages.push("الأسعار والخصومات تقبل منزلتين فقط.");
-    });
-    const keys = variants.map(
-      (v) => `${v.size.trim().toLocaleLowerCase()}:${v.color_id}`,
-    );
-    if (new Set(keys).size !== keys.length)
-      messages.push("لا يمكن تكرار نفس الحجم واللون أكثر من مرة.");
-    if (!editing && !primaryCreate) messages.push("الصورة الرئيسية مطلوبة.");
-    if (editing && keptImageIds.length + newImages.length < 1)
-      messages.push("يجب أن يبقى للمنتج صورة واحدة على الأقل.");
-    if (
-      (editing
-        ? keptImageIds.length + newImages.length
-        : 1 + newImages.length) > 11
-    )
-      messages.push("الحد الأقصى لصور المنتج هو 11 صورة.");
-    return messages;
-  };
+  const validate = () => validateProductDraft({ fields, variants, colorsLoaded, colors, editing, primaryCreate, keptImageIds, newImages });
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const found = validate();
     setErrors(found);
     if (!found.length) setConfirmSave(true);
   };
-  const payloadVariants = (): UpdateProductVariantDto[] =>
-    variants.map((v) => ({
-      product_variant_id: v.product_variant_id,
-      ...(editing ? { is_active: v.is_active === "true" } : {}),
-      size: v.size.trim(),
-      color_id: Number(v.color_id),
-      retail_price: Number(v.retail_price),
-      retail_discount: Number(v.retail_discount),
-      wholesale_price: Number(v.wholesale_price),
-      wholesale_discount: Number(v.wholesale_discount),
-    }));
+  const payloadVariants = () => productVariantPayload(variants, editing);
   const imagesChanged = () =>
     editing &&
     (keptImageIds.length !== existingImages.length ||
       keptImageIds.some((id, i) => id !== existingImages.map((x) => x.id)[i]) ||
       primaryExistingId !==
-        (existingImages.find((x) => x.is_primary)?.id ||
-          existingImages[0]?.id ||
-          null) ||
+      (existingImages.find((x) => x.is_primary)?.id ||
+        existingImages[0]?.id ||
+        null) ||
       newImages.length > 0 ||
       primaryNewIndex !== null);
   const save = async () => {
@@ -415,7 +346,10 @@ export default function AdminProductFormPage({
       </div>
     );
   return (
-    <div className="space-y-6">
+    <div
+      className={editing ? "product-editor space-y-3" : "space-y-6"}
+      dir="rtl"
+    >
       <button
         onClick={() => onNavigate("/owner/products")}
         className="inline-flex items-center gap-2 text-sm font-bold text-stone-600"
@@ -447,104 +381,110 @@ export default function AdminProductFormPage({
           {errors.join("، ")}
         </div>
       )}
-      <form onSubmit={submit} className="space-y-6">
-        <section className="rounded-2xl border bg-white p-5">
-          <h2 className="font-black text-brand">البيانات الأساسية</h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Field
-              label="اسم المنتج *"
-              value={fields.name}
-              onChange={(v) => setFields({ ...fields, name: v })}
-            />
-            <Field
-              label="الكود *"
-              value={fields.code}
-              onChange={(v) => setFields({ ...fields, code: v })}
-            />
-            <Select
-              label="التصنيف *"
-              searchable
-              value={fields.category_id}
-              onChange={(category_id) => setFields({ ...fields, category_id })}
-              placeholder="اختر التصنيف"
-              searchPlaceholder="ابحث عن تصنيف"
-              options={categories.map((category) => ({
-                value: String(category.category_id),
-                label: category.name,
-              }))}
-            />
-            <label className="sm:col-span-2">
-              <span className="rep-label">الوصف</span>
-              <textarea
-                className="rep-control min-h-24"
-                value={fields.description}
-                onChange={(e) =>
-                  setFields({ ...fields, description: e.target.value })
-                }
+      <form onSubmit={submit} className={editing ? "space-y-3" : "space-y-6"}>
+        <div className={editing ? "product-editor-overview" : "space-y-6"}>
+          <section className="product-editor-basics rounded-2xl border bg-white p-5">
+            <h2 className="font-black text-brand">البيانات الأساسية</h2>
+            <div className="product-editor-fields mt-4 grid gap-4 sm:grid-cols-2">
+              <Field
+                label="اسم المنتج *"
+                value={fields.name}
+                onChange={(v) => setFields({ ...fields, name: v })}
               />
-            </label>
-            {editing && (
-              <label
-                className={`flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 transition sm:col-span-2 ${fields.is_active ? "border-emerald-200 bg-emerald-50/60" : "border-stone-200 bg-stone-50"}`}
-              >
-                <span>
-                  <b className="block text-sm text-brand">حالة المنتج</b>
-                  <small className="text-stone-500">
-                    {fields.is_active
-                      ? "المنتج فعال ويظهر في القنوات المتاحة."
-                      : "المنتج غير فعال ولن يظهر للبيع."}
-                  </small>
-                </span>
-                <input
-                  type="checkbox"
-                  className="peer sr-only"
-                  checked={fields.is_active}
+              <Field
+                label="الكود *"
+                value={fields.code}
+                onChange={(v) => setFields({ ...fields, code: v })}
+              />
+              <Select
+                label="التصنيف *"
+                searchable
+                value={fields.category_id}
+                onChange={(category_id) =>
+                  setFields({ ...fields, category_id })
+                }
+                placeholder="اختر التصنيف"
+                searchPlaceholder="ابحث عن تصنيف"
+                options={categories.map((category) => ({
+                  value: String(category.category_id),
+                  label: category.name,
+                }))}
+              />
+              <label className="product-editor-description sm:col-span-2">
+                <span className="rep-label">الوصف</span>
+                <textarea
+                  className="rep-control min-h-24"
+                  value={fields.description}
                   onChange={(e) =>
-                    setFields({ ...fields, is_active: e.target.checked })
+                    setFields({ ...fields, description: e.target.value })
                   }
                 />
-                <span
-                  className="relative h-7 w-12 shrink-0 rounded-full bg-stone-300 transition peer-checked:bg-emerald-600 peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 after:absolute after:right-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:-translate-x-5"
-                  aria-hidden="true"
-                />
               </label>
-            )}
-          </div>
-        </section>
-        <ImageEditor
-          editing={editing}
-          existing={existingImages}
-          keptIds={keptImageIds}
-          setKeptIds={setKeptImageIds}
-          primaryExistingId={primaryExistingId}
-          setPrimaryExistingId={setPrimaryExistingId}
-          primaryCreate={primaryCreate}
-          setPrimaryCreate={(f) =>
-            setPrimaryCreate(f ? acceptFiles([f])[0] || null : null)
-          }
-          setNewImages={(files) => setNewImages(acceptFiles(files))}
-          removeNewImage={(index) => {
-            setNewImages((files) =>
-              files.filter((_, itemIndex) => itemIndex !== index),
-            );
-            setPrimaryNewIndex((current) =>
-              current === index
-                ? null
-                : current !== null && current > index
-                  ? current - 1
-                  : current,
-            );
-          }}
-          primaryNewIndex={primaryNewIndex}
-          setPrimaryNewIndex={setPrimaryNewIndex}
-          previews={previewFiles}
-        />
-        <section className="rounded-2xl border bg-white p-5">
+              {editing && (
+                <label
+                  className={`product-editor-status flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 transition sm:col-span-2 ${fields.is_active ? "border-emerald-200 bg-emerald-50/60" : "border-stone-200 bg-stone-50"}`}
+                >
+                  <span>
+                    <b className="block text-sm text-brand">حالة المنتج</b>
+                    <small className="text-stone-500">
+                      {fields.is_active
+                        ? "المنتج فعال ويظهر في القنوات المتاحة."
+                        : "المنتج غير فعال ولن يظهر للبيع."}
+                    </small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={fields.is_active}
+                    onChange={(e) =>
+                      setFields({ ...fields, is_active: e.target.checked })
+                    }
+                  />
+                  <span
+                    className="relative h-7 w-12 shrink-0 rounded-full bg-stone-300 transition peer-checked:bg-emerald-600 peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 after:absolute after:right-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:-translate-x-5"
+                    aria-hidden="true"
+                  />
+                </label>
+              )}
+            </div>
+          </section>
+          <ImageEditor
+            editing={editing}
+            existing={existingImages}
+            keptIds={keptImageIds}
+            setKeptIds={setKeptImageIds}
+            primaryExistingId={primaryExistingId}
+            setPrimaryExistingId={setPrimaryExistingId}
+            primaryCreate={primaryCreate}
+            setPrimaryCreate={(f) =>
+              setPrimaryCreate(f ? acceptFiles([f])[0] || null : null)
+            }
+            setNewImages={(files) => setNewImages(acceptFiles(files))}
+            removeNewImage={(index) => {
+              setNewImages((files) =>
+                files.filter((_, itemIndex) => itemIndex !== index),
+              );
+              setPrimaryNewIndex((current) =>
+                current === index
+                  ? null
+                  : current !== null && current > index
+                    ? current - 1
+                    : current,
+              );
+            }}
+            primaryNewIndex={primaryNewIndex}
+            setPrimaryNewIndex={setPrimaryNewIndex}
+            previews={previewFiles}
+          />
+        </div>
+        <section className="product-editor-variants rounded-2xl border bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-black text-brand">الخيارات والأسعار</h2>
+              <h2 className="font-black text-brand">
+                الأصناف والأسعار ({variants.length})
+              </h2>
               <p className="text-xs text-stone-500">
-                معرفات الخيارات الحالية تبقى مرتبطة بنفس السجل عند التعديل.
+                الحجم واللون وأسعار البيع لكل صنف.
               </p>
             </div>
             <button
@@ -556,67 +496,58 @@ export default function AdminProductFormPage({
               إضافة خيار
             </button>
           </div>
-          <div className="mt-4 space-y-4">
-            {variants.map((v, index) => (
-              <VariantEditor
-                key={v.key}
-                value={v}
-                index={index}
-                colors={colors}
-                onCreateColor={createColor}
-                onChange={(field, value) => setVariant(v.key, field, value)}
-                onRemove={() =>
-                  setVariants((all) =>
-                    v.product_variant_id
-                      ? all.map((x) =>
-                          x.key === v.key
-                            ? {
+          <div className="product-variants-table-wrap mt-3">
+            <table className="product-variants-table">
+              <thead>
+                <tr>
+                  {[
+                    "الصنف",
+                    "الحجم",
+                    "اللون",
+                    "سعر الأونلاين",
+                    "خصم الأونلاين",
+                    "سعر الجملة",
+                    "خصم الجملة",
+                    "الحالة",
+                    "الإجراء",
+                  ].map((label) => (
+                    <th key={label} scope="col">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {variants.map((v, index) => (
+                  <VariantEditor
+                    key={v.key}
+                    value={v}
+                    index={index}
+                    colors={colors}
+                    onCreateColor={createColor}
+                    onChange={(field, value) => setVariant(v.key, field, value)}
+                    onRemove={() =>
+                      setVariants((all) =>
+                        v.product_variant_id
+                          ? all.map((x) =>
+                            x.key === v.key
+                              ? {
                                 ...x,
                                 is_active:
                                   x.is_active === "true" ? "false" : "true",
                               }
-                            : x,
-                        )
-                      : all.filter((x) => x.key !== v.key),
-                  )
-                }
-              />
-            ))}
+                              : x,
+                          )
+                          : all.filter((x) => x.key !== v.key),
+                      )
+                    }
+                  />
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
-        {editing && productId && (
-          <button
-            type="button"
-            className="btn-outline text-red-700"
-            disabled={saving}
-            onClick={() => {
-              if (
-                !window.confirm(
-                  "حذف المنتج نهائيًا؟ يرفض النظام حذف أي منتج له مخزون أو تاريخ أعمال. التغييرات غير المحفوظة لن تُحفظ.",
-                )
-              )
-                return;
-              setSaving(true);
-              void productsService
-                .permanentDelete(productId)
-                .then((result) => {
-                  initialSnapshot.current = "";
-                  onDirtyChange(false);
-                  onNotify(result.message, "success");
-                  onNavigate("/owner/products");
-                })
-                .catch((error) =>
-                  setErrors(
-                    apiMessages(error, "تعذر الحذف؛ استخدم تعطيل المنتج"),
-                  ),
-                )
-                .finally(() => setSaving(false));
-            }}
-          >
-            حذف نهائي لمنتج غير مستخدم
-          </button>
-        )}
-        <div className="sticky bottom-3 z-20 flex gap-3 rounded-2xl border bg-white/95 p-3 shadow-xl backdrop-blur">
+        <div className="product-editor-save sticky bottom-3 z-20 flex gap-3 rounded-2xl border bg-white/95 p-3 shadow-xl backdrop-blur">
           <button
             disabled={saving}
             className="min-h-12 rounded-xl bg-brand px-7 font-black text-white disabled:opacity-50"
@@ -643,387 +574,5 @@ export default function AdminProductFormPage({
         confirmLabel="حفظ"
       />
     </div>
-  );
-}
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-}) {
-  return (
-    <label>
-      <span className="rep-label">{label}</span>
-      <input
-        type={type}
-        min={type === "number" ? 0 : undefined}
-        step={type === "number" ? "0.01" : undefined}
-        className="rep-control"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
-}
-function VariantEditor({
-  value,
-  index,
-  colors,
-  onCreateColor,
-  onChange,
-  onRemove,
-}: {
-  value: VariantDraft;
-  index: number;
-  colors: ColorResponseDto[];
-  onCreateColor: (name: string) => Promise<string>;
-  onChange: (field: keyof VariantDraft, value: string) => void;
-  onRemove: () => void;
-}) {
-  return (
-    <article className="rounded-xl border bg-stone-50 p-4">
-      <div className="mb-3 flex justify-between">
-        <b className="text-brand">
-          الخيار {index + 1}
-          {value.product_variant_id
-            ? ` · #${value.product_variant_id}`
-            : " · جديد"}
-        </b>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-red-600"
-          aria-label={
-            value.product_variant_id
-              ? value.is_active === "true"
-                ? "تعطيل الخيار"
-                : "تفعيل الخيار"
-              : "إزالة الخيار الجديد"
-          }
-        >
-          {value.product_variant_id ? (
-            value.is_active === "true" ? (
-              "تعطيل"
-            ) : (
-              "تفعيل"
-            )
-          ) : (
-            <Trash2 className="h-4 w-4" />
-          )}
-        </button>
-      </div>
-      {value.is_active === "false" && (
-        <p className="text-sm text-amber-700">
-          الخيار معطّل؛ يحتفظ بمخزونه وتاريخه ولا يظهر للاختيار في الكتالوج.
-        </p>
-      )}
-      <div className="grid gap-4 lg:grid-cols-[minmax(220px,0.8fr)_minmax(0,1.2fr)_minmax(0,1.2fr)]">
-        <div className="grid content-start gap-3 sm:grid-cols-2 lg:grid-cols-1">
-          <Field
-            label="الحجم *"
-            value={value.size}
-            onChange={(v) => onChange("size", v)}
-          />
-          <Select
-            label="اللون * (اختر بلا لون عند عدم انطباق اللون)"
-            searchable
-            value={value.color_id}
-            onChange={(colorId) => onChange("color_id", colorId)}
-            onCreate={onCreateColor}
-            placeholder="اختر اللون"
-            searchPlaceholder="ابحث عن لون أو أضف لونًا جديدًا"
-            emptyText="لا توجد ألوان مطابقة"
-            options={[
-              ...(!value.color_id ||
-              colors.some((color) => String(color.color_id) === value.color_id)
-                ? []
-                : [
-                    {
-                      value: value.color_id,
-                      label: `لون غير متاح حاليًا (#${value.color_id})`,
-                    },
-                  ]),
-              ...colors.map((color) => ({
-                value: String(color.color_id),
-                label: color.name,
-              })),
-            ]}
-          />
-        </div>
-        <div className="rounded-xl border border-stone-200 bg-white p-3">
-          <h3 className="mb-3 text-xs font-black text-brand">سعر الأونلاين</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-            <Field
-              type="number"
-              label="السعر *"
-              value={value.retail_price}
-              onChange={(v) => onChange("retail_price", v)}
-            />
-            <Field
-              type="number"
-              label="الخصم"
-              value={value.retail_discount}
-              onChange={(v) => onChange("retail_discount", v)}
-            />
-          </div>
-        </div>
-        <div className="rounded-xl border border-stone-200 bg-white p-3">
-          <h3 className="mb-3 text-xs font-black text-brand">سعر الجملة</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-            <Field
-              type="number"
-              label="السعر *"
-              value={value.wholesale_price}
-              onChange={(v) => onChange("wholesale_price", v)}
-            />
-            <Field
-              type="number"
-              label="الخصم"
-              value={value.wholesale_discount}
-              onChange={(v) => onChange("wholesale_discount", v)}
-            />
-          </div>
-        </div>
-      </div>
-    </article>
-  );
-}
-function ImageEditor({
-  editing,
-  existing,
-  keptIds,
-  setKeptIds,
-  primaryExistingId,
-  setPrimaryExistingId,
-  primaryCreate,
-  setPrimaryCreate,
-  setNewImages,
-  removeNewImage,
-  primaryNewIndex,
-  setPrimaryNewIndex,
-  previews,
-}: {
-  editing: boolean;
-  existing: ProductImageResponseDto[];
-  keptIds: number[];
-  setKeptIds: (v: number[]) => void;
-  primaryExistingId: number | null;
-  setPrimaryExistingId: (v: number | null) => void;
-  primaryCreate: File | null;
-  setPrimaryCreate: (v: File | null) => void;
-  setNewImages: (v: File[]) => void;
-  removeNewImage: (index: number) => void;
-  primaryNewIndex: number | null;
-  setPrimaryNewIndex: (v: number | null) => void;
-  previews: { file: File; url: string }[];
-}) {
-  const [dragTarget, setDragTarget] = useState<"primary" | "additional" | null>(
-    null,
-  );
-  const droppedFiles = (event: DragEvent<HTMLElement>) => {
-    event.preventDefault();
-    return Array.from(event.dataTransfer.files);
-  };
-  const dropPrimary = (event: DragEvent<HTMLLabelElement>) => {
-    const [file] = droppedFiles(event);
-    setDragTarget(null);
-    if (file) setPrimaryCreate(file);
-  };
-  const dropAdditional = (event: DragEvent<HTMLLabelElement>) => {
-    const files = droppedFiles(event);
-    setDragTarget(null);
-    if (files.length) setNewImages(files);
-  };
-  return (
-    <section className="rounded-2xl border bg-white p-5">
-      <h2 className="font-black text-brand">الصور</h2>
-      <p className="mt-1 text-xs text-stone-500">
-        JPG أو PNG أو WEBP. الحد النهائي 11 صورة.
-      </p>
-      {editing && (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          {existing.map((img) => {
-            const kept = keptIds.includes(img.id);
-            return (
-              <div
-                key={img.id}
-                className={`rounded-xl border p-2 ${kept ? "" : "opacity-40"}`}
-              >
-                <img
-                  src={resolveApiAssetUrl(img.url) || ""}
-                  alt=""
-                  className="aspect-square w-full rounded-lg object-cover"
-                />
-                <label className="mt-2 flex items-center gap-1 text-xs">
-                  <input
-                    type="radio"
-                    name="primary-image"
-                    disabled={!kept}
-                    checked={
-                      primaryExistingId === img.id && primaryNewIndex === null
-                    }
-                    onChange={() => {
-                      setPrimaryExistingId(img.id);
-                      setPrimaryNewIndex(null);
-                    }}
-                  />
-                  رئيسية
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (kept) {
-                      const next = keptIds.filter((id) => id !== img.id);
-                      setKeptIds(next);
-                      if (primaryExistingId === img.id)
-                        setPrimaryExistingId(next[0] || null);
-                    } else setKeptIds([...keptIds, img.id]);
-                  }}
-                  className="mt-1 text-xs font-bold text-red-600"
-                >
-                  {kept ? "إزالة" : "استعادة"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        {!editing && (
-          <div className="rounded-xl">
-            <span className="rep-label">الصورة الرئيسية *</span>
-            <input
-              id="product-primary-image"
-              type="file"
-              className="peer sr-only"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => setPrimaryCreate(e.target.files?.[0] || null)}
-            />
-            <label
-              htmlFor="product-primary-image"
-              onDragEnter={(event) => {
-                event.preventDefault();
-                setDragTarget("primary");
-              }}
-              onDragOver={(event) => event.preventDefault()}
-              onDragLeave={() => setDragTarget(null)}
-              onDrop={dropPrimary}
-              className={`flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-5 text-center shadow-sm transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 ${dragTarget === "primary" ? "scale-[1.01] border-gold bg-gold/15 shadow-lg ring-4 ring-gold/15" : "border-stone-300 bg-stone-50 hover:-translate-y-0.5 hover:border-gold hover:bg-gold/5 hover:shadow-md"}`}
-            >
-              <ImagePlus className="h-7 w-7 text-gold-dark" />
-              <strong className="text-sm text-brand">
-                اسحب الصورة الرئيسية وأفلتها هنا
-              </strong>
-              <span className="text-xs text-stone-500">أو اضغط للاختيار</span>
-            </label>
-            <p
-              className="mt-2 truncate text-xs text-stone-500"
-              aria-live="polite"
-            >
-              {primaryCreate?.name || "لم يتم اختيار صورة"}
-            </p>
-          </div>
-        )}
-        <div className="rounded-xl">
-          <span className="rep-label">
-            {editing ? "صور جديدة" : "صور إضافية"}
-          </span>
-          <input
-            id="product-additional-images"
-            type="file"
-            className="peer sr-only"
-            multiple
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(e) => setNewImages(Array.from(e.target.files || []))}
-          />
-          <label
-            htmlFor="product-additional-images"
-            onDragEnter={(event) => {
-              event.preventDefault();
-              setDragTarget("additional");
-            }}
-            onDragOver={(event) => event.preventDefault()}
-            onDragLeave={() => setDragTarget(null)}
-            onDrop={dropAdditional}
-            className={`flex min-h-40 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-5 text-center shadow-sm transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 ${dragTarget === "additional" ? "scale-[1.01] border-gold bg-gold/15 shadow-lg ring-4 ring-gold/15" : "border-stone-300 bg-stone-50 hover:-translate-y-0.5 hover:border-gold hover:bg-gold/5 hover:shadow-md"}`}
-          >
-            <ImagePlus className="h-7 w-7 text-gold-dark" />
-            <strong className="text-sm text-brand">
-              اسحب الصور وأفلتها هنا
-            </strong>
-            <span className="text-xs text-stone-500">
-              أو اضغط لاختيار عدة صور
-            </span>
-          </label>
-          <p className="mt-2 text-xs text-stone-500" aria-live="polite">
-            {previews.length - (primaryCreate ? 1 : 0) > 0
-              ? `تم اختيار ${previews.length - (primaryCreate ? 1 : 0)} صورة`
-              : "لم يتم اختيار صور إضافية"}
-          </p>
-        </div>
-      </div>
-      {previews.length > 0 && (
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-          {previews.map(({ file, url }, combinedIndex) => {
-            const newIndex = combinedIndex - (primaryCreate ? 1 : 0);
-            const isAdditional = newIndex >= 0;
-            return (
-              <div
-                key={`${file.name}-${combinedIndex}`}
-                className="rounded-xl border p-2"
-              >
-                <img
-                  src={url}
-                  alt=""
-                  className="aspect-square w-full rounded-lg object-cover"
-                />
-                <p className="mt-1 truncate text-[10px]">{file.name}</p>
-                {(!primaryCreate || isAdditional) && (
-                  <button
-                    type="button"
-                    onClick={() => removeNewImage(newIndex)}
-                    className="mt-1 text-xs font-bold text-red-600"
-                  >
-                    إزالة
-                  </button>
-                )}
-                {primaryCreate && !isAdditional && (
-                  <button
-                    type="button"
-                    onClick={() => setPrimaryCreate(null)}
-                    className="mt-1 text-xs font-bold text-red-600"
-                  >
-                    إزالة
-                  </button>
-                )}
-                {editing && isAdditional && (
-                  <label className="mt-1 flex items-center gap-1 text-xs">
-                    <input
-                      type="radio"
-                      name="primary-image"
-                      checked={primaryNewIndex === newIndex}
-                      onChange={() => {
-                        setPrimaryNewIndex(newIndex);
-                        setPrimaryExistingId(null);
-                      }}
-                    />
-                    رئيسية
-                  </label>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-      <div className="mt-3 flex items-center gap-2 text-xs text-stone-500">
-        <ImagePlus className="h-4 w-4" />
-        لا يتم رفع الصور إلا عند الحفظ النهائي.
-      </div>
-    </section>
   );
 }

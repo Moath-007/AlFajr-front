@@ -2,6 +2,7 @@ import type { DecimalString, IsoDateTimeString, NumericId } from './common';
 import type { ApiOrderStatus } from './orders';
 
 export interface AdminDashboardQuery {
+  stock_threshold?: number;
   range?: 'current_month' | 'all_time';
   date_from?: string;
   date_to?: string;
@@ -13,7 +14,7 @@ export interface AdminDashboardResponseDto {
     treasury_base_balance: DecimalString };
   orders: { completed: number; pending: number; cancelled: number; pending_online: number;
     scope: 'current_document_state' };
-  stock_alerts: { low: number; out: number; negative: number; low_threshold: 5 };
+  stock_alerts: { low: number; out: number; negative: number; low_threshold: number };
   check_alerts: { due_today: number; overdue: number; scope: 'incoming_in_treasury_bank_collection' };
   recent_orders: Array<{ order_id: NumericId; status: ApiOrderStatus;
     total_amount: DecimalString; created_at: IsoDateTimeString;    sale_account: { id: NumericId; name: string } | null }>;

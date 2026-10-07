@@ -225,7 +225,7 @@ export default function PublicSelect({
             width: position.width,
             maxHeight: position.maxHeight,
           } satisfies CSSProperties}
-          className="z-[60] overflow-y-auto overscroll-contain rounded-2xl border border-stone-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(22,46,33,0.16)] animate-fade-in"
+          className="z-[1100] overflow-y-auto overscroll-contain rounded-2xl border border-stone-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(22,46,33,0.16)] animate-fade-in"
         >
           {normalizedOptions.map((option, index) => {
             const isSelected = option.value === value;

@@ -6,7 +6,10 @@ import {
   type SalesReturnDto,
   type SalesReturnInput,
 } from "@/api";
+import { RepDateInput } from '@/components/rep/RepFormControls';
+import './ReturnsOperationsPage.css';
 import AccountPicker from './AccountPicker';
+import ReturnVariantSelect from './ReturnVariantSelect';
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import Modal from "@/components/ui/Modal";
 import { apiMessages } from "@/components/rep/repOrderUtils";
@@ -16,21 +19,18 @@ type Line = {
   key: string;
   customer_return_item_id?: number;
   product_variant_id: number;
+  variant: ReturnVariant;
   quantity: string;
   price: string;
 };
-const variantLabel = (v: ReturnVariant) =>
-  `${v.products.name} · ${v.products.code} · ${v.colors.name} · ${v.size}${!v.is_active || !v.products.is_active ? " (غير نشط)" : ""}`;
 export default function SalesReturnEditor({
   document,
   accounts,
-  variants,
   onClose,
   onSaved,
 }: {
   document: SalesReturnDto | null;
   accounts: AccountIdentityOption[];
-  variants: ReturnVariant[];
   onClose: () => void;
   onSaved: (id: number) => void;
 }) {
@@ -50,12 +50,11 @@ export default function SalesReturnEditor({
       key: String(i.customer_return_item_id),
       customer_return_item_id: i.customer_return_item_id,
       product_variant_id: i.product_variant_id,
+      variant: { ...i.product_variants, product_variant_id: i.product_variant_id },
       quantity: String(i.quantity),
       price: String(i.unit_price),
     })) ?? [],
   );
-  const [search, setSearch] = useState("");
-  const [picked, setPicked] = useState(0);
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -126,9 +125,11 @@ export default function SalesReturnEditor({
       <Modal
         open
         onClose={saving ? () => undefined : onClose}
-        title={document ? `تعديل ${document.return_number}` : "إنشاء مردود بيع"}
+        title={document ? `تعديل ${document.return_number}` : "إنشاء مردود مبيعات"}
+        className="return-editor-modal"
         size="return"
         mobileFullscreen
+        footer={<div dir="rtl" className="return-editor-total"><div><span className="text-xs text-stone-500">الإجمالي · {lines.length} بند</span><b className="block text-xl text-brand">{formatMoney(total)}</b></div><button className="btn-primary min-h-11" onClick={review} disabled={saving}>مراجعة وحفظ</button></div>}
       >
         <div dir="rtl" className="space-y-4">
           {error && (
@@ -136,94 +137,27 @@ export default function SalesReturnEditor({
               {error}
             </p>
           )}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="return-editor-meta">
             <AccountPicker accounts={accounts} value={account || null} onChange={id => setAccount(id ?? 0)} label="الحساب العام" kinds={['General']} />
-            <label>
-              تاريخ المردود
-              <input
-                className="rep-control"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </label>
+            <RepDateInput label="تاريخ المردود" value={date} onChange={setDate} disabled={saving}/>
           </div>
-          <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
-            <input
-              className="rep-control"
-              aria-label="البحث عن صنف"
-              placeholder="ابحث عن الصنف أو الرمز"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <select
-              aria-label="اختيار الخيار"
-              className="rep-control"
-              value={picked}
-              onChange={(e) => setPicked(Number(e.target.value))}
-            >
-              <option value={0}>اختر المنتج / اللون / المقاس</option>
-              {variants
-                .filter((v) =>
-                  variantLabel(v)
-                    .toLowerCase()
-                    .includes(search.trim().toLowerCase()),
-                )
-                .map((v) => (
-                  <option
-                    key={v.product_variant_id}
-                    value={v.product_variant_id}
-                  >
-                    {variantLabel(v)}
-                  </option>
-                ))}
-            </select>
-            <button
-              className="btn-outline"
-              disabled={!picked}
-              onClick={() => {
-                setLines((rows) => [
-                  ...rows,
-                  {
-                    key: crypto.randomUUID(),
-                    product_variant_id: picked,
-                    quantity: "1",
-                    price: "",
-                  },
-                ]);
-                setPicked(0);
-              }}
-            >
-              إضافة سطر
-            </button>
+          <section className="return-editor-add"><h4 className="return-editor-section-title">إضافة الأصناف</h4><div className="return-editor-add-controls">
+            <ReturnVariantSelect disabled={saving} onChange={variant => setLines(rows => [...rows, { key: crypto.randomUUID(), product_variant_id: variant.product_variant_id, variant, quantity: "1", price: "" }])} />
           </div>
+          </section>
+          <h4 className="return-editor-section-title">بنود المردود ({lines.length})</h4>
+          <p className="text-xs text-stone-500">سعر المردود المالي مستقل عن تكلفة المخزون. يمكن تكرار الصنف في أكثر من بند.</p>
+          {!lines.length&&<p className="returns-state">أضف الأصناف المراد إرجاعها.</p>}
           <div className="space-y-3">
             {lines.map((l) => (
               <div
                 key={l.key}
-                className="grid gap-2 rounded-xl border p-3 sm:grid-cols-[2fr_90px_110px_90px_auto]"
+                className="return-editor-line"
               >
-                <select
-                  className="rep-control"
-                  aria-label="صنف السطر"
-                  value={l.product_variant_id}
-                  onChange={(e) =>
-                    update(l.key, {
-                      product_variant_id: Number(e.target.value),
-                    })
-                  }
-                >
-                  {variants.map((v) => (
-                    <option
-                      key={v.product_variant_id}
-                      value={v.product_variant_id}
-                    >
-                      {variantLabel(v)}
-                    </option>
-                  ))}
-                </select>
+                <ReturnVariantSelect value={l.variant} disabled={saving} onChange={variant => update(l.key, { product_variant_id: variant.product_variant_id, variant })} />
+
                 <label>
-                  الكمية
+                  <span className="rep-label">الكمية</span>
                   <input
                     className="rep-control"
                     type="number"
@@ -236,7 +170,7 @@ export default function SalesReturnEditor({
                   />
                 </label>
                 <label>
-                  السعر ₪
+                  <span className="rep-label">سعر المردود ₪</span>
                   <input
                     className="rep-control"
                     type="number"
@@ -246,9 +180,9 @@ export default function SalesReturnEditor({
                     onChange={(e) => update(l.key, { price: e.target.value })}
                   />
                 </label>
-                <b>{formatMoney(Number(l.quantity) * Number(l.price))}</b>
+                <div><span className="rep-label">قيمة البند</span><b>{formatMoney(Number(l.quantity) * Number(l.price))}</b></div>
                 <button
-                  className="text-red-700"
+                  className="btn-ghost min-h-11 text-red-700"
                   onClick={() =>
                     setLines((rows) => rows.filter((r) => r.key !== l.key))
                   }
@@ -259,19 +193,15 @@ export default function SalesReturnEditor({
             ))}
           </div>
           <label className="block">
-            ملاحظات
+            <span className="rep-label">ملاحظات (اختيارية)</span>
             <textarea
               className="rep-control"
+              rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
             />
           </label>
-          <div className="flex justify-between gap-3">
-            <b>الإجمالي: {formatMoney(total)} ₪</b>
-            <button className="btn-primary" onClick={review} disabled={saving}>
-              مراجعة وحفظ
-            </button>
-          </div>
+
         </div>
       </Modal>
       <ConfirmDialog
@@ -281,7 +211,7 @@ export default function SalesReturnEditor({
         loading={saving}
         severity="normal"
         title="تأكيد المردود"
-        message={`تأكيد ${document ? "جميع تغييرات الحساب والتاريخ والبنود والأسعار والملاحظات" : "إنشاء المردود"} بإجمالي ${formatMoney(total)} ₪ على حساب ${accounts.find((a) => a.account_id === account)?.name ?? ""}؟`}
+        message={`تأكيد ${document ? "جميع تغييرات الحساب والتاريخ والبنود والأسعار والملاحظات" : "إنشاء المردود"} بإجمالي ${formatMoney(total)} على حساب ${accounts.find((a) => a.account_id === account)?.name ?? ""}؟`}
       />
     </>
   );

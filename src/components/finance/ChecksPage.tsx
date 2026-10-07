@@ -1,119 +1,42 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { checksService, currenciesService, ledgerService, type CurrencyDto, type IncomingCheckMovementAction, type IncomingCheckMovementDto, type LedgerAccount, type ManagedCheck, type ManagedCheckEditDto, type ManagedCheckEvent, type ManagedCheckLocation, type ManagedChecksQuery, type ManagedChecksResponse } from '@/api';
+import { checksService, currenciesService, ledgerService, type CurrencyDto, type IncomingCheckMovementAction, type IncomingCheckMovementDto, type LedgerAccount, type ManagedCheck, type ManagedCheckEditDto, type ManagedCheckEvent, type ManagedCheckLocation, type ManagedChecksQuery } from '@/api';
 import { ApiError } from '@/api/errors';
-import { apiMessages, formatOrderDate, formatOrderDateTime } from '@/components/rep/repOrderUtils';
 import { RepDateInput, RepSelect } from '@/components/rep/RepFormControls';
-import AccountPicker from './AccountPicker';
+import { apiMessages, formatOrderDateTime } from '@/components/rep/repOrderUtils';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-
-const locationLabels: Record<ManagedCheckLocation, string> = {
-  TREASURY: 'الخزنة',
-  BANK: 'البنك',
-  COLLECTION: 'برسم التحصيل',
-  ENDORSED_PARTY: 'مجيّر لطرف',
-  SOURCE_PARTY: 'لدى المصدر',
-  CASHED: 'مصروف نقدًا',
-  CANCELLED: 'ملغى',
-  ISSUED: 'صادر',
-  CLEARED: 'صُرف من البنك',
-  RETURNED_OUTGOING: 'شيك صادر راجع',
-};
-const locations = Object.entries(locationLabels) as Array<[ManagedCheckLocation, string]>;
-const number = (value: string) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed)
-    ? parsed.toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : value;
-};
-const date = (value: string) => formatOrderDate(value.slice(0, 10));
-const movementLabels: Record<IncomingCheckMovementAction, string> = {
-  DEPOSITED: 'إيداع في البنك',
-  SENT_TO_COLLECTION: 'إرسال للتحصيل',
-  RETURNED_FROM_BANK: 'إرجاع من البنك إلى الخزنة',
-  ENDORSED: 'تجيير لطرف',
-  ENDORSEMENT_RETURNED: 'إرجاع من الطرف إلى الخزنة',
-  RETURNED_TO_SOURCE: 'إرجاع إلى مصدر الشيك',
-  RETRIEVED_FROM_SOURCE: 'استرداد من المصدر إلى الخزنة',
-  CASHED: 'صرف الشيك نقدًا',
-};
-const eventLabels: Record<string, string> = {
-  ...movementLabels,
-  RECEIVED: 'استلام الشيك',
-  OUTGOING_ISSUED: 'إصدار شيك صادر',
-  OUTGOING_CLEARED: 'تأكيد صرف الشيك الصادر',
-  OUTGOING_RETURNED: 'إرجاع الشيك الصادر',
-  PAYMENT_CANCELLED: 'إلغاء الدفعة المرتبطة بالشيك',
-  DETAILS_EDITED: 'تعديل بيانات الشيك',
-  MOVEMENT_CANCELLED: 'التراجع عن حركة',
-};
-const undoableActions = new Set<string>([...Object.keys(movementLabels), 'OUTGOING_CLEARED', 'OUTGOING_RETURNED', 'PAYMENT_CANCELLED']);
-const latestBusinessEvent = (check: ManagedCheck) => [...check.events]
-  .sort((left, right) => right.check_event_id - left.check_event_id)
-  .find((item) => !item.cancelled_at && !['DETAILS_EDITED', 'MOVEMENT_CANCELLED'].includes(item.action));
-const undoableEvent = (check: ManagedCheck): ManagedCheckEvent | null => {
-  const event = latestBusinessEvent(check);
-  return event && undoableActions.has(event.action) && !event.cancels_event_id && event.to_location === check.location ? event : null;
-};
-type OutgoingAction = 'clear' | 'return';
-type CheckReview = { kind: 'movement' | 'undo' | 'outgoing'; title: string; message: string; details: string[]; destructive: boolean };
-const availableOutgoingActions = (check: ManagedCheck): OutgoingAction[] => {
-  if (check.direction !== 'Outgoing') return [];
-  if (check.location === 'ISSUED') return ['clear', 'return'];
-  if (check.location === 'CLEARED') return ['return'];
-  return [];
-};
-const outgoingLabels: Record<OutgoingAction, string> = { clear: 'تأكيد صرف الشيك الصادر', return: 'إرجاع الشيك الصادر' };
-const availableMovements = (check: ManagedCheck): IncomingCheckMovementAction[] => {
-  if (check.direction !== 'Incoming') return [];
-  if (check.location === 'TREASURY') return ['DEPOSITED', 'SENT_TO_COLLECTION', 'ENDORSED', 'RETURNED_TO_SOURCE', 'CASHED'];
-  if ((check.location === 'BANK' || check.location === 'COLLECTION') && check.current_bank_account_id) return ['RETURNED_FROM_BANK'];
-  if (check.location === 'ENDORSED_PARTY' && check.current_party_account_id) return ['ENDORSEMENT_RETURNED'];
-  if (check.location === 'SOURCE_PARTY') return ['RETRIEVED_FROM_SOURCE'];
-  return [];
-};
-const lastBusinessDate = (check: ManagedCheck) => latestBusinessEvent(check)?.operation_date.slice(0, 10);
-const businessToday = () => {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Hebron', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(new Date());
-  const value = (type: string) => parts.find((part) => part.type === type)!.value;
-  return `${value('year')}-${value('month')}-${value('day')}`;
-};
-const firstValidOperationDate = (check: ManagedCheck, action?: IncomingCheckMovementAction) =>
-  [businessToday(), lastBusinessDate(check) ?? '', action === 'DEPOSITED' ? check.due_date.slice(0, 10) : ''].reduce((latest, date) => date > latest ? date : latest, '');
-const bankIdentifiers = (check: ManagedCheck) => {
-  const received = check.events.find((event) => ['RECEIVED', 'OUTGOING_ISSUED'].includes(event.action));
-  const initial = received?.details && typeof received.details === 'object' && !Array.isArray(received.details)
-    ? received.details as Record<string, unknown> : {};
-  const edits = [...check.events].reverse().filter((event) => event.action === 'DETAILS_EDITED' && event.details && typeof event.details === 'object' && !Array.isArray(event.details))
-    .map((event) => event.details as Record<string, unknown>);
-  const value = (key: string) => {
-    const updated = edits.find((details) => Object.prototype.hasOwnProperty.call(details, key));
-    const raw = updated ? updated[key] : initial[key];
-    return typeof raw === 'string' && raw.trim() ? raw : '—';
-  };
-  return { bankNumber: value('bank_number'), branchNumber: value('branch_number'), accountNumber: value('account_number') };
-};
+import Modal from '@/components/ui/Modal';
+import { ChevronLeft, ChevronRight, History, Loader2, Pencil, SlidersHorizontal, Undo2, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import AccountPicker from './AccountPicker';
+import { ActionIcon } from './CheckActionIcon';
+import CheckFiltersPopover from './CheckFiltersPopover';
+import { actionTone, availableMovements, availableOutgoingActions, bankIdentifiers, date, eventLabels, firstValidOperationDate, lastBusinessDate, locationLabels, locations, movementLabels, number, outgoingLabels, undoableEvent, type CheckReview, type OutgoingAction } from './checkPresentation';
+import './ChecksPage.css';
+import ChecksResults from './ChecksResults';
+import { useChecksList } from './useChecksList';
 
 export default function ChecksPage() {
+
   const { id } = useParams();
   const navigate = useNavigate();
   const isDetailPage = id !== undefined;
-  const [searchInput, setSearchInput] = useState('');
-  const [query, setQuery] = useState<ManagedChecksQuery>({ page: 1, limit: 20 });
-  const [response, setResponse] = useState<ManagedChecksResponse | null>(null);
+  const { searchInput, setSearchInput, query, setQuery, response, loading, error, revision, setRevision } = useChecksList(isDetailPage)
+
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const advancedTrigger = useRef<HTMLButtonElement>(null);
+  const closeAdvanced = useCallback(() => { setAdvancedOpen(false); advancedTrigger.current?.focus(); }, []);
+
   const [currencies, setCurrencies] = useState<CurrencyDto[]>([]);
   const [accounts, setAccounts] = useState<LedgerAccount[]>([]);
   const [accountsError, setAccountsError] = useState('');
   const [currencyError, setCurrencyError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [revision, setRevision] = useState(0);
+
   const [selectedId, setSelectedId] = useState<number | null>(() => {
     const value = Number(id);
     return Number.isSafeInteger(value) && value > 0 ? value : null;
   });
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [selected, setSelected] = useState<ManagedCheck | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsError, setDetailsError] = useState('');
@@ -164,28 +87,9 @@ export default function ChecksPage() {
   }, [id]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const search = searchInput.trim() || undefined;
-      setQuery((current) => current.search === search ? current : { ...current, search, page: 1 });
-    }, 350);
-    return () => window.clearTimeout(timer);
-  }, [searchInput]);
-
-  useEffect(() => {
-    if (isDetailPage) return;
-    const controller = new AbortController();
-    setLoading(true);
-    setResponse(null);
-    setError('');
-    checksService.list(query, controller.signal).then(setResponse).catch((reason: unknown) => {
-      if (!controller.signal.aborted) setError(apiMessages(reason, 'تعذر تحميل الشيكات.').join('، '));
-    }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
-  }, [query, revision, isDetailPage]);
-
-  useEffect(() => {
     const controller = new AbortController();
     currenciesService.list(controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
       setCurrencies(Array.isArray(result) ? result : result.items ?? result.currencies ?? []);
       setCurrencyError('');
     }).catch((reason: unknown) => {
@@ -197,6 +101,7 @@ export default function ChecksPage() {
   useEffect(() => {
     const controller = new AbortController();
     ledgerService.accounts(controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
       setAccounts(result);
       setAccountsError('');
     }).catch((reason: unknown) => {
@@ -211,7 +116,7 @@ export default function ChecksPage() {
     setSelected(null);
     setDetailsLoading(true);
     setDetailsError('');
-    checksService.details(selectedId, controller.signal).then(setSelected).catch((reason: unknown) => {
+    checksService.details(selectedId, controller.signal).then(result => { if (!controller.signal.aborted) setSelected(result); }).catch((reason: unknown) => {
       if (!controller.signal.aborted) setDetailsError(apiMessages(reason, 'تعذر تحميل تفاصيل الشيك.').join('، '));
     }).finally(() => { if (!controller.signal.aborted) setDetailsLoading(false); });
     return () => controller.abort();
@@ -251,9 +156,11 @@ export default function ChecksPage() {
     if (!/^\d+(?:\.\d{1,6})?$/.test(editRate) || Number(editRate) <= 0) { setEditError('أدخل سعر صرف صالحًا.'); return; }
     if (!editCurrencyId || !editSourceId || selected.direction === 'Outgoing' && !editBankId) { setEditError('اختر العملة والحساب المرتبط والبنك للشيك الصادر.'); return; }
     const input: ManagedCheckEditDto = {
-      ...(!identifyingLocked && {number, bank_number: editBankNumber.trim(),
+      ...(!identifyingLocked && {
+        number, bank_number: editBankNumber.trim(),
         branch_number: editBranchNumber.trim(), account_number: editAccountNumber.trim(),
-        due_date: editDueDate, payment_notes: editPaymentNotes.trim()}),
+        due_date: editDueDate, payment_notes: editPaymentNotes.trim()
+      }),
       amount: editAmount,
       currency_id: Number(editCurrencyId),
       exchange_rate: editRate,
@@ -331,10 +238,10 @@ export default function ChecksPage() {
     if (needsParty && !party) { setMovementError('اختر حساب طرف موجودًا يختلف عن مصدر الشيك.'); return; }
     const destination = movementAction === 'DEPOSITED' ? 'البنك ' + bank?.name
       : movementAction === 'SENT_TO_COLLECTION' ? 'التحصيل عبر البنك ' + bank?.name
-      : movementAction === 'ENDORSED' ? 'الطرف ' + (party?.name)
-      : movementAction === 'RETURNED_TO_SOURCE' ? 'مصدر الشيك ' + sourceLabel(selected)
-      : movementAction === 'CASHED' ? 'الصندوق ' + cash?.name
-      : 'الخزنة';
+        : movementAction === 'ENDORSED' ? 'الطرف ' + (party?.name)
+          : movementAction === 'RETURNED_TO_SOURCE' ? 'مصدر الشيك ' + sourceLabel(selected)
+            : movementAction === 'CASHED' ? 'الصندوق ' + cash?.name
+              : 'الخزنة';
     if (!confirmed) {
       setReview({
         kind: 'movement', title: movementLabels[movementAction],
@@ -406,10 +313,12 @@ export default function ChecksPage() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(undoDate)) { setUndoError('اختر تاريخ عملية صالحًا.'); return; }
     if (lastBusinessDate(selected) && undoDate < lastBusinessDate(selected)!) { setUndoError('تاريخ التراجع يسبق آخر حركة فعالة للشيك.'); return; }
     if (!confirmed) {
-      setReview({ kind: 'undo', title: 'التراجع عن حركة الشيك',
+      setReview({
+        kind: 'undo', title: 'التراجع عن حركة الشيك',
         message: 'سيُعكس أثر آخر حركة ويعود الشيك إلى حالته السابقة.',
         details: [`الشيك: #${selected.number} · ${amountLabel(selected)}`, `الحركة: ${eventLabels[movement.action] ?? movement.action}`, `تاريخ التراجع: ${date(undoDate)}`],
-        destructive: true });
+        destructive: true
+      });
       return;
     }
     setReview(null);
@@ -454,12 +363,14 @@ export default function ChecksPage() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(outgoingDate)) { setOutgoingError('اختر تاريخ عملية صالحًا.'); return; }
     if (lastBusinessDate(selected) && outgoingDate < lastBusinessDate(selected)!) { setOutgoingError('تاريخ العملية يسبق آخر حركة فعالة للشيك.'); return; }
     if (!confirmed) {
-      setReview({ kind: 'outgoing', title: outgoingLabels[outgoingAction],
+      setReview({
+        kind: 'outgoing', title: outgoingLabels[outgoingAction],
         message: outgoingAction === 'return'
           ? 'سيُعاد الشيك الصادر ويُعكس أثر الدفعة المرتبطة به.'
           : 'سيُسجّل أن الشيك الصادر صُرف من البنك.',
         details: [`الشيك: #${selected.number} · ${amountLabel(selected)}`, `تاريخ العملية: ${date(outgoingDate)}`],
-        destructive: outgoingAction === 'return' });
+        destructive: outgoingAction === 'return'
+      });
       return;
     }
     setReview(null);
@@ -493,65 +404,79 @@ export default function ChecksPage() {
   const changePage = (page: number) => { resetSelection(); setQuery((current) => ({ ...current, page })); };
   const pagination = response?.pagination;
 
-  return <div className="space-y-5" dir="rtl">
-    <ConfirmDialog open={editReview} onClose={()=>setEditReview(false)} onConfirm={()=>void saveEdit(undefined,true)} loading={editSaving} severity="normal" title="اعتماد تصحيح الشيك" message="سيحفظ النظام تفاصيل التصحيح ويعكس ويعيد ترحيل القيود عند تغيير البيانات المالية. لا ينشئ صرف الشيك الصادر أثرًا ماليًا إضافيًا." />
-    {!isDetailPage && <>
-    <header className="flex flex-wrap items-end justify-between gap-3 border-b pb-4">
-      <div><p className="text-xs font-black text-gold-dark">عرض الشيكات</p><h1 className="text-3xl font-black text-brand">الشيكات المُدارة</h1><p className="text-sm text-stone-500">القائمة والموقع والاستحقاق كما يعيدها النظام. <Link className="text-gold-dark underline" to="/owner/treasury">عرض الخزنة</Link></p></div>
-      <button type="button" className="btn-outline" onClick={() => { setEditing(false); setMovementAction(null); setUndoEventId(null); setOutgoingAction(null); setRevision((value) => value + 1); }} disabled={loading || editSaving || movementSaving || undoSaving || outgoingSaving}>تحديث</button>
-    </header>
+  const clearFilters = () => { setSearchInput(''); resetSelection(); setQuery({ page: 1, limit: 20 }); };
+  const clearFilter = (keys: Array<keyof ManagedChecksQuery>) => { resetSelection(); if (keys.includes('search')) setSearchInput(''); setQuery(current => { const next = { ...current, page: 1 }; keys.forEach(key => delete next[key]); return next; }); };
+  const filterChips: Array<{ label: string; keys: Array<keyof ManagedChecksQuery>; advanced?: boolean }> = [
+    ...(searchInput.trim() ? [{ label: `بحث: ${searchInput.trim()}`, keys: ['search' as const] }] : []),
+    ...(query.direction ? [{ label: query.direction === 'Incoming' ? 'وارد' : 'صادر', keys: ['direction' as const] }] : []),
+    ...(query.location ? [{ label: locationLabels[query.location], keys: ['location' as const], advanced: true }] : []),
+    ...(query.due_status ? [{ label: query.due_status === 'Due' ? 'مستحق' : 'غير مستحق', keys: ['due_status' as const], advanced: true }] : []),
+    ...(query.currency_id ? [{ label: currencies.find(c => c.currency_id === query.currency_id)?.code ?? 'عملة محددة', keys: ['currency_id' as const], advanced: true }] : []),
+    ...(query.due_from || query.due_to ? [{ label: query.due_from && query.due_to ? `${date(query.due_from)} — ${date(query.due_to)}` : query.due_from ? `من ${date(query.due_from)}` : `حتى ${date(query.due_to!)}`, keys: ['due_from' as const, 'due_to' as const], advanced: true }] : []),
+  ];
+  const advancedCount = filterChips.filter(chip => chip.advanced).length;
+  return <div className={`checks-page ${!isDetailPage ? 'checks-list-page' : ''} space-y-5 ${!isDetailPage && pagination && pagination.total_pages > 1 ? 'checks-has-pagination' : ''}`} dir="rtl">
 
-    <section className="grid gap-3 rounded-2xl border bg-white p-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="فلاتر الشيكات">
-      <label className="block"><span className="rep-label">بحث برقم الشيك أو اسم الحساب</span><input className="rep-control" value={searchInput} onChange={(event) => { setSearchInput(event.target.value); resetSelection(); }} /></label>
-      <RepSelect label="الموقع" value={query.location ?? ''} onChange={(value) => { resetSelection(); setQuery((current) => ({ ...current, location: value as ManagedCheckLocation || undefined, page: 1 })); }} options={[{ value: '', label: 'كل المواقع' }, ...locations.map(([value, label]) => ({ value, label }))]} />
-      <RepSelect label="الاستحقاق" value={query.due_status ?? ''} onChange={(value) => { resetSelection(); setQuery((current) => ({ ...current, due_status: value as 'Due' | 'NotDue' || undefined, page: 1 })); }} options={[{ value: '', label: 'الكل' }, { value: 'Due', label: 'مستحق' }, { value: 'NotDue', label: 'غير مستحق' }]} />
-      <RepSelect label="العملة" value={String(query.currency_id ?? '')} onChange={(value) => { resetSelection(); setQuery((current) => ({ ...current, currency_id: value ? Number(value) : undefined, page: 1 })); }} disabled={!!currencyError} options={[{ value: '', label: 'كل العملات' }, ...currencies.map((currency) => ({ value: String(currency.currency_id), label: `${currency.name} (${currency.code})` }))]} />
-      <RepDateInput label="الاستحقاق من" value={query.due_from ?? ''} onChange={(value) => { resetSelection(); setQuery((current) => ({ ...current, due_from: value || undefined, page: 1 })); }} max={query.due_to} />
-      <RepDateInput label="الاستحقاق إلى" value={query.due_to ?? ''} onChange={(value) => { resetSelection(); setQuery((current) => ({ ...current, due_to: value || undefined, page: 1 })); }} min={query.due_from} />
-    </section>
-    {currencyError && <p className="text-sm text-amber-800">{currencyError} <button className="underline" onClick={() => setRevision((value) => value + 1)}>إعادة المحاولة</button></p>}
-    {accountsError && <p className="text-sm text-amber-800">{accountsError} <button className="underline" onClick={() => setRevision((value) => value + 1)}>إعادة المحاولة</button></p>}
-    {error && <div className="rep-error" role="alert">{error} <button className="underline" onClick={() => setRevision((value) => value + 1)}>إعادة المحاولة</button></div>}
-    {editFeedback && <div className="rounded-xl border bg-white p-3 text-sm text-brand" role="status">{editFeedback}</div>}
-    {loading && <p className="rounded-xl border bg-white p-6 text-stone-500">جارٍ تحميل الشيكات…</p>}
-    {!loading && response && <>
-      <p className="text-sm text-stone-500">{pagination?.total ?? 0} شيك · صفحة {pagination?.page ?? 1} من {pagination?.total_pages || 1}</p>
-      {response.items.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{response.items.map((check) => <Link key={check.managed_check_id} to={`/owner/checks/${check.managed_check_id}`} className="min-w-0 rounded-2xl border bg-white p-4 text-right transition hover:border-gold-dark hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-dark">
-        <div className="flex flex-wrap items-start justify-between gap-2"><b className="break-words text-brand">شيك #{check.number}</b><span className="text-xs">{check.direction === 'Incoming' ? 'وارد' : 'صادر'}</span></div>
-        <p className="mt-1 break-words text-sm">{sourceLabel(check)}</p>
-        <p className="mt-2 break-words text-lg font-black">{amountLabel(check)}</p>
-        <p className="text-xs text-stone-500">{locationLabels[check.location] ?? check.location} · {check.due_status === 'Due' ? 'مستحق' : 'غير مستحق'} · {date(check.due_date)}</p>
-      </Link>)}</div> : <p className="rounded-xl border bg-white p-6 text-center text-stone-500">لا توجد شيكات مطابقة.</p>}
-      {pagination && pagination.total_pages > 1 && <nav aria-label="صفحات الشيكات" className="flex flex-wrap items-center justify-center gap-3"><button type="button" className="btn-outline" disabled={loading || pagination.page <= 1} onClick={() => changePage(pagination.page - 1)}>السابق</button><span className="text-sm font-bold">{pagination.page} / {pagination.total_pages}</span><button type="button" className="btn-outline" disabled={loading || pagination.page >= pagination.total_pages} onClick={() => changePage(pagination.page + 1)}>التالي</button></nav>}
-    </>}
+    {!isDetailPage && <>
+      <header className="flex flex-wrap items-end justify-between gap-3 border-b pb-4">
+        <div><p className="text-xs font-black text-gold-dark">عرض الشيكات</p><h1 className="text-3xl font-black text-brand">الشيكات المُدارة</h1><p className="text-sm text-stone-500">متابعة الشيكات الواردة والصادرة وحركاتها. <Link className="text-gold-dark underline" to="/owner/treasury">عرض الخزنة</Link></p></div>
+        <button type="button" className="btn-outline" onClick={() => { setEditing(false); setMovementAction(null); setUndoEventId(null); setOutgoingAction(null); setRevision((value) => value + 1); }} disabled={loading || editSaving || movementSaving || undoSaving || outgoingSaving}>تحديث</button>
+      </header>
+
+      <section className="checks-quick-filters grid items-end gap-3 rounded-2xl border bg-white p-4" aria-label="فلاتر الشيكات">
+        <label className="block min-w-0"><span className="rep-label">بحث برقم الشيك أو اسم الحساب</span><input className="rep-control" placeholder="رقم الشيك أو اسم الحساب…" type="search" value={searchInput} onChange={event => { setSearchInput(event.target.value); resetSelection(); }} /></label>
+        <RepSelect label="الاتجاه" value={query.direction ?? ''} onChange={value => { resetSelection(); setQuery(current => ({ ...current, direction: value as 'Incoming' | 'Outgoing' || undefined, page: 1 })); }} options={[{ value: '', label: 'الكل' }, { value: 'Incoming', label: 'وارد' }, { value: 'Outgoing', label: 'صادر' }]} />
+        <button ref={advancedTrigger} type="button" className="btn-outline min-h-11 justify-center" aria-haspopup="dialog" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(open => !open)}><SlidersHorizontal className="h-4 w-4" />فلاتر إضافية{advancedCount ? ` (${advancedCount})` : ''}</button>
+      </section>
+      {filterChips.length > 0 && <div className="flex min-w-0 flex-wrap items-center gap-2" aria-label="الفلاتر النشطة">{filterChips.map(chip => <button type="button" key={chip.keys.join('-')} aria-label={`إزالة فلتر ${chip.label}`} className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-full border border-brand/10 bg-brand-50 px-3 py-2 text-sm text-brand hover:bg-brand-100 focus-visible:ring-2 focus-visible:ring-gold" onClick={() => clearFilter(chip.keys)}><span className="min-w-0 break-words">{chip.label}</span><X className="h-4 w-4 shrink-0" /></button>)}<button type="button" className="btn-ghost min-h-11" onClick={clearFilters}>مسح الكل</button></div>}
+      <CheckFiltersPopover open={advancedOpen} onClose={closeAdvanced} trigger={advancedTrigger} footer={<div dir="rtl" className="flex items-center justify-between gap-3"><span className="text-xs text-stone-600">الفلاتر تُطبّق تلقائيًا</span><button type="button" className="btn-ghost min-h-11" onClick={clearFilters}>مسح الكل</button></div>}>
+        <div dir="rtl" className="grid min-w-0 gap-4 sm:grid-cols-2">
+          <RepSelect floating label="الموقع" value={query.location ?? ''} onChange={(value) => { resetSelection(); setQuery((current) => ({ ...current, location: value as ManagedCheckLocation || undefined, page: 1 })); }} options={[{ value: '', label: 'كل المواقع' }, ...locations.map(([value, label]) => ({ value, label }))]} />
+          <RepSelect floating label="الاستحقاق" value={query.due_status ?? ''} onChange={(value) => { resetSelection(); setQuery((current) => ({ ...current, due_status: value as 'Due' | 'NotDue' || undefined, page: 1 })); }} options={[{ value: '', label: 'الكل' }, { value: 'Due', label: 'مستحق' }, { value: 'NotDue', label: 'غير مستحق' }]} />
+          <RepSelect floating label="العملة" value={String(query.currency_id ?? '')} onChange={(value) => { resetSelection(); setQuery((current) => ({ ...current, currency_id: value ? Number(value) : undefined, page: 1 })); }} disabled={!!currencyError} options={[{ value: '', label: 'كل العملات' }, ...currencies.map((currency) => ({ value: String(currency.currency_id), label: `${currency.name} (${currency.code})` }))]} />
+          <RepDateInput label="الاستحقاق من" value={query.due_from ?? ''} onChange={(value) => { resetSelection(); setQuery((current) => ({ ...current, due_from: value || undefined, page: 1 })); }} max={query.due_to} />
+          <RepDateInput label="الاستحقاق إلى" value={query.due_to ?? ''} onChange={(value) => { resetSelection(); setQuery((current) => ({ ...current, due_to: value || undefined, page: 1 })); }} min={query.due_from} />
+
+        </div>
+      </CheckFiltersPopover>
+      {currencyError && <p className="text-sm text-amber-800">{currencyError} <button className="underline" onClick={() => setRevision((value) => value + 1)}>إعادة المحاولة</button></p>}
+      {accountsError && <p className="text-sm text-amber-800">{accountsError} <button className="underline" onClick={() => setRevision((value) => value + 1)}>إعادة المحاولة</button></p>}
+      {error && <div className="rep-error" role="alert">{error} <button className="underline" onClick={() => setRevision((value) => value + 1)}>إعادة المحاولة</button></div>}
+      {editFeedback && <div className="rounded-xl border bg-white p-3 text-sm text-brand" role="status">{editFeedback}</div>}
+      {loading && <p role="status" className="flex min-h-40 items-center justify-center gap-2 rounded-xl border bg-white p-6 text-stone-500"><Loader2 className="h-5 w-5 animate-spin" />جارٍ تحميل الشيكات…</p>}
+      {!loading && response && <>
+        <p className="text-sm text-stone-500">{pagination?.total ?? 0} شيك · صفحة {pagination?.page ?? 1} من {pagination?.total_pages || 1}</p>
+        {response.items.length ? <ChecksResults response={response} accounts={accounts} sourceLabel={sourceLabel} amountLabel={amountLabel} navigate={navigate} /> : <p className="rounded-xl border bg-white p-8 text-center text-stone-500">{searchInput || query.direction || query.location || query.currency_id || query.due_status || query.due_from || query.due_to ? 'لا توجد شيكات تطابق البحث والفلاتر.' : 'لا توجد شيكات بعد.'}</p>}
+        {pagination && pagination.total_pages > 1 && createPortal(<nav aria-label="صفحات الشيكات" className="checks-floating-pagination"><div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white p-2 shadow-sm"><button type="button" className="btn-ghost min-h-11" disabled={loading || pagination.page <= 1} onClick={() => changePage(pagination.page - 1)}><ChevronRight className="h-4 w-4" />السابق</button><span aria-current="page" className="rounded-xl bg-brand-50 px-4 py-2 text-sm font-bold text-brand">{pagination.page} من {pagination.total_pages}</span><button type="button" className="btn-ghost min-h-11" disabled={loading || pagination.page >= pagination.total_pages} onClick={() => changePage(pagination.page + 1)}>التالي<ChevronLeft className="h-4 w-4" /></button></div></nav>, document.body)}
+      </>}
     </>}
     {isDetailPage && <nav className="text-sm text-stone-500"><Link to="/owner/checks" className="font-bold text-brand hover:underline">الشيكات المُدارة</Link><span className="mx-2">/</span>تفاصيل الشيك</nav>}
     {isDetailPage && selectedId === null && <div className="rep-error" role="alert">رقم الشيك غير صالح. <Link to="/owner/checks" className="underline">العودة إلى الشيكات</Link></div>}
-    {isDetailPage && selectedId !== null && <section id="check-details" className="mx-auto max-w-6xl space-y-5 rounded-2xl border bg-white p-4 sm:p-6" aria-label="تفاصيل الشيك">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4"><div><p className="text-xs font-bold text-gold-dark">الشيكات المُدارة</p><div className="mt-1 flex flex-wrap items-center gap-3"><h1 className="text-2xl font-black text-brand">{selected ? `شيك #${selected.number}` : 'تفاصيل الشيك'}</h1>{selected && <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-black text-brand">{selected.direction === 'Incoming' ? 'وارد' : 'صادر'}</span>}</div></div><div className="flex flex-wrap gap-2">{selected && !editing && !movementAction && undoEventId === null && !outgoingAction && <button type="button" className="btn-outline" onClick={() => startEdit(selected)}>تعديل البيانات</button>}<button type="button" className="btn-outline" onClick={() => navigate('/owner/checks')} disabled={editSaving || movementSaving || undoSaving || outgoingSaving}>العودة للشيكات</button></div></div>
+    {isDetailPage && selectedId !== null && <section id="check-details" className="checks-detail-card mx-auto max-w-6xl space-y-5 rounded-2xl border bg-white p-4 sm:p-6" aria-label="تفاصيل الشيك">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4"><div><p className="text-xs font-bold text-gold-dark">الشيكات المُدارة</p><div className="mt-1 flex flex-wrap items-center gap-3"><h1 className="text-2xl font-black text-brand">{selected ? `شيك #${selected.number}` : 'تفاصيل الشيك'}</h1>{selected && <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-black text-brand">{selected.direction === 'Incoming' ? 'وارد' : 'صادر'}</span>}</div></div><div className="checks-detail-tools">{selected && <button type="button" className="btn-outline min-h-11" onClick={() => setHistoryOpen(true)}><History size={18} aria-hidden="true" />الحركات <span className="checks-badge">{selected.events.length}</span></button>}{selected && !editing && !movementAction && undoEventId === null && !outgoingAction && <button type="button" className="btn-outline check-tone check-tone-edit" onClick={() => startEdit(selected)}><Pencil size={18} aria-hidden="true" />تعديل البيانات</button>}<button type="button" className="btn-ghost min-h-11" aria-label="العودة للشيكات" title="العودة للشيكات" onClick={() => navigate('/owner/checks')} disabled={editSaving || movementSaving || undoSaving || outgoingSaving}><ChevronRight size={22} aria-hidden="true" /></button></div></div>
       {editFeedback && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800" role="status">{editFeedback}</div>}
       {detailsLoading && <p>جارٍ تحميل التفاصيل…</p>}
       {detailsError && <div className="rep-error" role="alert">{detailsError}</div>}
       {selected && <>
         {!editing && <>
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-stone-200 bg-stone-200 lg:grid-cols-4">
-          {([['رقم الشيك', selected.number], ['رقم البنك', bankIdentifiers(selected).bankNumber], ['رقم الفرع', bankIdentifiers(selected).branchNumber], ['رقم الحساب', bankIdentifiers(selected).accountNumber]] as const).map(([label, value]) => <div key={label} className="min-w-0 bg-white px-4 py-3"><p className="text-xs font-bold text-stone-500">{label}</p><p className="mt-1 break-all text-base font-black text-brand" dir="ltr">{value}</p></div>)}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-stone-100 py-3 text-sm">
-          <span className="text-stone-500">المبلغ <b className="mr-1 text-base text-brand">{amountLabel(selected)}</b></span>
-          <span className="text-stone-500">الحساب <b className="mr-1 text-brand">{sourceLabel(selected)}</b></span>
-          <span className="text-stone-500">الموقع <b className="mr-1 text-brand">{locationLabels[selected.location] ?? selected.location}</b></span>
-          <span className="text-stone-500">الاستحقاق <b className="mr-1 text-brand">{date(selected.due_date)}</b></span>
-          {selected.current_bank_account_id && <span className="text-stone-500">{selected.direction === 'Outgoing' ? 'البنك المسحوب عليه' : 'البنك الحالي'} <b className="mr-1 text-brand">{accounts.find((account) => account.account_id === selected.current_bank_account_id)?.name ?? `حساب #${selected.current_bank_account_id}`}</b></span>}
-          {(Number(selected.exchange_rate) !== 1 || Number(selected.base_amount) !== Number(selected.original_amount)) && <span className="text-stone-500">بالعملة الأساسية <b className="mr-1 text-brand">{number(selected.base_amount)}</b><span className="mr-1 text-xs">(سعر الصرف {selected.exchange_rate})</span></span>}
-        </div>
-        {selected.payments.notes && <p className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-600">ملاحظة السند: <span className="font-bold text-brand">{selected.payments.notes}</span></p>}
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-stone-200 bg-stone-200 lg:grid-cols-4">
+            {([['رقم الشيك', selected.number], ['رقم البنك', bankIdentifiers(selected).bankNumber], ['رقم الفرع', bankIdentifiers(selected).branchNumber], ['رقم الحساب', bankIdentifiers(selected).accountNumber]] as const).map(([label, value]) => <div key={label} className="min-w-0 bg-white px-4 py-3"><p className="text-xs font-bold text-stone-500">{label}</p><p className="mt-1 break-all text-base font-black text-brand" dir="ltr">{value}</p></div>)}
+          </div>
+          <div className="checks-details-summary flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-stone-100 py-3 text-sm">
+            <span className="text-stone-500">المبلغ <b className="mr-1 text-base text-brand">{amountLabel(selected)}</b></span>
+            <span className="text-stone-500">الحساب <b className="mr-1 text-brand">{sourceLabel(selected)}</b></span>
+            <span className="text-stone-500">الموقع <b className="mr-1 text-brand">{locationLabels[selected.location] ?? 'غير محدد'}</b></span>
+            <span className="text-stone-500">الاستحقاق <b className="mr-1 text-brand">{date(selected.due_date)}</b></span>
+            {selected.current_bank_account_id && <span className="text-stone-500">{selected.direction === 'Outgoing' ? 'البنك المسحوب عليه' : 'البنك الحالي'} <b className="mr-1 text-brand">{accounts.find((account) => account.account_id === selected.current_bank_account_id)?.name ?? `حساب #${selected.current_bank_account_id}`}</b></span>}
+            {(Number(selected.exchange_rate) !== 1 || Number(selected.base_amount) !== Number(selected.original_amount)) && <span className="text-stone-500">بالعملة الأساسية <b className="mr-1 text-brand">{number(selected.base_amount)}</b><span className="mr-1 text-xs">(سعر الصرف {selected.exchange_rate})</span></span>}
+          </div>
+          {selected.payments.notes && <p className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-600">ملاحظة السند: <span className="font-bold text-brand">{selected.payments.notes}</span></p>}
         </>}
         {availableMovements(selected).length > 0 && !editing && undoEventId === null && !outgoingAction && <div className="space-y-3 border-t pt-4">
-          <h3 className="font-black text-brand">حركات الشيك الوارد</h3>
-          <div className="flex flex-wrap gap-2">{availableMovements(selected).map((action) => <button type="button" key={action} className="btn-outline min-h-10 px-4 text-sm" disabled={movementSaving} onClick={() => openMovement(action)}>{movementLabels[action]}</button>)}</div>
-          {movementAction && <form className="max-w-3xl space-y-3 rounded-xl border border-gold-dark/40 bg-amber-50/50 p-4" onSubmit={(event) => void saveMovement(event)}>
-            <h4 className="font-black text-brand">{movementLabels[movementAction]}</h4>
+          <h3 className="font-black text-brand">إجراءات الشيك</h3>
+          <div className="checks-actions">{availableMovements(selected).filter(action => !['RETURNED_TO_SOURCE', 'RETURNED_FROM_BANK', 'ENDORSEMENT_RETURNED'].includes(action)).map((action, index) => <button type="button" key={action} className={`btn-outline check-tone ${index === 0 ? 'check-action-primary' : ''} check-tone-${actionTone(action)}`} disabled={movementSaving} onClick={() => openMovement(action)}><ActionIcon action={action} />{movementLabels[action]}</button>)}</div>
+          {availableMovements(selected).some(action => ['RETURNED_TO_SOURCE', 'RETURNED_FROM_BANK', 'ENDORSEMENT_RETURNED'].includes(action)) && <div className="checks-actions checks-danger">{availableMovements(selected).filter(action => ['RETURNED_TO_SOURCE', 'RETURNED_FROM_BANK', 'ENDORSEMENT_RETURNED'].includes(action)).map(action => <button type="button" key={action} className={`btn-outline check-tone check-tone-${actionTone(action)}`} disabled={movementSaving} onClick={() => openMovement(action)}>{movementLabels[action]}</button>)}</div>}
+          {movementAction && <Modal className={`check-tone-modal check-tone-${actionTone(movementAction)}`} open title={movementLabels[movementAction]} size="lg" mobileFullscreen onClose={() => { if (!movementSaving && !review) { setMovementAction(null); setMovementError(''); } }}><form dir="rtl" className="space-y-4" onSubmit={(event) => void saveMovement(event)}>
             <p className="text-sm text-stone-600">{movementAction === 'CASHED' ? 'ستنتقل قيمة الشيك من «شيكات بحوزتنا» إلى الصندوق النقدي الذي تختاره.' : 'ستُسجّل الحركة المالية عند التأكيد، ويمكنك مراجعتها في سجل الشيك وكشف الحساب.'}</p>
             {(movementAction === 'DEPOSITED' || movementAction === 'SENT_TO_COLLECTION') && <>
               <AccountPicker accounts={accounts.filter((item) => item.kind === 'Bank')} kinds={['Bank']} label="الحساب البنكي" value={movementBankId} onChange={setMovementBankId} disabled={movementSaving || !!accountsError} />
@@ -567,31 +492,25 @@ export default function ChecksPage() {
             </div>
             {movementError && <p className="rep-error" role="alert">{movementError}</p>}
             <div className="flex flex-wrap gap-2"><button type="submit" className="btn-primary" disabled={movementSaving || !!accountsError && ['DEPOSITED', 'SENT_TO_COLLECTION', 'ENDORSED', 'CASHED'].includes(movementAction)}>{movementSaving ? 'جارٍ التنفيذ…' : 'مراجعة وتأكيد'}</button><button type="button" className="btn-outline" disabled={movementSaving} onClick={() => { setMovementAction(null); setMovementError(''); }}>إلغاء</button></div>
-          </form>}
+          </form></Modal>}
         </div>}
         {availableOutgoingActions(selected).length > 0 && !editing && !movementAction && undoEventId === null && <div className="space-y-3 border-t pt-4">
-          <h3 className="font-black text-brand">حركات الشيك الصادر</h3>
-          <div className="flex flex-wrap gap-2">{availableOutgoingActions(selected).map((action) => <button type="button" key={action} className="btn-outline" disabled={outgoingSaving} onClick={() => openOutgoing(action)}>{outgoingLabels[action]}</button>)}</div>
-          {outgoingAction && <form className="space-y-3 rounded-xl border border-gold-dark/40 bg-amber-50/50 p-4" onSubmit={(event) => void saveOutgoing(event)}>
-            <h4 className="font-black text-brand">{outgoingLabels[outgoingAction]}</h4>
+          <h3 className="font-black text-brand">إجراءات الشيك</h3>
+          <div className="checks-actions">{availableOutgoingActions(selected).map((action) => <button type="button" key={action} className={`btn-outline check-tone ${action === 'clear' ? 'check-action-primary' : ''} check-tone-${action === 'clear' ? 'cash' : 'return'}`} disabled={outgoingSaving} onClick={() => openOutgoing(action)}><ActionIcon action={action} />{outgoingLabels[action]}</button>)}</div>
+          {outgoingAction && <Modal className={`check-tone-modal check-tone-${outgoingAction === 'clear' ? 'cash' : 'return'}`} open title={outgoingLabels[outgoingAction]} size="lg" mobileFullscreen onClose={() => { if (!outgoingSaving && !review) { setOutgoingAction(null); setOutgoingError(''); } }}><form dir="rtl" className="space-y-4" onSubmit={(event) => void saveOutgoing(event)}>
             <p className="text-xs text-stone-600">{outgoingAction === 'clear' ? 'سيؤكد النظام صرف الشيك الصادر، ويمكن التراجع عن هذه الحركة لاحقًا إذا بقيت آخر حركة فعالة.' : 'سيعيد النظام أثر الدفعة المرتبطة بالشيك وفق قواعده، ويمكن التراجع إذا بقيت هذه آخر حركة فعالة.'}</p>
             <RepDateInput label="تاريخ العملية" min={lastBusinessDate(selected)} value={outgoingDate} onChange={setOutgoingDate} disabled={outgoingSaving} />
             {outgoingError && <p className="rep-error" role="alert">{outgoingError}</p>}
             <div className="flex flex-wrap gap-2"><button type="submit" className="btn-primary" disabled={outgoingSaving}>{outgoingSaving ? 'جارٍ التنفيذ…' : 'مراجعة وتأكيد'}</button><button type="button" className="btn-outline" disabled={outgoingSaving} onClick={() => { setOutgoingAction(null); setOutgoingError(''); }}>إلغاء</button></div>
-          </form>}
+          </form></Modal>}
         </div>}
-        {editing && <form className="mx-auto max-w-5xl space-y-5 rounded-2xl border border-stone-200 bg-stone-50/70 p-4 sm:p-6" onSubmit={(event) => void saveEdit(event)}>
-          <div className="border-b border-stone-200 pb-4">
-            <h2 className="text-xl font-black text-brand">تعديل بيانات الشيك</h2>
-            <p className="mt-1 text-sm text-stone-500">عدّل البيانات ثم راجع المبلغ والحساب قبل الحفظ.</p>
-          </div>
-
+        {editing && <Modal className="check-tone-modal check-tone-edit" open title={`تعديل الشيك #${selected.number}`} size="lg" mobileFullscreen onClose={() => { if (!editSaving && !editReview) { setEditing(false); setEditError(''); } }} footer={<div dir="rtl" className="flex gap-2"><button type="submit" form="check-edit-form" className="btn-primary min-h-11 flex-1" disabled={editSaving}>{editSaving ? 'جارٍ الحفظ…' : 'حفظ التعديل'}</button><button type="button" className="btn-outline min-h-11" disabled={editSaving} onClick={() => { setEditing(false); setEditError(''); }}>إلغاء</button></div>}><form id="check-edit-form" dir="rtl" className="min-w-0 space-y-4" onSubmit={(event) => void saveEdit(event)}>
           <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-4 sm:p-5" aria-label="البيانات الأساسية">
             <div><h3 className="font-black text-brand">البيانات الأساسية</h3><p className="text-xs text-stone-500">رقم الشيك وقيمته</p></div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <label className="block"><span className="rep-label">رقم الشيك</span><input className="rep-control" dir="ltr" value={editNumber} onChange={(event) => setEditNumber(event.target.value)} required disabled={editSaving || identifyingLocked} /></label>
               <label className="block"><span className="rep-label">المبلغ</span><input className="rep-control" dir="ltr" inputMode="decimal" value={editAmount} onChange={(event) => setEditAmount(event.target.value)} required disabled={editSaving} /></label>
-              <RepSelect label="العملة" value={editCurrencyId} onChange={setEditCurrencyId} disabled={editSaving || !!currencyError} options={[{ value: '', label: 'اختر العملة' }, ...currencies.map((currency) => ({ value: String(currency.currency_id), label: `${currency.name} (${currency.code})` }))]} />
+              <RepSelect floating label="العملة" value={editCurrencyId} onChange={setEditCurrencyId} disabled={editSaving || !!currencyError} options={[{ value: '', label: 'اختر العملة' }, ...currencies.map((currency) => ({ value: String(currency.currency_id), label: `${currency.name} (${currency.code})` }))]} />
               <label className="block"><span className="rep-label">سعر الصرف</span><input className="rep-control" dir="ltr" inputMode="decimal" value={editRate} onChange={(event) => setEditRate(event.target.value)} required disabled={editSaving} /></label>
             </div>
             {Number(editAmount) > 0 && Number(editRate) > 0 && <div className="rounded-lg bg-brand/5 px-4 py-3 text-sm text-brand">القيمة بالعملة الأساسية <b className="mr-2 text-base">{number((Number(editAmount) * Number(editRate)).toFixed(2))}</b></div>}
@@ -623,22 +542,18 @@ export default function ChecksPage() {
           </section>
 
           {editError && <p className="rep-error" role="alert">{editError}</p>}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-4">
-            <p className="text-xs text-stone-500">يحفظ النظام التعديل في سجل الشيك ويصحح القيود المالية عند الحاجة.</p>
-            <div className="flex gap-2"><button type="button" className="btn-outline" disabled={editSaving} onClick={() => { setEditing(false); setEditError(''); }}>إلغاء</button><button type="submit" className="btn-primary" disabled={editSaving}>{editSaving ? 'جارٍ الحفظ…' : 'حفظ التعديل'}</button></div>
-          </div>
-        </form>}
-        {!editing && <div><h3 className="mb-2 font-black text-brand">سجل الأحداث</h3>{selected.events.length ? <ol className="space-y-2 border-r-2 border-gold-dark pr-4">{selected.events.map((event) => <li key={event.check_event_id} className="rounded-xl bg-stone-50 p-3 text-sm"><b>{eventLabels[event.action] ?? event.action}</b><p className="text-stone-600">{event.from_location ? (locationLabels[event.from_location as ManagedCheckLocation] ?? event.from_location) : 'بداية'} ← {locationLabels[event.to_location as ManagedCheckLocation] ?? event.to_location}</p><p className="text-xs text-stone-500">تاريخ الحركة: {date(event.operation_date)} · التسجيل: {formatOrderDateTime(event.created_at)} · المنفذ #{event.created_by ?? 'غير مسجل'}</p>{event.notes && <p className="text-xs text-stone-600">{event.notes}</p>}{event.cancelled_at && <p className="text-xs text-red-700">أُلغيت الحركة{event.cancel_reason ? `: ${event.cancel_reason}` : ''}</p>}{event.cancels_event_id && <p className="text-xs text-stone-600">تراجع عن الحدث #{event.cancels_event_id}</p>}{undoableEvent(selected)?.check_event_id === event.check_event_id && !movementAction && !outgoingAction && <button type="button" className="btn-outline mt-2" disabled={undoSaving} onClick={() => openUndo(event)}>تراجع عن آخر حركة</button>}</li>)}</ol> : <p className="text-sm text-stone-500">لا توجد أحداث مسجلة.</p>}</div>}
-        {undoEventId !== null && !editing && !movementAction && !outgoingAction && <form className="space-y-3 rounded-xl border border-gold-dark/40 bg-amber-50/50 p-4" onSubmit={(event) => void saveUndo(event)}>
-          <h3 className="font-black text-brand">التراجع عن آخر حركة</h3>
+        </form></Modal>}       {historyOpen && <Modal open title={`حركات الشيك #${selected.number}`} size="lg" mobileFullscreen onClose={() => setHistoryOpen(false)}><div dir="rtl">{selected.events.length ? <ol className="checks-history space-y-3 border-r-2 border-stone-200 pr-3">{selected.events.map((event) => <li key={event.check_event_id} className={`rounded-xl bg-stone-50 p-3 text-sm ${event.cancelled_at ? 'event-undone' : ''}`}><b>{eventLabels[event.action] ?? 'حركة شيك'}</b><p className="text-stone-600">من {event.from_location ? (locationLabels[event.from_location as ManagedCheckLocation] ?? 'موقع سابق') : 'بداية'} إلى {locationLabels[event.to_location as ManagedCheckLocation] ?? 'موقع غير محدد'}</p><p className="text-xs text-stone-500">تاريخ الحركة: {date(event.operation_date)} · التسجيل: {formatOrderDateTime(event.created_at)}</p>{event.notes && <p className="text-xs text-stone-600">{event.notes}</p>}{event.cancelled_at && <p className="text-xs text-red-700">أُلغيت الحركة{event.cancel_reason ? `: ${event.cancel_reason}` : ''}</p>}{event.cancels_event_id && <p className="text-xs text-stone-600">تراجع عن الحدث #{event.cancels_event_id}</p>}{undoableEvent(selected)?.check_event_id === event.check_event_id && !movementAction && !outgoingAction && <button type="button" className="btn-outline check-tone check-tone-undo mt-3 min-h-11" disabled={undoSaving} onClick={() => { setHistoryOpen(false); openUndo(event); }}><Undo2 size={18} aria-hidden="true" />تراجع عن آخر حركة</button>}</li>)}</ol> : <p className="text-sm text-stone-500">لا توجد أحداث مسجلة.</p>}</div></Modal>}
+        {undoEventId !== null && !editing && !movementAction && !outgoingAction && <Modal className="check-tone-modal check-tone-undo" open title={'التراجع عن آخر حركة'} size="lg" mobileFullscreen onClose={() => { if (!undoSaving && !review) { setUndoEventId(null); setUndoError(''); } }}><form dir="rtl" className="space-y-4" onSubmit={(event) => void saveUndo(event)}>
           <p className="text-xs text-stone-600">سيعكس النظام آثار الحركة ويحتفظ بها في السجل مع حدث التراجع.</p>
           <div className="grid gap-3 sm:grid-cols-2"><RepDateInput label="تاريخ التراجع" min={lastBusinessDate(selected)} value={undoDate} onChange={setUndoDate} disabled={undoSaving} /><label className="block"><span className="rep-label">سبب التراجع (اختياري)</span><input className="rep-control" value={undoReason} onChange={(event) => setUndoReason(event.target.value)} disabled={undoSaving} /></label></div>
           {undoError && <p className="rep-error" role="alert">{undoError}</p>}
           <div className="flex flex-wrap gap-2"><button type="submit" className="btn-primary" disabled={undoSaving}>{undoSaving ? 'جارٍ التراجع…' : 'مراجعة وتأكيد'}</button><button type="button" className="btn-outline" disabled={undoSaving} onClick={() => { setUndoEventId(null); setUndoError(''); }}>إلغاء</button></div>
-        </form>}
+        </form></Modal>}
       </>}
     </section>}
+    <ConfirmDialog className="check-tone-modal check-tone-edit" open={editReview} onClose={() => setEditReview(false)} onConfirm={() => void saveEdit(undefined, true)} loading={editSaving} severity="normal" title="اعتماد تصحيح الشيك" message="سيحفظ النظام تفاصيل التصحيح ويعكس ويعيد ترحيل القيود عند تغيير البيانات المالية. لا ينشئ صرف الشيك الصادر أثرًا ماليًا إضافيًا." />
     <ConfirmDialog
+      className={`check-tone-modal check-tone-${review?.kind === 'undo' ? 'undo' : review?.kind === 'outgoing' ? outgoingAction === 'clear' ? 'cash' : 'return' : actionTone(movementAction ?? '')}`}
       open={review !== null}
       onClose={() => setReview(null)}
       onConfirm={() => {

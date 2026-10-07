@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { createPortal } from 'react-dom';
-import { CopyPlus, Plus, Trash2 } from 'lucide-react';
+import { useAuth } from '@/auth';
+import Modal from '@/components/ui/Modal';
+import { RepDateInput } from '@/components/rep/RepFormControls';
+import { CheckCircle2, CopyPlus, Plus, Trash2 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { currenciesService, ledgerService, paymentsService, type AccountKind, type CreatePaymentDto, type CurrencyDto, type LedgerAccount, type VoucherInput } from '@/api';
+import { accountsService, currenciesService, ledgerService, paymentsService, type AccountKind, type CreatePaymentDto, type CurrencyDto, type LedgerAccount, type VoucherInput } from '@/api';
 import { apiMessages } from '@/components/rep/repOrderUtils';
 import PaymentDraftTable, { type PaymentDraftTableRow } from './PaymentDraftTable';
 import { formatMoney } from '@/utils/money';
@@ -46,13 +48,15 @@ const addMonths = (value: string, count: number) => {
 };
 
 export default function VouchersPage() {
+  const { user } = useAuth();
+  const admin = user?.role === 'Admin';
   const [params] = useSearchParams();
   const preselected = Number(params.get('account')) || null;
   const appliedAccount = useRef<number | null>(null);
   const nextKey = useRef(2);
   const nextLineKey = useRef(3);
   const submitting = useRef(false);
-  const [accounts, setAccounts] = useState<LedgerAccount[]>([]);
+  const [accounts, setAccounts] = useState<Array<Pick<LedgerAccount, 'account_id' | 'name' | 'kind' | 'account_number' | 'is_system'>>>([]);
   const [currencies, setCurrencies] = useState<CurrencyDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -64,27 +68,34 @@ export default function VouchersPage() {
   const [checksToAdd, setChecksToAdd] = useState('1');
   const [lines, setLines] = useState<DraftLine[]>(() => newLines(preselected));
   const [journalNotes, setJournalNotes] = useState('');
-  const [journalDate, setJournalDate] = useState(() => new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Hebron',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
+  const [journalDate, setJournalDate] = useState(businessToday);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [successHasChecks, setSuccessHasChecks] = useState(false);
   const [pending, setPending] = useState<Pending | null>(null);
+  const errorRegion = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!error) return;
+    errorRegion.current?.focus({preventScroll:true});
+    errorRegion.current?.scrollIntoView({block:'center'});
+  }, [error]);
 
   const load = useCallback(async () => {
     setLoading(true); setLoadError('');
     try {
-      const [accountRows, response] = await Promise.all([ledgerService.accounts(), currenciesService.list()]);
+      const [accountRows, response] = await Promise.all([admin ? ledgerService.accounts() : accountsService.allOptions().then(rows => rows.map(row => ({...row, is_system: false}))), currenciesService.list()]);
       const rows = Array.isArray(response) ? response : response.items ?? response.currencies ?? [];
       const active = rows.filter((currency) => currency.is_active);
       setAccounts(accountRows); setCurrencies(active);
       setCashId((current) => {
-        return accountRows.some((account) => ['Cash', 'Bank'].includes(account.kind) && account.account_id === current) ? current : null;
+        return accountRows.some((account) => account.kind === 'Cash' && account.account_id === current) ? current : null;
       });
       const baseId = String(active.find((currency) => currency.is_base)?.currency_id ?? '');
       setDrafts((current) => current.map((draft) => draft.currencyId ? draft : { ...draft, currencyId: baseId }));
     } catch (reason) { setLoadError(apiMessages(reason, 'تعذر تحميل الحسابات أو العملات.').join('، ')); }
     finally { setLoading(false); }
-  }, []);
+  }, [admin]);
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
     if (!preselected || appliedAccount.current === preselected) return;
@@ -101,9 +112,9 @@ export default function VouchersPage() {
   }, [accounts, preselected]);
 
   const selectedAccount = accounts.find((account) => account.account_id === accountId);
-  const manualAccounts = accounts.filter((account) => !isInternalAccount(account));
+  const manualAccounts = accounts.filter((account) => !isInternalAccount(account) && ['General', 'Cash', 'Bank'].includes(account.kind));
   const baseCurrency = currencies.find((currency) => currency.is_base);
-  const cashChoices = accounts.filter((account) => ['Cash', 'Bank'].includes(account.kind));
+  const cashChoices = manualAccounts.filter((account) => account.kind === 'Cash');
   const treasuryAccountIds = accounts.filter((account) => treasuryKinds.includes(account.kind)).map((account) => account.account_id);
   const hasCash = drafts.some((draft) => draft.method === 'Cash');
   const hasCheck = drafts.some((draft) => draft.method === 'Check');
@@ -112,6 +123,7 @@ export default function VouchersPage() {
     return sum + (convertedCents(draft.amount, currency?.is_base ? '1' : draft.rate) ?? 0);
   }, 0), [currencies, drafts]);
   const total = totalCents / 100;
+  const methodTotal = (method: PaymentDraftTableRow['method']) => drafts.filter(draft => draft.method === method).reduce((sum, draft) => sum + (convertedCents(draft.amount, currencies.find(currency => currency.currency_id === Number(draft.currencyId))?.is_base ? '1' : draft.rate) ?? 0), 0) / 100;
   const debitCents = useMemo(() => lines.reduce((sum, line) => sum + (line.side === 'debit' ? cents(line.amount) : 0), 0), [lines]);
   const creditCents = useMemo(() => lines.reduce((sum, line) => sum + (line.side === 'credit' ? cents(line.amount) : 0), 0), [lines]);
   const balanced = debitCents > 0 && debitCents === creditCents;
@@ -153,6 +165,9 @@ export default function VouchersPage() {
       if (lines.length < 2 || lines.some((line) => !line.account_id || !validAmount(line.amount) || !manualAccounts.some((account) => account.account_id === line.account_id)) || !balanced) {
         setError('أكمل أطراف القيد بمبالغ صحيحة وتأكد من تساوي المدين والدائن.'); return;
       }
+      const net = new Map<number, number>();
+      for (const line of lines) net.set(line.account_id!, (net.get(line.account_id!) ?? 0) + (line.side === 'debit' ? cents(line.amount) : -cents(line.amount)));
+      if ([...net.values()].every(amount => amount === 0)) { setError('لا يمكن تسجيل تحويل بلا أثر بين الحسابات. اختر حسابين مختلفين.'); return; }
       if (!journalNotes.trim()) { setError('أدخل ملاحظة توضح سبب القيد.'); return; }
       if (!journalDate) { setError('اختر تاريخ القيد.'); return; }
       const input: VoucherInput = { type, occurred_at: journalDate, notes: journalNotes.trim(), lines: lines.map((line) => ({ account_id: line.account_id!, [line.side]: Number(line.amount) })) };
@@ -164,10 +179,10 @@ export default function VouchersPage() {
     if (!drafts.length) { setError('أضف سطر قبض أو صرف واحدًا على الأقل.'); return; }
     if (!baseCurrency) { setError('العملة الأساسية غير محددة. تحقق من إعدادات العملات.'); return; }
     const cashAccount = cashChoices.find((account) => account.account_id === cashId);
-    const bankAccount = accounts.find((account) => account.account_id === bankId);
+    const bankAccount = manualAccounts.find((account) => account.account_id === bankId);
     if (hasCheck && (selectedAccount.is_system || !['General'].includes(selectedAccount.kind))) { setError('اختر حسابًا عامًا للشيك.'); return; }
     if (hasCash && !cashAccount) { setError('اختر صندوقًا نقديًا للسند.'); return; }
-    if (type === 'Disbursement' && hasCheck && bankAccount?.kind !== 'Bank') { setError('اختر البنك المسحوب عليه للشيكات الصادرة.'); return; }
+    if (type === 'Disbursement' && hasCheck && bankAccount?.kind !== 'Bank') { setError('اختر البنك الذي يُسحب منه مبلغ الشيك.'); return; }
     const steps: BatchStep[] = [];
     for (const [index, draft] of drafts.entries()) {
       const currency = currencies.find((item) => item.currency_id === Number(draft.currencyId));
@@ -202,7 +217,7 @@ export default function VouchersPage() {
       return `${index + 1}. ${draft.method === 'Check' ? 'شيك' : 'نقد'}: ${draft.amount} ${currency.code}${currency.is_base ? '' : ` × ${draft.rate} = ${formatMoney(base, baseCurrency)}`}`;
     }).join('\n');
     const cashLocation = hasCash ? `\n${type === 'Receipt' ? 'صندوق الاستلام' : 'صندوق الدفع'}: ${cashAccount?.name}` : '';
-    const checkBank = type === 'Disbursement' && hasCheck ? `\nالبنك المسحوب عليه: ${bankAccount?.name}` : '';
+    const checkBank = hasCheck ? (type === 'Disbursement' ? `\nالبنك الذي يُسحب منه مبلغ الشيك: ${bankAccount?.name}` : '\nوجهة الشيكات: خزنة الشيكات') : '';
     const summary = `${type === 'Receipt' ? 'سند قبض' : 'سند صرف'} — ${selectedAccount.name}\n${steps.length} سطر، منها ${drafts.filter((draft) => draft.method === 'Check').length} شيك${cashLocation}${checkBank}\n${details}\nالإجمالي بالعملة الأساسية: ${formatMoney(total, baseCurrency)}`;
     setPending({ kind: 'batch', steps, summary });
   };
@@ -214,7 +229,7 @@ export default function VouchersPage() {
     try {
       if (pending.kind === 'journal') {
         const result = await ledgerService.voucher(pending.input) as { journal_entry_id: number };
-        setSuccess(`حُفظ سند القيد رقم ${result.journal_entry_id} بنجاح.`);
+        setSuccess(`حُفظ سند القيد رقم ${result.journal_entry_id} بنجاح.`); setSuccessHasChecks(false);
         setLines(newLines()); setJournalNotes('');
       } else {
         for (const step of pending.steps) {
@@ -223,7 +238,7 @@ export default function VouchersPage() {
           completed++;
           setDrafts((current) => current.filter((draft) => draft.key !== step.key));
         }
-        setSuccess(`حُفظ ${completed} سند/شيك بنجاح. يمكنك متابعة الشيكات من صفحتها.`);
+        setSuccess(`تم حفظ ${completed === 1 ? 'السند' : `${completed} سندات`} بنجاح.`); setSuccessHasChecks(pending.steps.some(step=>step.input.payment_method==='Check'));
         setDrafts([newDraft(nextKey.current++, String(baseCurrency?.currency_id ?? ''))]);
       }
       setPending(null); void load();
@@ -239,12 +254,12 @@ export default function VouchersPage() {
     const label = side === 'credit' ? 'الدائن' : 'المدين';
     return <div className="min-w-0 rounded-2xl border border-stone-200 bg-stone-50/70 p-3 sm:p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <div><h3 className="text-lg font-black text-brand">جهة {label}</h3><p className="text-xs text-stone-500">{sideLines.length} {sideLines.length === 1 ? 'حساب' : 'حسابات'}</p></div>
+        <div><h3 className="text-lg font-black text-brand">{side === 'credit' ? 'الطرف الأول · دائن' : 'الطرف الثاني · مدين'}</h3><p className="text-xs text-stone-500">{sideLines.length} {sideLines.length === 1 ? 'حساب' : 'حسابات'}</p></div>
         <button type="button" className="btn-outline gap-1.5" onClick={() => { setLines((current) => [...current, { key: nextLineKey.current++, account_id: null, side, amount: '' }]); clearMessage(); }}><Plus className="h-4 w-4" /> إضافة حساب</button>
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_96px_40px] gap-2 px-2 pb-2 text-xs font-bold text-stone-500 sm:grid-cols-[minmax(0,1fr)_130px_40px]"><span>الحساب</span><span>المبلغ</span><span className="sr-only">إزالة</span></div>
-      <div className="space-y-2">{sideLines.map((line, index) => <div key={line.key} className="grid min-w-0 grid-cols-[minmax(0,1fr)_96px_40px] items-center gap-2 rounded-xl border border-stone-200 bg-white p-2 shadow-sm sm:grid-cols-[minmax(0,1fr)_130px_40px]">
-        <AccountPicker accounts={manualAccounts} label={`حساب ${label} ${index + 1}`} value={line.account_id} onChange={(id) => editLine(line.key, { account_id: id })} disabled={loading || !!loadError} compact />
+      <div className="space-y-2">{sideLines.map((line, index) => <div key={line.key} className="voucher-journal-row grid min-w-0 grid-cols-[minmax(0,1fr)_96px_40px] items-center gap-2 rounded-xl border border-stone-200 bg-white p-2 shadow-sm sm:grid-cols-[minmax(0,1fr)_130px_40px]">
+        <AccountPicker accounts={manualAccounts} label={`حساب ${label} ${index + 1}`} value={line.account_id} onChange={(id) => editLine(line.key, { account_id: id })} disabled={loading || !!loadError} compact showIdentity />
         <label className="block min-w-0"><span className="sr-only">مبلغ حساب {label} {index + 1}</span><input className="rep-control text-left" dir="ltr" inputMode="decimal" placeholder="0.00" value={line.amount} onChange={(event) => editLine(line.key, { amount: event.target.value })} /></label>
         <button type="button" aria-label={`إزالة حساب ${label} ${index + 1}`} title="إزالة الحساب" className="grid h-10 w-10 place-items-center rounded-lg text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300" disabled={sideLines.length <= 1} onClick={() => { setLines((current) => current.filter((row) => row.key !== line.key)); clearMessage(); }}><Trash2 className="h-4 w-4" /></button>
       </div>)}</div>
@@ -252,31 +267,69 @@ export default function VouchersPage() {
     </div>;
   };
 
-  return <div className="mx-auto max-w-7xl space-y-5" dir="rtl">
-    <header className="border-b border-stone-200 pb-4"><p className="text-xs font-black text-gold-dark">الدفتر المالي</p><h1 className="text-3xl font-black text-brand">السندات</h1><p className="mt-1 text-sm text-stone-500">نقد أو شيك لكل سطر. بيانات الشيكات وحالاتها في <Link className="font-bold text-gold-dark underline" to="/owner/checks">صفحة الشيكات</Link>.</p></header>
+  return <div className="vouchers-page min-w-0 w-full space-y-4" dir="rtl">
+    <header className="border-b border-stone-200 pb-4"><p className="text-xs font-black text-gold-dark">الدفتر المالي</p><h1 className="text-3xl font-black text-brand">السندات</h1><p className="mt-1 text-sm text-stone-500">{type === 'Journal' ? 'قيد مباشر بين الحسابات، مع توضيح الطرف الدائن والطرف المدين.' : <>نقد أو شيك لكل سطر. بيانات الشيكات وحالاتها في {admin ? <Link className="font-bold text-gold-dark underline" to="/owner/checks">صفحة الشيكات</Link> : 'صفحة الشيكات'}.</>}</p></header>
     <div role="group" aria-label="نوع السند" className="grid grid-cols-3 gap-2 rounded-2xl bg-stone-100 p-1.5">
       {([['Receipt', 'سند قبض'], ['Disbursement', 'سند صرف'], ['Journal', 'سند قيد']] as const).map(([value, label]) =>
         <button key={value} type="button" aria-pressed={type === value} className={`min-h-11 rounded-xl px-2 py-2 text-center text-sm font-black transition sm:text-base ${type === value ? 'bg-white text-brand shadow-sm ring-1 ring-gold/60' : 'text-stone-600 hover:bg-white/70'}`} onClick={() => { setType(value); clearMessage(); }}>{label}</button>)}
     </div>
     {loadError && <div className="rep-error" role="alert">{loadError} <button type="button" className="mr-2 underline" onClick={() => void load()}>إعادة المحاولة</button></div>}
     {loading && <p className="text-sm text-stone-500" role="status">جارٍ تحميل الحسابات والعملات…</p>}
+    {!loading && !loadError && !manualAccounts.length && <p role="status" className="rep-section p-4 text-sm text-stone-500">لا توجد حسابات متاحة. أنشئ حسابًا أولًا من صفحة الحسابات.</p>}
     <form onSubmit={submit} className="space-y-4">
       <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm sm:p-5">
         {type === 'Journal' ? <div className="space-y-4">
-          <div className="border-b border-stone-100 pb-4"><h2 className="font-black text-brand">أطراف القيد</h2><p className="text-xs text-stone-500">كل حسابات الدفتر متاحة هنا. الدائن يمينًا والمدين يسارًا.</p></div>
+          <div className="border-b border-stone-100 pb-4"><h2 className="font-black text-brand">أطراف القيد</h2><p className="text-xs text-stone-500">اختر الحساب والمبلغ لكل طرف. في تحويل الصندوق أو البنك: المصدر دائن، والوجهة مدين.</p></div>
           <div className="grid gap-4 lg:grid-cols-2">{renderJournalColumn('credit')}{renderJournalColumn('debit')}</div>
           <div className="flex flex-wrap gap-6 rounded-xl bg-brand-50 p-3 text-sm font-bold text-brand" aria-live="polite"><span>المدين: {formatMoney(debitCents / 100, baseCurrency)}</span><span>الدائن: {formatMoney(creditCents / 100, baseCurrency)}</span><span className={balanced ? 'text-emerald-700' : 'text-red-700'}>{balanced ? 'القيد متوازن' : `الفرق: ${formatMoney(Math.abs(debitCents - creditCents) / 100, baseCurrency)}`}</span></div>
-          <label className="block"><span className="rep-label">تاريخ القيد</span><input type="date" className="rep-control" value={journalDate} onChange={event => setJournalDate(event.target.value)} required /></label><label className="block"><span className="rep-label">سبب القيد</span><textarea className="rep-control min-h-24" rows={3} value={journalNotes} onChange={(event) => { setJournalNotes(event.target.value); clearMessage(); }} /></label>
+          <RepDateInput label="تاريخ القيد" value={journalDate} onChange={setJournalDate} /><label className="block"><span className="rep-label">سبب القيد</span><textarea className="rep-control min-h-24" rows={3} value={journalNotes} onChange={(event) => { setJournalNotes(event.target.value); clearMessage(); }} /></label>
         </div> : <div className="space-y-5">
-          <div className="grid items-start gap-4 sm:grid-cols-2"><AccountPicker accounts={manualAccounts} label="الحساب المقابل" exclude={treasuryAccountIds} value={accountId} onChange={(id) => { setAccountId(id); clearMessage(); }} disabled={loading || !!loadError} />{hasCash && <AccountPicker accounts={cashChoices} label={type === 'Receipt' ? 'حساب الاستلام *' : 'حساب الدفع *'} kinds={['Cash', 'Bank']} value={cashId} onChange={(id) => { setCashId(id); clearMessage(); }} disabled={loading || !!loadError} />}{type === 'Disbursement' && hasCheck && <AccountPicker accounts={accounts} label="البنك المسحوب عليه الشيك" kinds={['Bank']} value={bankId} onChange={(id) => { setBankId(id); clearMessage(); }} disabled={loading || !!loadError} />}</div>
-          <div><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-black text-brand">جدول الدفعات</h2><p className="text-xs text-stone-500">العملات النشطة تُحمّل من قاعدة البيانات. أدخل سعر الصرف إذا اخترت عملة غير أساسية.</p></div><button type="button" className="btn-outline" onClick={() => { setDrafts((current) => [...current, newDraft(nextKey.current++, String(baseCurrency?.currency_id ?? ''))]); clearMessage(); }}><Plus className="h-4 w-4" /> إضافة دفعة</button></div><PaymentDraftTable rows={drafts} currencies={currencies} onChange={editDraft} onRemove={(index) => { setDrafts((current) => current.filter((_, i) => i !== index)); clearMessage(); }} /></div>
-          <div className="flex flex-wrap items-center gap-2"><div className="flex items-center overflow-hidden rounded-lg border border-brand/15 bg-white"><input aria-label="عدد الشيكات المراد إضافتها" className="h-10 w-16 border-0 px-2 text-center text-sm font-bold outline-none" type="number" min="1" value={checksToAdd} onChange={(event) => setChecksToAdd(event.target.value)} /><button type="button" className="inline-flex h-10 items-center gap-2 bg-brand-50 px-3 text-xs font-black text-brand hover:bg-brand-100" onClick={addChecks}><CopyPlus className="h-4 w-4" /> إضافة شيكات</button></div><span className="text-xs text-stone-500">تُنسخ بيانات آخر شيك مع زيادة الرقم والاستحقاق، دون حد ثابت لعدد الشيكات.</span></div>
+          <AccountPicker accounts={manualAccounts} kinds={['General']} label={type === 'Receipt' ? 'المقبوض منه · حساب عام' : 'المدفوع له · حساب عام'} exclude={treasuryAccountIds} value={accountId} onChange={(id) => { setAccountId(id); clearMessage(); }} disabled={loading || !!loadError} showIdentity />
+          <div className="grid items-start gap-3 md:grid-cols-2">
+            {hasCash && <section className="min-w-0 rounded-xl border border-stone-200 bg-stone-50/60 p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-brand">النقد</h2><span className="text-sm font-bold text-brand">{formatMoney(methodTotal('Cash'), baseCurrency)}</span></div><AccountPicker accounts={cashChoices} label={type === 'Receipt' ? 'صندوق استلام النقد' : 'صندوق الصرف'} kinds={['Cash']} value={cashId} onChange={(id) => { setCashId(id); clearMessage(); }} disabled={loading || !!loadError || !cashChoices.length} showIdentity />{!loading && !loadError && !cashChoices.length && <p className="mt-2 text-sm text-stone-500">لا توجد صناديق نقد. اطلب من الأدمن إنشاء صندوق من {admin ? <Link className="underline" to="/owner/accounts?type=Cash&page=1">الحسابات</Link> : 'الحسابات'}.</p>}</section>}
+            {hasCheck && <section className="min-w-0 rounded-xl border border-stone-200 bg-stone-50/60 p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-brand">الشيكات</h2><span className="text-sm font-bold text-brand">{formatMoney(methodTotal('Check'), baseCurrency)}</span></div>{type === 'Receipt' ? <div><p className="font-bold text-brand">خزنة الشيكات</p><p className="mt-1 text-xs leading-6 text-stone-500">تُحفظ الشيكات هنا. إيداعها بالبنك من {admin ? <Link to="/owner/checks" className="underline">صفحة الشيكات</Link> : 'صفحة الشيكات'}.</p></div> : <><AccountPicker accounts={manualAccounts} label="البنك الذي يُسحب منه مبلغ الشيك" kinds={['Bank']} value={bankId} onChange={(id) => { setBankId(id); clearMessage(); }} disabled={loading || !!loadError} showIdentity /></>}</section>}
+          </div>
+          <div><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-black text-brand">جدول الدفعات</h2><p className="text-xs text-stone-500">العملات النشطة تُحمّل من قاعدة البيانات. أدخل سعر الصرف إذا اخترت عملة غير أساسية.</p></div><button type="button" className="btn-outline" onClick={() => { setDrafts((current) => [...current, newDraft(nextKey.current++, String(baseCurrency?.currency_id ?? ''))]); clearMessage(); }}><Plus className="h-4 w-4" /> إضافة دفعة</button></div><PaymentDraftTable scrollable rows={drafts} currencies={currencies} onChange={editDraft} onRemove={(index) => { setDrafts((current) => current.filter((_, i) => i !== index)); clearMessage(); }} /></div>
+          <div className="flex flex-wrap items-center gap-2"><div className="flex items-center overflow-hidden rounded-lg border border-brand/15 bg-white"><input aria-label="عدد الشيكات المراد إضافتها" className="h-11 w-16 border-0 px-2 text-center text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold" type="number" min="1" value={checksToAdd} onChange={(event) => setChecksToAdd(event.target.value)} /><button type="button" className="inline-flex min-h-11 items-center gap-2 bg-brand-50 px-3 text-xs font-black text-brand hover:bg-brand-100" onClick={addChecks}><CopyPlus className="h-4 w-4" /> إضافة شيكات</button></div><span className="text-xs text-stone-500">تُنسخ بيانات آخر شيك مع زيادة الرقم والاستحقاق، دون حد ثابت لعدد الشيكات.</span></div>
           <div className="rounded-xl bg-brand-50 p-3 font-black text-brand">الإجمالي بالعملة الأساسية: {formatMoney(total, baseCurrency)}</div>
         </div>}
       </section>
-      {error && <div className="rep-error" role="alert">{error}</div>}{success && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-800" role="status">{success}</div>}
+      {error && <div ref={errorRegion} tabIndex={-1} className="rep-error scroll-mt-24 outline-none" role="alert">{error}</div>}
       <div className="flex justify-end"><button type="submit" className="btn-primary min-w-36" disabled={saving || loading || !!loadError || !accounts.length}>{saving ? 'جارٍ الاعتماد…' : 'اعتماد السند'}</button></div>
     </form>
-    {pending && createPortal(<div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" dir="rtl"><button type="button" className="absolute inset-0" aria-label="إغلاق مراجعة السند" disabled={saving} onClick={() => setPending(null)} /><div role="dialog" aria-modal="true" aria-labelledby="voucher-review-title" className="relative z-10 w-full max-w-md rounded-2xl bg-white p-5 shadow-xl sm:p-6"><h2 id="voucher-review-title" className="text-xl font-black text-brand">مراجعة السند قبل الاعتماد</h2><p className="mt-2 text-sm text-stone-500">راجع عدد الدفعات والإجمالي. سيُحفظ كل سطر كسند أو شيك مستقل.</p><div className="mt-4 whitespace-pre-line rounded-xl bg-stone-50 p-4 text-sm leading-7 text-brand">{pending.summary}</div><div className="mt-5 flex justify-end gap-2"><button type="button" className="btn-outline" disabled={saving} onClick={() => setPending(null)}>رجوع للتعديل</button><button type="button" className="btn-primary" disabled={saving} onClick={() => void save()}>{saving ? 'جارٍ الحفظ…' : 'تأكيد الاعتماد'}</button></div></div></div>, document.body)}
+    <Modal open={!!success} title="تم الحفظ" size="sm" onClose={()=>setSuccess('')} footer={<div dir="rtl" className="grid gap-2"><button type="button" className="btn-primary min-h-11 w-full" onClick={()=>setSuccess('')}>حسنًا</button>{admin && successHasChecks && <Link className="btn-outline min-h-11 justify-center" to="/owner/checks">متابعة الشيكات</Link>}</div>}>
+      <div dir="rtl" role="status" className="flex flex-col items-center gap-3 py-3 text-center"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><CheckCircle2 className="h-8 w-8" aria-hidden="true" /></span><p className="text-lg font-bold text-brand">{success}</p>{successHasChecks && <p className="text-sm text-stone-500">يمكنك متابعة الشيكات من صفحة الشيكات.</p>}</div>
+    </Modal>
+    <Modal open={!!pending} title="مراجعة السند" onClose={saving?()=>undefined:()=>setPending(null)} size="lg" footer={<div dir="rtl" className="grid grid-cols-1 gap-2 sm:grid-cols-2"><button type="button" className="btn-primary min-h-11 sm:order-2" disabled={saving} onClick={()=>void save()}>{saving?'جارٍ الحفظ…':'تأكيد الاعتماد'}</button><button type="button" className="btn-outline min-h-11" disabled={saving} onClick={()=>setPending(null)}>رجوع للتعديل</button></div>}>
+      <div dir="rtl" className="min-w-0 space-y-4 text-brand">
+        {pending?.kind === 'batch' && <>
+          <div className="rounded-xl border border-stone-200 p-4">
+            <p className="text-xs text-stone-500">{pending.steps[0]?.type === 'Receipt' ? 'سند قبض · المقبوض منه' : 'سند صرف · المدفوع له'}</p>
+            <p className="mt-1 break-words font-bold">{accounts.find(account=>account.account_id===pending.steps[0]?.accountId)?.name}</p>
+            <p className="mt-2 text-xs text-stone-500">{pending.steps.length} دفعة · {pending.steps.filter(step=>step.input.payment_method==='Check').length} شيك</p>
+          </div>
+          <ol className="space-y-2" aria-label="الدفعات للمراجعة">
+            {pending.steps.map((step,index)=>{
+              const input=step.input;
+              const currency=currencies.find(item=>item.currency_id===input.currency_id);
+              const location= input.payment_method==='Cash' ? accounts.find(account=>account.account_id===input.money_account_id)?.name : step.type==='Receipt' ? 'خزنة الشيكات' : accounts.find(account=>account.account_id===input.bank_account_id)?.name;
+              return <li key={step.key} className="min-w-0 rounded-xl bg-stone-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-bold">{index+1}. {input.payment_method==='Check'?'شيك':'نقد'}</span><b dir="ltr" className="text-base tabular-nums">{formatMoney(input.amount,currency)}</b></div>
+                <p className="mt-2 break-words text-sm"><span className="text-stone-500">{input.payment_method==='Cash' ? step.type==='Receipt'?'صندوق الاستلام: ':'صندوق الصرف: ' : step.type==='Receipt'?'الوجهة: ':'البنك المسحوب منه: '}</span>{location}</p>
+                {input.check && <p className="mt-1 break-words text-xs text-stone-500">رقم الشيك: {input.check.check_number} · الاستحقاق: {input.check.due_date}</p>}
+                {currency && !currency.is_base && <p className="mt-1 text-xs text-stone-500">سعر الصرف: {input.exchange_rate} · بالعملة الأساسية: {formatMoney(convertedCents(String(input.amount),String(input.exchange_rate))! / 100,baseCurrency)}</p>}
+              </li>;
+            })}
+          </ol>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-brand-50 p-4"><span className="text-sm font-bold">الإجمالي بالعملة الأساسية</span><strong dir="ltr" className="text-xl tabular-nums">{formatMoney(pending.steps.reduce((sum,step)=>sum+(convertedCents(String(step.input.amount),String(step.input.exchange_rate))??0),0)/100,baseCurrency)}</strong></div>
+          <p className="text-xs text-stone-500">كل دفعة تُحفظ كسند مستقل.</p>
+        </>}
+        {pending?.kind === 'journal' && <>
+          <p className="text-sm text-stone-500">راجع أطراف القيد قبل الاعتماد.</p>
+          <div className="grid gap-3 sm:grid-cols-2">{(['debit','credit'] as const).map(side=><section key={side} className="min-w-0 rounded-xl border border-stone-200 p-3"><h3 className="mb-3 text-sm font-bold">{side==='debit'?'المدين':'الدائن'}</h3><ul className="space-y-3">{pending.input.lines.filter(line=>line[side]).map((line,index)=><li key={index} className="min-w-0 border-t border-stone-100 pt-2"><p className="break-words text-sm">{accounts.find(account=>account.account_id===line.account_id)?.name}</p><b dir="ltr" className="mt-1 block text-right tabular-nums">{formatMoney(line[side]!,baseCurrency)}</b></li>)}</ul><p className="mt-3 border-t pt-3 text-sm font-bold">الإجمالي: {formatMoney(pending.input.lines.reduce((sum,line)=>sum+(line[side]??0),0),baseCurrency)}</p></section>)}</div>
+          <p className="whitespace-pre-wrap break-words text-sm text-stone-500">{pending.input.notes}</p>
+        </>}
+      </div>
+    </Modal>
   </div>;
 }

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Modal from "./Modal";
 
 interface ConfirmDialogProps {
+  className?: string;
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -28,12 +29,14 @@ export default function ConfirmDialog({
   confirmDisabled = false,
   severity = "destructive",
   details,
+  className,
 }: ConfirmDialogProps) {
   const destructive = severity === "destructive";
   const Icon = destructive ? AlertTriangle : CircleHelp;
 
   return (
     <Modal
+      className={className}
       open={open}
       onClose={loading ? () => undefined : onClose}
       title={title}
@@ -59,6 +62,7 @@ export default function ConfirmDialog({
       )}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <button
+          type="button"
           disabled={loading || confirmDisabled}
           onClick={onConfirm}
           className={`${destructive ? "btn-danger" : "btn-primary"} flex-1 disabled:cursor-wait disabled:opacity-60`}
@@ -72,6 +76,7 @@ export default function ConfirmDialog({
           )}
         </button>
         <button
+          type="button"
           disabled={loading}
           onClick={onClose}
           className="btn-outline flex-1 disabled:opacity-50"

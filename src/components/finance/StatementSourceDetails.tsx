@@ -22,13 +22,13 @@ function Detail({ label, value }: { label: string; value: string | number | null
 
 export default function StatementSourceDetailsView({ details }: { details: StatementSourceDetails }) {
   const items = details.items ?? [];
-  return <div className="mt-3 space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm" style={{ breakInside: 'avoid' }}>
+  return <div className="mt-3 space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm" >
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
       <b className="text-brand">{details.kind === 'Order' ? 'فاتورة بيع' :
         details.kind === 'Purchase' ? 'عملية شراء' : details.kind === 'Return' ? details.return_type === 'SalesReturn' ? 'مردود مبيعات' : 'مردود مشتريات' :
         details.kind === 'Payment' ? details.payment_type === 'Receipt' ? 'سند قبض' : 'سند صرف' :
         details.kind === 'CheckMovement' ? 'حركة شيك' : 'رصيد افتتاحي'} {details.return_number ?? `#${details.reference_id}`}</b>
-      {details.is_reversal && <span className="font-bold text-red-700">حركة معكوسة</span>}
+      {details.is_reversal && <span className="font-bold text-red-700">حركة إلغاء</span>}
       {details.status && <span>{statuses[details.status] ?? details.status}</span>}
       {details.cancelled && <span>ملغى حاليًا</span>}
     </div>
@@ -44,14 +44,14 @@ export default function StatementSourceDetailsView({ details }: { details: State
       </tr>)}</tbody>
     </table></div>}
     <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-      {details.kind === 'Order' && <><Detail label="مجموع المنتجات بعد خصم البنود" value={details.subtotal ? formatMoney(details.subtotal) : null} /><Detail label="إجمالي خصومات المنتجات" value={details.product_discount_total ? formatMoney(details.product_discount_total) : null} /><Detail label="خصم الطلب" value={details.order_discount ? formatMoney(details.order_discount) : null} /></>}
+      {details.kind === 'Order' && <><Detail label="مجموع المنتجات بعد الخصم" value={details.subtotal ? formatMoney(details.subtotal) : null} /><Detail label="إجمالي خصومات المنتجات" value={details.product_discount_total ? formatMoney(details.product_discount_total) : null} /><Detail label="خصم الفاتورة" value={details.order_discount ? formatMoney(details.order_discount) : null} /></>}
       {(details.kind === 'Order' || details.kind === 'Purchase' || details.kind === 'Return') && <Detail label="الإجمالي النهائي" value={details.total ? formatMoney(details.total) : null} />}
       {details.kind === 'Return' && <><Detail label="تاريخ المردود" value={details.return_date?.slice(0,10)} /><Detail label="العملية الأصلية" value={details.purchase_id ? `شراء #${details.purchase_id}` : null} /></>}
       {details.kind === 'Payment' && <>
         <Detail label="الطريقة" value={details.method === 'Check' ? 'شيك' : 'نقد'} />
         <Detail label="المبلغ الأصلي" value={details.amount ? `${formatMoney(details.amount)} ${details.currency?.code ?? ''}` : null} />
         <Detail label="سعر الصرف" value={details.exchange_rate} />
-        <Detail label="بالعملة الأساسية" value={details.base_amount ? formatMoney(details.base_amount) : null} />
+        <Detail label="المبلغ المعتمد في الحساب" value={details.base_amount ? formatMoney(details.base_amount) : null} />
         {details.check && <><Detail label="رقم الشيك" value={details.check.number} /><Detail label="بنك الشيك" value={details.check.bank_name} /><Detail label="تاريخ الاستحقاق" value={details.check.due_date.slice(0, 10)} /><Detail label="موقع الشيك الحالي" value={checkLocations[details.check.location] ?? details.check.location} /></>}
       </>}
       {details.kind === 'CheckMovement' && <>
@@ -61,7 +61,7 @@ export default function StatementSourceDetailsView({ details }: { details: State
         <Detail label="تاريخ الاستحقاق" value={details.check?.due_date.slice(0, 10)} />
         <Detail label="موقع الشيك الحالي" value={details.check?.location ? checkLocations[details.check.location] ?? details.check.location : null} />
         <Detail label="المبلغ الأصلي" value={details.amount ? `${formatMoney(details.amount)} ${details.currency?.code ?? ''}` : null} />
-        <Detail label="بالعملة الأساسية" value={details.base_amount ? formatMoney(details.base_amount) : null} />
+        <Detail label="المبلغ المعتمد في الحساب" value={details.base_amount ? formatMoney(details.base_amount) : null} />
       </>}
     </div>
     {details.notes && <p className="whitespace-pre-wrap text-stone-600"><b>ملاحظات:</b> {details.notes}</p>}

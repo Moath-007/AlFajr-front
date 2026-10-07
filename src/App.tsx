@@ -99,7 +99,7 @@ const AccountDetailsPage = lazy(() => import('@/components/finance/AccountDetail
 const AccountSourcePage = lazy(() => import('@/components/finance/AccountSourcePage'));
 const VouchersPage = lazy(() => import('@/components/finance/VouchersPage'));
 const TreasuryPage = lazy(() => import('@/components/finance/TreasuryPage'));
-const AccountPaymentsPage = lazy(() => import('@/components/finance/AccountPaymentsPage'));
+const CashVouchersPage = lazy(() => import('@/components/finance/CashVouchersPage'));
 const ReturnsOperationsPage = lazy(() => import('@/components/finance/ReturnsOperationsPage'));
 const AdminCompanyProfilePage = lazy(
   () => import("@/components/owner/AdminCompanyProfilePage"),
@@ -112,7 +112,7 @@ const PurchasesPage = lazy(
   () => import("@/components/purchases/PurchasesPage"),
 );
 
-const RepDashboard = lazy(() => import("@/components/rep/RepDashboard"));
+
 const WholesaleProductsPage = lazy(
   () => import("@/components/rep/WholesaleProductsPage"),
 );
@@ -266,11 +266,9 @@ function OwnerLayout({ store }: { store: AppStore }) {
   const location = useLocation();
   const { user, logout } = useAuth();
   const ownerEditDirtyRef = useRef(false);
-  const [, setOwnerEditDirty] = useState(false);
   const [pendingAction, setPendingAction] = useState<null | (() => void)>(null);
   const handleOwnerEditDirtyChange = useCallback((dirty: boolean) => {
     ownerEditDirtyRef.current = dirty;
-    setOwnerEditDirty(dirty);
   }, []);
   const runOrConfirm = useCallback((action: () => void) => {
     if (ownerEditDirtyRef.current) setPendingAction(() => action);
@@ -427,9 +425,11 @@ function OwnerLayout({ store }: { store: AppStore }) {
                 <Route path="accounts" element={<AccountsPage />} />
                 <Route path="accounts/:id" element={<AccountDetailsPage />} />
                 <Route path="accounts/:id/statement" element={<AccountStatementPage />} />
+                <Route path="cash-vouchers" element={<CashVouchersPage />} />
                 <Route path="account-sources/:kind/:id" element={<AccountSourcePage />} />
                 <Route path="vouchers" element={<VouchersPage />} />
                 <Route path="treasury" element={<TreasuryPage />} />
+                <Route path="*" element={<Navigate to="/owner" replace />} />
                 <Route path="payments" element={<Navigate to="/owner/vouchers" replace />} />
                 <Route
                   path="returns"
@@ -528,12 +528,10 @@ function RepLayout() {
   const { user, logout } = useAuth();
   const { totalQuantity } = useWholesaleCart();
   const { resetStockVisibility } = useWholesaleStockVisibility();
-  const [, setEditDirty] = useState(false);
   const editDirtyRef = useRef(false);
   const [pendingAction, setPendingAction] = useState<null | (() => void)>(null);
   const handleEditDirtyChange = useCallback((dirty: boolean) => {
     editDirtyRef.current = dirty;
-    setEditDirty(dirty);
   }, []);
   const runOrConfirm = useCallback((action: () => void) => {
     if (editDirtyRef.current) setPendingAction(() => action);
@@ -571,7 +569,7 @@ function RepLayout() {
               <Routes>
                 <Route
                   path=""
-                  element={<RepDashboard onNavigate={repNavigate} />}
+                  element={<Navigate to="/rep/orders" replace />}
                 />
                 <Route
                   path="products"
@@ -617,7 +615,8 @@ function RepLayout() {
                 <Route path="accounts/:id" element={<AccountDetailsPage />} />
                 <Route path="accounts/:id/statement" element={<AccountStatementPage />} />
                 <Route path="account-sources/:kind/:id" element={<AccountSourcePage />} />
-                <Route path="payments" element={<AccountPaymentsPage />} />
+                <Route path="vouchers" element={<VouchersPage />} />
+                <Route path="payments" element={<Navigate to="/rep/vouchers" replace />} />
                 <Route path="returns" element={<ReturnsOperationsPage />} />
 
 

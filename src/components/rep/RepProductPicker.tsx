@@ -1,3 +1,4 @@
+import ProductImage from '@/components/ui/ProductImage';
 import { useCallback, useEffect, useState } from "react";
 import {
   ArrowRight,
@@ -220,7 +221,7 @@ export default function RepProductPicker({
             <div className="grid gap-5 lg:grid-cols-[220px_1fr]">
               <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-stone-100">
                 {details.images[0] ? (
-                  <img
+                  <ProductImage
                     src={
                       resolveApiAssetUrl(
                         details.images.find((image) => image.is_primary)?.url ??
@@ -386,7 +387,7 @@ export default function RepProductPicker({
                   >
                     <span className="relative block aspect-[16/9] bg-stone-100">
                       {product.primary_image ? (
-                        <img
+                        <ProductImage
                           src={
                             resolveApiAssetUrl(product.primary_image.url) ??
                             undefined

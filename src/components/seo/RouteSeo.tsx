@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
-import Seo, { DEFAULT_IMAGE, SITE_NAME, SITE_URL } from "./Seo";
+import Seo from "./Seo";
+import { DEFAULT_IMAGE, SITE_NAME, SITE_URL } from "./site";
 
 const publicPages: Record<string, { title: string; description: string }> = {
   "/": {

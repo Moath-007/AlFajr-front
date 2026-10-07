@@ -1,4 +1,4 @@
-import { apiClient } from '../client';
+import { apiClient } from "../client";
 import type {
   AccountIdentity,
   AccountIdentityEdit,
@@ -13,17 +13,17 @@ import type {
   AccountDiscountInput,
   AccountMovementQuery,
   EffectiveAccountStatement,
-} from '../types/accounts';
+} from "../types/accounts";
 const queryString = (query: AccountsQuery | AccountMovementQuery) => {
   const params = new URLSearchParams();
   Object.entries(query).forEach(([key, value]) => {
     if (value !== undefined) params.set(key, String(value));
   });
-  return params.size ? `?${params}` : '';
+  return params.size ? `?${params}` : "";
 };
 export const accountsService = {
   allOptions: async (
-    query: Omit<AccountsQuery, 'page' | 'limit'> = {},
+    query: Omit<AccountsQuery, "page" | "limit"> = {},
     signal?: AbortSignal,
   ): Promise<AccountIdentityOption[]> => {
     const items: AccountIdentityOption[] = [];
@@ -48,7 +48,7 @@ export const accountsService = {
       { signal },
     ),
   create: (input: AccountIdentityInput) =>
-    apiClient.post<AccountIdentity>('/accounts', input),
+    apiClient.post<AccountIdentity>("/accounts", input),
   edit: (id: number, input: AccountIdentityEdit) =>
     apiClient.patch<AccountIdentity>(`/accounts/${id}`, input),
   remove: (id: number) =>
@@ -63,11 +63,6 @@ export const accountsService = {
   ) =>
     apiClient.get<AccountFinancialDetail>(
       `/accounts/${id}/financial-details${queryString(query)}`,
-      { signal },
-    ),
-  opening: (id: number, signal?: AbortSignal) =>
-    apiClient.get<AccountFinancialDocument | null>(
-      `/accounts/${id}/opening-balance`,
       { signal },
     ),
   createOpening: (id: number, data: OpeningBalanceInput) =>
@@ -91,7 +86,7 @@ export const accountsService = {
   ) =>
     apiClient.get<{
       items: AccountFinancialDocument[];
-      pagination: AccountIdentityList['pagination'];
+      pagination: AccountIdentityList["pagination"];
     }>(`/accounts/${id}/discounts${queryString(query)}`, { signal }),
   discount: (id: number, signal?: AbortSignal) =>
     apiClient.get<AccountFinancialDocument>(`/account-discounts/${id}`, {

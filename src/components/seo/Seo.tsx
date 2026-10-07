@@ -1,8 +1,6 @@
 import { useEffect } from "react";
 
-const SITE_URL = "https://alfajr.com.ps";
-const DEFAULT_IMAGE = `${SITE_URL}/assets/al-fajr-logo.webp`;
-const SITE_NAME = "شركة الفجر للصناعة والتجارة";
+import { DEFAULT_IMAGE, SITE_NAME, SITE_URL } from "./site";
 
 interface SeoProps {
   title: string;
@@ -80,5 +78,3 @@ export default function Seo({
 
   return null;
 }
-
-export { DEFAULT_IMAGE, SITE_NAME, SITE_URL };

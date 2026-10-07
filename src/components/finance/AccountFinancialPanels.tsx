@@ -6,6 +6,7 @@ import {
   type OpeningBalanceInput,
   type PaginationResponseDto,
 } from '@/api';
+import { RepDateInput, RepSelect } from '@/components/rep/RepFormControls';
 import Modal from '@/components/ui/Modal';
 import {
   apiMessages,
@@ -118,14 +119,17 @@ export function FinancialDocumentEditor({
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
+            if (!date) { setError('اختر تاريخ المستند.'); return; }
             setConfirm(true);
           }}
         >
           <label className="block">
-            المبلغ (₪)
+            <span className="rep-label">المبلغ (₪)</span>
             <input
               required
               type="number"
+              inputMode="decimal"
+              disabled={busy}
               min={kind === 'Opening' ? 0 : 0.01}
               step="0.01"
               className="rep-control"
@@ -133,40 +137,10 @@ export function FinancialDocumentEditor({
               onChange={(e) => setAmount(e.target.value)}
             />
           </label>
+          <RepSelect label="الاتجاه" value={direction} onChange={setDirection} disabled={busy} options={(kind === 'Opening' ? (['Debit','Credit'] as const) : (['ReduceReceivable','ReducePayable'] as const)).map(value=>({value,label:directionLabels[value]}))} />
+          <RepDateInput label="تاريخ المستند" value={date} onChange={setDate} disabled={busy} />
           <label className="block">
-            الاتجاه
-            <select
-              className="rep-control"
-              aria-label="الاتجاه"
-              value={direction}
-              onChange={(e) =>
-                setDirection(
-                  e.target.value as AccountFinancialDocument['direction'],
-                )
-              }
-            >
-              {(kind === 'Opening'
-                ? (['Debit', 'Credit'] as const)
-                : (['ReduceReceivable', 'ReducePayable'] as const)
-              ).map((d) => (
-                <option key={d} value={d}>
-                  {directionLabels[d]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block">
-            تاريخ المستند
-            <input
-              required
-              type="date"
-              className="rep-control"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </label>
-          <label className="block">
-            السبب / ملاحظات
+            <span className="rep-label">السبب / ملاحظات</span>
             <textarea
               rows={3}
               className="rep-control"
@@ -227,15 +201,15 @@ export function OpeningPanel({
   }
   return (
     <section className="rounded-2xl border bg-white p-5">
-      <div className="mb-3 flex justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-bold text-brand">الرصيد الافتتاحي</h2>
         {admin && (!document || document.status === 'Completed') && (
-          <div className="flex gap-3 text-sm">
-            <button className="text-brand" onClick={() => setEditing(true)}>
+          <div className="flex flex-wrap gap-1 text-sm">
+            <button className="btn-ghost min-h-11 text-brand" onClick={() => setEditing(true)}>
               {document ? 'تعديل' : 'إضافة'}
             </button>
             {document && (
-              <button className="text-red-700" onClick={() => setCancel(true)}>
+              <button className="btn-ghost min-h-11 text-red-700 hover:bg-red-50" onClick={() => setCancel(true)}>
                 إلغاء المستند
               </button>
             )}
@@ -337,7 +311,7 @@ export function DiscountPanel({
   }
   return (
     <section className="rounded-2xl border bg-white p-5">
-      <header className="mb-4 flex justify-between gap-3">
+      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-bold text-brand">خصومات على الحساب</h2>
         <button
           className="btn-outline"
@@ -372,13 +346,13 @@ export function DiscountPanel({
                 {d.status === 'Completed' && (
                   <>
                     <button
-                      className="text-brand"
+                      className="btn-ghost min-h-11 text-brand"
                       onClick={() => setEditor({ document: d })}
                     >
                       تعديل
                     </button>
                     <button
-                      className="text-red-700"
+                      className="btn-ghost min-h-11 text-red-700 hover:bg-red-50"
                       onClick={() => setAction({ document: d, kind: 'cancel' })}
                     >
                       إلغاء
@@ -386,7 +360,7 @@ export function DiscountPanel({
                   </>
                 )}
                 <button
-                  className="text-red-700"
+                  className="btn-ghost min-h-11 text-red-700 hover:bg-red-50"
                   onClick={() => setAction({ document: d, kind: 'delete' })}
                 >
                   حذف نهائي

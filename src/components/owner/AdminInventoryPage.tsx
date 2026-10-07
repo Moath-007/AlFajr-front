@@ -1,103 +1,57 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Boxes, History, RefreshCw, Search } from "lucide-react";
+import { useInventoryMovements } from './useInventoryMovements';
+import { useOpeningStock } from './useOpeningStock';
+
 import {
   categoriesService,
   colorsService,
   inventoryService,
   type CategoryResponseDto,
-  type ColorResponseDto,
-  type InventoryItemDto,
-  type InventoryMovementDto,
-  type PaginationResponseDto,
-  type StockStatus,
+  type ColorResponseDto
 } from "@/api";
-import { Skeleton } from "@/components/ui/Skeleton";
-import EmptyState from "@/components/ui/EmptyState";
-import Modal from "@/components/ui/Modal";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { RepSelect } from "@/components/rep/RepFormControls";
 import { apiMessages } from "@/components/rep/repOrderUtils";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import EmptyState from "@/components/ui/EmptyState";
+import Modal from "@/components/ui/Modal";
+import { Skeleton } from "@/components/ui/Skeleton";
+import {
+  Boxes,
+  History,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState
+} from "react";
+import { createPortal } from "react-dom";
+import { InventoryMovementRow, MovementPagination, StockBadge } from './InventoryDisplay';
+import { formatInventoryCost, movementLabels, westernNumber } from './inventoryPresentation';
+import { useInventoryList } from './useInventoryList';
 
-const empty: PaginationResponseDto = {
-  page: 1,
-  limit: 20,
-  total: 0,
-  total_pages: 0,
-};
-const emptyMovementPagination: PaginationResponseDto = {
-  page: 1,
-  limit: 10,
-  total: 0,
-  total_pages: 0,
-};
-const movementLabels: Record<string, string> = {
-  Sale: "بيع وخصم من المخزون",
-  Order: "طلب",
-  OrderEdit: "تعديل طلب",
-  OrderCancelled: "إلغاء طلب",
-  CustomerPurchase: "شراء بضاعة",
-  CustomerPurchaseEdit: "تعديل شراء بضاعة",
-  CustomerPurchaseCancelled: "إلغاء شراء بضاعة",
-  SalesReturn: "مردود مبيعات",
-  PurchaseReturn: "مردود مشتريات",
-  ReturnCancelled: "إلغاء مردود",
-  OpeningStockCorrected: "تصحيح مخزون افتتاحي",
-  OpeningStockCancelled: "إلغاء مخزون افتتاحي",
-  OpeningBalance: "رصيد افتتاحي",
-  OpeningStock: "مخزون افتتاحي",
-  OpeningBalanceCancelled: "إلغاء رصيد افتتاحي",
-  Cancellation: "إلغاء",
-};
+import CheckFiltersPopover from "@/components/finance/CheckFiltersPopover";
+import "./AdminInventoryPage.css";
 export default function AdminInventoryPage() {
-  const [items, setItems] = useState<InventoryItemDto[]>([]);
-  const [pagination, setPagination] = useState(empty);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("");
-  const [color, setColor] = useState("");
-  const [stock, setStock] = useState("");
-  const [threshold, setThreshold] = useState("5");
-  const [sort, setSort] = useState("stock_quantity:asc");
+  const { items, pagination, page, setPage, search, setSearch, setQuery, category, setCategory, color, setColor, stock, setStock, threshold, setThreshold, sort, setSort, loading, errors, setRetry, load } = useInventoryList();
+  const { movementItem, setMovementItem, movements, movementsLoading, movementSearch, setMovementSearch, movementQuery, movementSource, setMovementSource, setMovementPage, movementPagination, movementError, openMovements } = useInventoryMovements();
+  const { openingItem, setOpeningItem, pendingOpeningItem, setPendingOpeningItem, openingQuantity, setOpeningQuantity, openingCost, setOpeningCost, existingOpeningCost, setExistingOpeningCost, openingRows, selectedOpeningId, setSelectedOpeningId, openingReady, stockErrors, setStockErrors, confirm, setConfirm, saving, setSaving, notice, setNotice, openOpening, prepare, saveOpening } = useOpeningStock(load);
+
+  const [advanced, setAdvanced] = useState(false);
+  const filterTrigger = useRef<HTMLButtonElement>(null);
+  const closeAdvanced = useCallback(() => {
+    setAdvanced(false);
+    filterTrigger.current?.focus();
+  }, []);
+
   const [categories, setCategories] = useState<CategoryResponseDto[]>([]);
   const [colors, setColors] = useState<ColorResponseDto[]>([]);
   const [auxErrors, setAuxErrors] = useState<string[]>([]);
   const [auxRetry, setAuxRetry] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [retry, setRetry] = useState(0);
-  const [openingItem, setOpeningItem] = useState<InventoryItemDto | null>(null);
-  const [pendingOpeningItem, setPendingOpeningItem] =
-    useState<InventoryItemDto | null>(null);
-  const [openingQuantity, setOpeningQuantity] = useState("");
-  const [openingCost, setOpeningCost] = useState("");
-  const [existingOpeningCost, setExistingOpeningCost] = useState<string | null>(
-    null,
-  );
-  const [openingRows, setOpeningRows] = useState<
-    { id: number; quantity: number; unit_cost: string }[]
-  >([]);
-  const [selectedOpeningId, setSelectedOpeningId] = useState<number | null>(
-    null,
-  );
-  const [openingReady, setOpeningReady] = useState(false);
-  const [movementItem, setMovementItem] = useState<InventoryItemDto | null>(
-    null,
-  );
-  const [movements, setMovements] = useState<InventoryMovementDto[]>([]);
-  const [movementsLoading, setMovementsLoading] = useState(false);
-  const [movementSearch, setMovementSearch] = useState("");
-  const [movementQuery, setMovementQuery] = useState("");
-  const [movementSource, setMovementSource] = useState("");
-  const [movementPage, setMovementPage] = useState(1);
-  const [movementPagination, setMovementPagination] = useState(
-    emptyMovementPagination,
-  );
-  const [movementError, setMovementError] = useState("");
-  const [stockErrors, setStockErrors] = useState<string[]>([]);
-  const [confirm, setConfirm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState("");
+
   useEffect(() => {
     const c = new AbortController();
     setAuxErrors([]);
@@ -121,56 +75,7 @@ export default function AdminInventoryPage() {
     });
     return () => c.abort();
   }, [auxRetry]);
-  const load = useCallback(
-    (signal?: AbortSignal) => {
-      setLoading(true);
-      setErrors([]);
-      const [sort_by, sort_order] = sort.split(":") as [
-        "stock_quantity" | "product_name" | "code",
-        "asc" | "desc",
-      ];
-      return inventoryService
-        .list(
-          {
-            page,
-            limit: 20,
-            search: query || undefined,
-            category_id: category ? Number(category) : undefined,
-            color_id: color ? Number(color) : undefined,
-            stock_status: (stock as StockStatus) || undefined,
-            threshold: Number(threshold || 5),
-            sort_by,
-            sort_order,
-          },
-          signal,
-        )
-        .then((r) => {
-          if (signal?.aborted) return;
-          setItems(r.items);
-          setPagination(r.pagination);
-        })
-        .catch((e) => {
-          if (!signal?.aborted)
-            setErrors(apiMessages(e, "تعذر تحميل المخزون."));
-        })
-        .finally(() => {
-          if (!signal?.aborted) setLoading(false);
-        });
-    },
-    [category, color, page, query, sort, stock, threshold],
-  );
-  useEffect(() => {
-    const c = new AbortController();
-    void load(c.signal);
-    return () => c.abort();
-  }, [load, retry]);
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setPage(1);
-      setQuery(search.trim());
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [search]);
+
   const change = (setter: (v: string) => void) => (v: string) => {
     setter(v);
     setPage(1);
@@ -185,147 +90,62 @@ export default function AdminInventoryPage() {
     setSort("stock_quantity:asc");
     setPage(1);
   };
-  const openOpening = (item: InventoryItemDto) => {
-    setOpeningItem(item);
-    setSelectedOpeningId(null);
-    setOpeningRows([]);
-    setOpeningQuantity("");
-    setOpeningCost("");
-    setExistingOpeningCost(null);
-    setOpeningReady(false);
-    setStockErrors([]);
-  };
-  useEffect(() => {
-    if (!openingItem) return;
-    let cancelled = false;
-    void inventoryService
-      .cost(openingItem.product_variant_id)
-      .then((result) => {
-        if (cancelled) return;
-        setOpeningRows(result.openings);
-        setOpeningReady(true);
-      })
-      .catch((error) => {
-        if (!cancelled)
-          setStockErrors(apiMessages(error, "تعذر تحميل السعر الافتتاحي."));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [openingItem]);
-  const prepare = (e: FormEvent) => {
-    e.preventDefault();
-    if (!openingItem || !openingReady) return;
-    const quantity = Number(openingQuantity);
-    const price = Number(openingCost);
-    if (openingCost.trim() === "" || !Number.isFinite(price) || price < 0) {
-      setStockErrors(["أدخل سعر شراء افتتاحي صحيحًا."]);
-      return;
-    }
-    if (
-      openingQuantity.trim() === "" ||
-      !Number.isInteger(quantity) ||
-      quantity <= 0
-    ) {
-      setStockErrors(["أدخل كمية صحيحة موجبة للحركة الافتتاحية."]);
-      return;
-    }
-    setStockErrors([]);
-    setPendingOpeningItem(openingItem);
-    setOpeningItem(null);
-    setConfirm(true);
-  };
-  const saveOpening = async () => {
-    if (!pendingOpeningItem) return;
-    setSaving(true);
-    setStockErrors([]);
-    try {
-      const result =
-        selectedOpeningId === null
-          ? await inventoryService.openingStock(
-              pendingOpeningItem.product_variant_id,
-              {
-                quantity: Number(openingQuantity),
-                unit_cost: Number(openingCost),
-              },
-            )
-          : await inventoryService.editOpening(
-              pendingOpeningItem.product_variant_id,
-              selectedOpeningId,
-              {
-                quantity: Number(openingQuantity),
-                unit_cost: Number(openingCost),
-              },
-            );
-      setConfirm(false);
-      setPendingOpeningItem(null);
-      setNotice(result.message);
-      await load();
-    } catch (e) {
-      setConfirm(false);
-      setOpeningItem(pendingOpeningItem);
-      setPendingOpeningItem(null);
-      setStockErrors(apiMessages(e, "تعذر حفظ المخزون الافتتاحي."));
-    } finally {
-      setSaving(false);
-    }
-  };
-  const openMovements = (item: InventoryItemDto) => {
-    setMovementItem(item);
-    setMovements([]);
-    setMovementSearch("");
-    setMovementQuery("");
-    setMovementSource("");
-    setMovementPage(1);
-    setMovementPagination(emptyMovementPagination);
-    setMovementError("");
-  };
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setMovementPage(1);
-      setMovementQuery(movementSearch.trim());
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [movementSearch]);
-  useEffect(() => {
-    if (!movementItem) return;
-    const controller = new AbortController();
-    setMovementsLoading(true);
-    setMovementError("");
-    inventoryService
-      .movements(
-        movementItem.product_variant_id,
-        {
-          page: movementPage,
-          limit: 10,
-          search: movementQuery || undefined,
-          source_type: movementSource || undefined,
-        },
-        controller.signal,
-      )
-      .then((response) => {
-        if (controller.signal.aborted) return;
-        setMovements(response.items);
-        setMovementPagination(response.pagination);
-      })
-      .catch((error) => {
-        if (!controller.signal.aborted)
-          setMovementError(
-            apiMessages(error, "تعذر تحميل حركات المخزون.").join("، "),
-          );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setMovementsLoading(false);
-      });
-    return () => controller.abort();
-  }, [movementItem, movementPage, movementQuery, movementSource]);
+  const advancedCount = [
+    category,
+    color,
+    threshold !== "5" ? threshold : "",
+    sort !== "stock_quantity:asc" ? sort : "",
+  ].filter(Boolean).length;
+  const chips = [
+    {
+      key: "search",
+      value: search.trim(),
+      label: `البحث: ${search.trim()}`,
+      clear: () => {
+        setSearch("");
+        setQuery("");
+        setPage(1);
+      },
+    },
+    {
+      key: "stock",
+      value: stock,
+      label: `المخزون: ${{ in_stock: "متوفر", low_stock: "منخفض", out_of_stock: "نفد" }[stock] ?? ""}`,
+      clear: () => change(setStock)(""),
+    },
+    {
+      key: "category",
+      value: category,
+      label: `التصنيف: ${categories.find((c) => String(c.category_id) === category)?.name ?? "محدد"}`,
+      clear: () => change(setCategory)(""),
+    },
+    {
+      key: "color",
+      value: color,
+      label: `اللون: ${colors.find((c) => String(c.color_id) === color)?.name ?? "محدد"}`,
+      clear: () => change(setColor)(""),
+    },
+    {
+      key: "threshold",
+      value: threshold !== "5" && threshold ? threshold : "",
+      label: `حد المخزون المنخفض: ${threshold}`,
+      clear: () => change(setThreshold)("5"),
+    },
+    {
+      key: "sort",
+      value: sort !== "stock_quantity:asc" ? sort : "",
+      label: `الترتيب: ${{ "stock_quantity:desc": "الأعلى مخزونًا", "product_name:asc": "اسم المنتج", "code:asc": "الكود" }[sort] ?? ""}`,
+      clear: () => change(setSort)("stock_quantity:asc"),
+    },
+  ].filter((chip) => chip.value);
+
   return (
-    <div className="space-y-6">
+    <div className="inventory-page space-y-4" dir="rtl">
       <header className="border-b pb-5">
         <p className="text-xs font-black text-gold-dark">المخزون الحالي</p>
         <h1 className="mt-1 text-3xl font-black text-brand">إدارة المخزون</h1>
         <p className="mt-2 text-sm text-stone-500">
-          راقب الحركات وسجّل إضافة أو خصمًا يدويًا موثقًا لكل خيار.
+          تابع أرصدة الأصناف وتكلفتها وحركات المخزون.
         </p>
       </header>
       {notice && (
@@ -334,7 +154,7 @@ export default function AdminInventoryPage() {
         </div>
       )}
       <section className="rounded-2xl border bg-white p-4">
-        <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="inventory-quick-filters">
           <label>
             <span className="rep-label">البحث</span>
             <span className="relative block">
@@ -348,30 +168,6 @@ export default function AdminInventoryPage() {
             </span>
           </label>
           <RepSelect
-            label="التصنيف"
-            value={category}
-            onChange={change(setCategory)}
-            options={[
-              { value: "", label: "كل التصنيفات" },
-              ...categories.map((x) => ({
-                value: String(x.category_id),
-                label: x.name,
-              })),
-            ]}
-          />
-          <RepSelect
-            label="اللون"
-            value={color}
-            onChange={change(setColor)}
-            options={[
-              { value: "", label: "كل الألوان" },
-              ...colors.map((x) => ({
-                value: String(x.color_id),
-                label: x.name,
-              })),
-            ]}
-          />
-          <RepSelect
             label="حالة المخزون"
             value={stock}
             onChange={change(setStock)}
@@ -382,47 +178,105 @@ export default function AdminInventoryPage() {
               { value: "out_of_stock", label: "نفد" },
             ]}
           />
-          <label>
-            <span className="rep-label">حد المخزون المنخفض</span>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              className="rep-control"
-              value={threshold}
-              onChange={(e) => {
-                setThreshold(e.target.value);
-                setPage(1);
-              }}
-            />
-          </label>
-          <RepSelect
-            label="الترتيب"
-            value={sort}
-            onChange={change(setSort)}
-            options={[
-              { value: "stock_quantity:asc", label: "الأقل مخزونًا" },
-              { value: "stock_quantity:desc", label: "الأعلى مخزونًا" },
-              { value: "product_name:asc", label: "اسم المنتج" },
-              { value: "code:asc", label: "الكود" },
-            ]}
-          />
-        </div>
-        {(search ||
-          query ||
-          category ||
-          color ||
-          stock ||
-          threshold !== "5" ||
-          sort !== "stock_quantity:asc") && (
           <button
+            ref={filterTrigger}
             type="button"
-            onClick={clear}
-            className="mt-3 text-xs font-black text-gold-dark"
+            className="btn-outline inventory-filter-trigger"
+            aria-expanded={advanced}
+            onClick={() => setAdvanced(!advanced)}
           >
-            مسح الفلاتر
-          </button>
-        )}
+            <SlidersHorizontal size={18} />
+            فلاتر إضافية{advancedCount > 0 && <span>{advancedCount}</span>}
+          </button>{" "}
+        </div>
+        <CheckFiltersPopover
+          open={advanced}
+          onClose={closeAdvanced}
+          trigger={filterTrigger}
+          footer={
+            <button
+              type="button"
+              className="text-sm font-bold text-brand"
+              onClick={clear}
+            >
+              مسح الكل
+            </button>
+          }
+        >
+          <div className="grid gap-3">
+            {" "}
+            <RepSelect
+              floating
+              label="التصنيف"
+              value={category}
+              onChange={change(setCategory)}
+              options={[
+                { value: "", label: "كل التصنيفات" },
+                ...categories.map((x) => ({
+                  value: String(x.category_id),
+                  label: x.name,
+                })),
+              ]}
+            />
+            <RepSelect
+              floating
+              label="اللون"
+              value={color}
+              onChange={change(setColor)}
+              options={[
+                { value: "", label: "كل الألوان" },
+                ...colors.map((x) => ({
+                  value: String(x.color_id),
+                  label: x.name,
+                })),
+              ]}
+            />
+            <label>
+              <span className="rep-label">حد المخزون المنخفض</span>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                className="rep-control"
+                value={threshold}
+                onChange={(e) => {
+                  setThreshold(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </label>
+            <RepSelect
+              floating
+              label="الترتيب"
+              value={sort}
+              onChange={change(setSort)}
+              options={[
+                { value: "stock_quantity:asc", label: "الأقل مخزونًا" },
+                { value: "stock_quantity:desc", label: "الأعلى مخزونًا" },
+                { value: "product_name:asc", label: "اسم المنتج" },
+                { value: "code:asc", label: "الكود" },
+              ]}
+            />
+          </div>
+        </CheckFiltersPopover>
+        <div className="inventory-chips">
+          {chips.map((chip) => (
+            <button
+              key={chip.key}
+              onClick={chip.clear}
+              type="button"
+              aria-label={`إزالة فلتر ${chip.label}`}
+            >
+              <span>{chip.label}</span>
+              <X size={14} />
+            </button>
+          ))}
+          {chips.length > 0 && (
+            <button type="button" onClick={clear}>
+              مسح الكل
+            </button>
+          )}
+        </div>{" "}
         {auxErrors.length > 0 && (
           <div className="mt-3 flex justify-between rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">
             <span>{auxErrors.join("، ")}</span>
@@ -436,7 +290,7 @@ export default function AdminInventoryPage() {
         )}
       </section>
       {errors.length > 0 && (
-        <div className="rep-error text-center">
+        <div role="alert" className="rep-error text-center">
           {errors.join("، ")}
           <button
             onClick={() => setRetry((v) => v + 1)}
@@ -447,28 +301,45 @@ export default function AdminInventoryPage() {
           </button>
         </div>
       )}
+      <p className="text-xs text-stone-500">
+        {pagination.total} صنف · صفحة {page} من{" "}
+        {Math.max(1, pagination.total_pages)}
+      </p>
       {loading ? (
-        <Skeleton className="h-96" />
-      ) : items.length === 0 ? (
+        <div role="status">
+          <span className="sr-only">جارٍ تحميل المخزون…</span>
+          <Skeleton className="h-96" />
+        </div>
+      ) : errors.length > 0 ? null : items.length === 0 ? (
         <EmptyState
           icon={<Boxes className="h-8 w-8" />}
-          title="لا توجد خيارات مطابقة"
+          title={
+            chips.length ? "لا توجد أصناف مطابقة" : "لا توجد أصناف في المخزون"
+          }
+          action={
+            chips.length ? (
+              <button className="btn-outline" onClick={clear}>
+                مسح الكل
+              </button>
+            ) : undefined
+          }
         />
       ) : (
         <>
           <div className="hidden overflow-x-auto rounded-2xl border bg-white lg:block">
-            <table className="w-full min-w-[850px] text-sm">
+            <table className="inventory-table">
               <thead className="bg-stone-50">
                 <tr>
                   {[
                     "المنتج",
+                    "رمز المنتج",
                     "التصنيف",
                     "الحجم",
                     "اللون",
                     "الكمية",
                     "متوسط التكلفة",
                     "الحالة",
-                    "",
+                    "الإجراءات",
                   ].map((x, i) => (
                     <th key={`${x}-${i}`} className="px-4 py-3 text-right">
                       {x}
@@ -478,21 +349,37 @@ export default function AdminInventoryPage() {
               </thead>
               <tbody className="divide-y">
                 {items.map((x) => (
-                  <tr key={x.product_variant_id}>
+                  <tr
+                    key={x.product_variant_id}
+                    tabIndex={0}
+                    aria-label={`حركات ${x.product.name} ${x.size} ${x.color.name}`}
+                    onClick={() => openMovements(x)}
+                    onKeyDown={(e) => {
+                      if (
+                        e.target === e.currentTarget &&
+                        (e.key === "Enter" || e.key === " ")
+                      ) {
+                        e.preventDefault();
+                        openMovements(x);
+                      }
+                    }}
+                  >
                     <td className="px-4 py-3">
                       <b className="block text-brand">{x.product.name}</b>
-                      <small>{x.product.code}</small>
+                    </td>
+                    <td className="inventory-product-code">
+                      <span dir="ltr">{x.product.code}</span>
                     </td>
                     <td className="px-4">{x.category.name}</td>
                     <td className="px-4">{x.size}</td>
                     <td className="px-4">{x.color.name}</td>
-                    <td className="px-4 text-2xl font-black">
-                      {x.stock_quantity}
+                    <td className="inventory-quantity">
+                      <span dir="ltr">{x.stock_quantity}</span>
                     </td>
                     <td className="px-4 text-sm font-bold">
                       {x.average_cost === null
                         ? "لم يُدخل"
-                        : `${x.average_cost} ₪`}
+                        : formatInventoryCost(x.average_cost)}
                     </td>
                     <td className="px-4">
                       <StockBadge
@@ -501,20 +388,25 @@ export default function AdminInventoryPage() {
                       />
                     </td>
                     <td className="px-4">
-                      <div className="flex gap-2">
+                      <div
+                        className="inventory-actions"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <button
                           onClick={() => openOpening(x)}
-                          className="rounded-lg bg-brand px-3 py-2 text-xs font-black text-white"
+                          className="inventory-opening-action"
+                          title="المخزون الافتتاحي"
+                          aria-label={`المخزون الافتتاحي ${x.product.name}`}
                         >
-                          {x.average_cost === null
-                            ? "إضافة مخزون افتتاحي"
-                            : "تعديل السعر الافتتاحي"}
+                          المخزون الافتتاحي
                         </button>
                         <button
                           onClick={() => void openMovements(x)}
-                          className="rounded-lg border px-3 py-2 text-xs font-black"
+                          className="inventory-history-action"
+                          title="حركات المخزون"
+                          aria-label={`حركات المخزون ${x.product.name}`}
                         >
-                          <History className="inline h-4 w-4" /> الحركات
+                          <History size={17} />
                         </button>
                       </div>
                     </td>
@@ -523,7 +415,7 @@ export default function AdminInventoryPage() {
               </tbody>
             </table>
           </div>
-          <div className="space-y-3 lg:hidden">
+          <div className="inventory-cards lg:hidden">
             {items.map((x) => (
               <article
                 key={x.product_variant_id}
@@ -540,7 +432,9 @@ export default function AdminInventoryPage() {
                     </p>
                   </div>
                   <div className="text-center">
-                    <b className="block text-3xl">{x.stock_quantity}</b>
+                    <b className="block text-3xl" dir="ltr">
+                      {x.stock_quantity}
+                    </b>
                     <StockBadge
                       quantity={x.stock_quantity}
                       threshold={Number(threshold || 5)}
@@ -552,7 +446,7 @@ export default function AdminInventoryPage() {
                   <b>
                     {x.average_cost === null
                       ? "لم يُدخل"
-                      : `${x.average_cost} ₪`}
+                      : formatInventoryCost(x.average_cost)}
                   </b>
                 </p>
                 <button
@@ -574,27 +468,36 @@ export default function AdminInventoryPage() {
           </div>
         </>
       )}
-      {pagination.total_pages > 1 && (
-        <div className="flex justify-center gap-3">
-          <button
-            className="btn-outline"
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
+      {pagination.total_pages > 1 &&
+        createPortal(
+          <div
+            dir="rtl"
+            className="inventory-pagination"
+            role="navigation"
+            aria-label="صفحات المخزون"
           >
-            السابق
-          </button>
-          <span className="py-2 text-sm font-bold">
-            {page} / {pagination.total_pages}
-          </span>
-          <button
-            className="btn-outline"
-            disabled={page >= pagination.total_pages}
-            onClick={() => setPage(page + 1)}
-          >
-            التالي
-          </button>
-        </div>
-      )}
+            <button
+              dir="rtl"
+              className="btn-outline"
+              disabled={loading || page <= 1}
+              onClick={() => setPage(page - 1)}
+            >
+              السابق
+            </button>
+            <span className="py-2 text-sm font-bold">
+              صفحة {page} من {pagination.total_pages}
+            </span>
+            <button
+              dir="rtl"
+              className="btn-outline"
+              disabled={loading || page >= pagination.total_pages}
+              onClick={() => setPage(page + 1)}
+            >
+              التالي
+            </button>
+          </div>,
+          document.body,
+        )}
       <Modal
         open={openingItem !== null}
         onClose={() => setOpeningItem(null)}
@@ -832,194 +735,5 @@ export default function AdminInventoryPage() {
         )}
       </Modal>
     </div>
-  );
-}
-function movementLabel(source: string) {
-  return movementLabels[source] ?? "حركة مخزون";
-}
-function westernNumber(value: number) {
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 0,
-    useGrouping: false,
-  }).format(value);
-}
-function westernDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  })
-    .format(new Date(value))
-    .replace(",", "")
-    .toUpperCase();
-}
-function movementReference(movement: InventoryMovementDto) {
-  if (movement.order_id)
-    return (
-      <>
-        طلب <span dir="ltr">#{westernNumber(movement.order_id)}</span>
-      </>
-    );
-  if (movement.customer_purchase_id)
-    return (
-      <>
-        شراء زبون{" "}
-        <span dir="ltr">#{westernNumber(movement.customer_purchase_id)}</span>
-      </>
-    );
-  if (movement.customer_return_id)
-    return (
-      <>
-        مردود{" "}
-        <span dir="ltr">#{westernNumber(movement.customer_return_id)}</span>
-      </>
-    );
-  return (
-    <>
-      حركة{" "}
-      <span dir="ltr">#{westernNumber(movement.inventory_movement_id)}</span>
-    </>
-  );
-}
-function InventoryMovementRow({
-  movement,
-}: {
-  movement: InventoryMovementDto;
-}) {
-  const positive = movement.quantity_change > 0;
-  return (
-    <article className="rounded-xl border border-stone-200 bg-white px-3 py-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-black text-brand">
-              {movementLabel(movement.source_type)}
-            </h3>
-            <span
-              dir="ltr"
-              className={`inline-flex min-w-10 items-center justify-center rounded-full px-2 py-0.5 text-xs font-black ${positive ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800"}`}
-            >
-              {positive ? "+" : ""}
-              {westernNumber(movement.quantity_change)}
-            </span>
-          </div>
-          <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-stone-500">
-            <span>{movementReference(movement)}</span>
-            <span aria-hidden="true">·</span>
-            <span>{movement.users?.name ?? "النظام"}</span>
-            <span aria-hidden="true">·</span>
-            <time dir="ltr" dateTime={movement.created_at}>
-              {westernDateTime(movement.created_at)}
-            </time>
-          </p>
-        </div>
-        <strong
-          dir="ltr"
-          className="shrink-0 rounded-lg bg-stone-50 px-3 py-1.5 text-base tracking-wide text-brand"
-        >
-          {westernNumber(movement.before_quantity)}{" "}
-          <span className="text-stone-400">→</span>{" "}
-          {westernNumber(movement.after_quantity)}
-        </strong>
-      </div>
-      {movement.notes && (
-        <p className="mt-2 border-t border-stone-100 pt-2 text-xs text-stone-600">
-          {movement.notes}
-        </p>
-      )}
-    </article>
-  );
-}
-function MovementPagination({
-  pagination,
-  onChange,
-}: {
-  pagination: PaginationResponseDto;
-  onChange: (page: number) => void;
-}) {
-  const first = (pagination.page - 1) * pagination.limit + 1;
-  const last = Math.min(pagination.page * pagination.limit, pagination.total);
-  const start = Math.max(
-    1,
-    Math.min(pagination.page - 2, pagination.total_pages - 4),
-  );
-  const pages = Array.from(
-    { length: Math.min(5, pagination.total_pages) },
-    (_, index) => start + index,
-  );
-  return (
-    <nav
-      className="mt-3 flex flex-col gap-2 border-t border-stone-100 pt-3 sm:flex-row sm:items-center sm:justify-between"
-      aria-label="صفحات حركات المخزون"
-    >
-      <p className="text-center text-xs font-bold text-stone-500">
-        <span dir="ltr">
-          {westernNumber(first)}–{westernNumber(last)}
-        </span>{" "}
-        من <span dir="ltr">{westernNumber(pagination.total)}</span>
-      </p>
-      {pagination.total_pages > 1 && (
-        <div className="flex items-center justify-center gap-1" dir="rtl">
-          <button
-            type="button"
-            className="btn-outline min-h-9 px-3 py-1.5 text-xs"
-            disabled={pagination.page <= 1}
-            onClick={() => onChange(pagination.page - 1)}
-          >
-            السابق
-          </button>
-          {pages.map((page) => (
-            <button
-              key={page}
-              type="button"
-              dir="ltr"
-              aria-current={page === pagination.page ? "page" : undefined}
-              className={
-                page === pagination.page
-                  ? "h-9 min-w-9 rounded-lg bg-brand px-2 text-xs font-black text-white"
-                  : "h-9 min-w-9 rounded-lg border border-stone-200 bg-white px-2 text-xs font-black text-stone-600 hover:border-brand/30 hover:bg-brand-50"
-              }
-              onClick={() => onChange(page)}
-            >
-              {westernNumber(page)}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="btn-outline min-h-9 px-3 py-1.5 text-xs"
-            disabled={pagination.page >= pagination.total_pages}
-            onClick={() => onChange(pagination.page + 1)}
-          >
-            التالي
-          </button>
-        </div>
-      )}
-    </nav>
-  );
-}
-function StockBadge({
-  quantity,
-  threshold,
-}: {
-  quantity: number;
-  threshold: number;
-}) {
-  const state =
-    quantity < 0
-      ? ["عجز بالمخزون", "bg-red-100 text-red-800"]
-      : quantity === 0
-        ? ["نفد المخزون", "bg-red-50 text-red-700"]
-        : quantity <= threshold
-          ? ["مخزون منخفض", "bg-amber-50 text-amber-800"]
-          : ["مخزون طبيعي", "bg-emerald-50 text-emerald-700"];
-  return (
-    <span
-      className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-black ${state[1]}`}
-    >
-      {state[0]}
-    </span>
   );
 }

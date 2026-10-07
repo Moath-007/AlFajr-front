@@ -5,6 +5,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { usePublicCart } from "@/public";
+import { formatPrice } from '@/public/formatPrice';
 import { useState } from "react";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import QuantityInput from "@/components/ui/QuantityInput";
@@ -179,8 +180,4 @@ export default function CartPage({
       />
     </>
   );
-}
-
-function formatPrice(value: number) {
-  return `${new Intl.NumberFormat("ar-EG-u-nu-latn", { maximumFractionDigits: 2 }).format(value)} ₪`;
 }

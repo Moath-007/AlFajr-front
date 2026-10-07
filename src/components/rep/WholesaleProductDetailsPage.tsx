@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  ArrowRight,
-  PackageOpen,
-  ShoppingCart,
-} from "lucide-react";
+import { ArrowRight, PackageOpen, ShoppingCart } from "lucide-react";
 import {
   productsService,
   resolveApiAssetUrl,
@@ -12,6 +8,7 @@ import {
 import { useWholesaleCart, useWholesaleStockVisibility } from "@/rep";
 import { apiMessages, formatMoney } from "./repOrderUtils";
 import { Skeleton } from "@/components/ui/Skeleton";
+import Modal from "@/components/ui/Modal";
 import QuantityInput from "@/components/ui/QuantityInput";
 
 export default function WholesaleProductDetailsPage({
@@ -29,12 +26,18 @@ export default function WholesaleProductDetailsPage({
   const [imageId, setImageId] = useState<number | null>(null);
   const [variantId, setVariantId] = useState<number | null>(null);
   const [quantity, setQuantity] = useState(1);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [added, setAdded] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
+    setLoading(true);
+    setErrors([]);
+    setQuantity(1);
+    setPreviewOpen(false);
     productsService
       .getWholesaleById(productId, controller.signal)
       .then((response) => {
+        if (controller.signal.aborted) return;
         setProduct(response.product);
         setImageId(
           response.product.images.find((image) => image.is_primary)?.id ??
@@ -92,7 +95,7 @@ export default function WholesaleProductDetailsPage({
     window.setTimeout(() => setAdded(false), 1800);
   };
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <button
           onClick={() => onNavigate("/rep/products")}
@@ -102,6 +105,7 @@ export default function WholesaleProductDetailsPage({
         </button>
         <button
           onClick={() => onNavigate("/rep/orders/new")}
+          aria-label="مراجعة طلب الجملة"
           className="relative rounded-xl border border-stone-200 bg-white p-3 text-brand"
         >
           <ShoppingCart className="h-5 w-5" />
@@ -112,9 +116,15 @@ export default function WholesaleProductDetailsPage({
           )}
         </button>
       </div>
-      <main className="grid gap-7 lg:grid-cols-[1.05fr_0.95fr]">
+      <main className="grid items-start gap-5 sm:gap-7 lg:grid-cols-2">
         <section>
-          <div className="aspect-square overflow-hidden rounded-3xl border border-stone-200 bg-white">
+          <button
+            type="button"
+            disabled={!image}
+            onClick={() => setPreviewOpen(true)}
+            aria-label="عرض الصورة كاملة"
+            className="mx-auto block aspect-square w-full max-w-[520px] overflow-hidden rounded-2xl border border-stone-200 bg-white focus-visible:ring-2 focus-visible:ring-gold"
+          >
             {image ? (
               <img
                 src={resolveApiAssetUrl(image.url) ?? undefined}
@@ -126,14 +136,17 @@ export default function WholesaleProductDetailsPage({
                 <PackageOpen className="h-16 w-16 text-stone-300" />
               </div>
             )}
-          </div>
+          </button>
+          {image && <button type="button" className="mx-auto mt-2 block text-sm font-bold text-brand underline" onClick={() => setPreviewOpen(true)}>عرض الصورة كاملة</button>}
           {product.images.length > 1 && (
-            <div className="mt-3 grid grid-cols-5 gap-2">
+            <div className="mx-auto mt-2 flex max-w-[520px] gap-2 overflow-x-auto pb-1">
               {product.images.map((item) => (
                 <button
                   key={item.id}
+                  aria-label={`عرض صورة ${product.images.indexOf(item) + 1}`}
+                  aria-pressed={imageId === item.id}
                   onClick={() => setImageId(item.id)}
-                  className={`aspect-square overflow-hidden rounded-xl border-2 ${imageId === item.id ? "border-gold" : "border-transparent"}`}
+                  className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${imageId === item.id ? "border-gold" : "border-transparent"}`}
                 >
                   <img
                     src={resolveApiAssetUrl(item.url) ?? undefined}
@@ -145,45 +158,53 @@ export default function WholesaleProductDetailsPage({
             </div>
           )}
         </section>
-        <section className="rounded-3xl border border-stone-200 bg-white p-6 shadow-sm sm:p-8">
+        <section className="min-w-0 lg:sticky lg:top-32">
           <p className="text-sm font-black text-gold-dark">
             {product.category.name}
           </p>
-          <h1 className="mt-2 text-3xl font-black text-brand">
+          <h1 className="mt-1.5 text-2xl font-black leading-tight text-brand sm:text-3xl">
             {product.name}
           </h1>
           <p className="mt-1 text-sm font-bold text-stone-400">
             الكود: {product.code}
           </p>
           {product.description && (
-            <p className="mt-5 leading-8 text-stone-600">
+            <p className="mt-4 border-t border-stone-200 pt-4 text-sm leading-7 text-stone-600 sm:text-base">
               {product.description}
             </p>
           )}
-          <div className="mt-7">
+          <div className="mt-5">
             <h2 className="text-sm font-black text-brand">
               اختر المقاس واللون
             </h2>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
               {product.variants.map((item) => (
                 <button
                   key={item.id}
+                  aria-pressed={variantId === item.id}
                   onClick={() => {
                     setVariantId(item.id);
                     setQuantity(1);
                   }}
-                  className={`rounded-xl border p-3 text-right transition ${variantId === item.id ? "border-gold bg-gold/10 ring-2 ring-gold/15" : "border-stone-200 hover:border-gold/60"} disabled:cursor-not-allowed disabled:opacity-45`}
+                  className={`min-w-0 rounded-xl border px-3 py-2.5 text-sm text-right transition ${variantId === item.id ? "border-gold bg-gold/10 ring-2 ring-gold/15" : "border-stone-200 hover:border-gold/60"} disabled:cursor-not-allowed disabled:opacity-45`}
                 >
                   <strong className="block text-brand">
                     {item.size} — {item.color.name}
                   </strong>
-                  <span className="mt-1 block text-xs text-stone-500">{showWholesaleStock ? `الرصيد الحالي: ${item.stock_quantity}` : "متاح للطلب"}</span>
+                  <span className="mt-1 block text-xs text-stone-500">
+                    {showWholesaleStock
+                      ? `الرصيد الحالي: ${item.stock_quantity}`
+                      : "متاح للطلب"}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
           {variant && (
-            <div className="mt-6 rounded-2xl bg-stone-50 p-4">
+            <div className="mt-5 rounded-2xl border border-stone-100 bg-stone-50 p-4">
+              <p className="mb-2 text-xs text-stone-500">
+                سعر الجملة للخيار المحدد
+              </p>
               <div className="flex flex-wrap items-baseline gap-3">
                 {Number(variant.discount) > 0 && (
                   <span className="text-sm text-stone-400 line-through">
@@ -199,7 +220,7 @@ export default function WholesaleProductDetailsPage({
                   </span>
                 )}
               </div>
-              <div className="mt-5 flex items-center justify-between">
+              <div className="mt-4 flex items-center justify-between">
                 <span className="text-sm font-bold text-stone-600">الكمية</span>
                 <QuantityInput value={quantity} onChange={setQuantity} />
               </div>
@@ -208,13 +229,27 @@ export default function WholesaleProductDetailsPage({
           <button
             disabled={!variant}
             onClick={add}
-            className="mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ShoppingCart className="h-5 w-5" />
             {added ? "تمت الإضافة" : "إضافة إلى طلب الجملة"}
           </button>
         </section>
       </main>
+      <Modal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title={product.name}
+        size="xl"
+      >
+        {image && (
+          <img
+            src={resolveApiAssetUrl(image.url) ?? undefined}
+            alt={product.name}
+            className="mx-auto max-h-[75dvh] w-full object-contain"
+          />
+        )}
+      </Modal>
     </div>
   );
 }

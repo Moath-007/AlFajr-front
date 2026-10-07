@@ -12,6 +12,8 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { apiMessages } from "@/components/rep/repOrderUtils";
 import CurrencySettings from "./CurrencySettings";
 
+import "./AdminCompanyProfilePage.css";
+
 type Fields = {
   company_name: string;
   email: string;
@@ -147,12 +149,12 @@ export default function AdminCompanyProfilePage({
     value: string,
   ) => setFields({ ...fields, [key]: value });
   return (
-    <div className="space-y-6">
+    <div className="company-settings space-y-4" dir="rtl">
       <header className="border-b pb-5">
         <p className="text-xs font-black text-gold-dark">بيانات الموقع</p>
-        <h1 className="mt-1 text-3xl font-black text-brand">بيانات الشركة</h1>
+        <h1 className="mt-1 text-3xl font-black text-brand">الإعدادات</h1>
         <p className="mt-2 text-sm text-stone-500">
-          المصدر المركزي لمعلومات التواصل وساعات العمل والإعلان العام.
+          بيانات الشركة والتواصل والإعلان والعملات.
         </p>
       </header>
       {errors.length > 0 && (
@@ -160,8 +162,8 @@ export default function AdminCompanyProfilePage({
           {errors.join("، ")}
         </div>
       )}
-      <CurrencySettings onNotify={onNotify} />
-      <form onSubmit={save} className="space-y-6">
+
+      <form onSubmit={save} className="company-settings-form">
         <Section title="البيانات الأساسية">
           <Field
             label="اسم الشركة *"
@@ -210,6 +212,7 @@ export default function AdminCompanyProfilePage({
             {fields.phones.map((phone, index) => (
               <div key={index} className="flex gap-2">
                 <input
+                  aria-label={`رقم الهاتف ${index + 1}`}
                   dir="ltr"
                   className="rep-control"
                   value={phone}
@@ -250,7 +253,7 @@ export default function AdminCompanyProfilePage({
             />
           </label>
         </Section>
-        <section className="rounded-2xl border bg-white p-5">
+        <section className="company-announcement rounded-2xl border bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-black text-brand">الإعلان</h2>
             <label
@@ -285,7 +288,10 @@ export default function AdminCompanyProfilePage({
             />
           </label>
         </section>
-        <div className="sticky bottom-3 z-20 rounded-2xl border bg-white/95 p-3 shadow-xl backdrop-blur">
+        <div className="company-save-bar sticky bottom-3 z-20 rounded-2xl border bg-white/95 p-3 shadow-xl backdrop-blur">
+          <span className="text-xs text-stone-500" role="status">
+            {dirty ? "تغييرات غير محفوظة" : "كل التغييرات محفوظة"}
+          </span>
           <button
             disabled={saving || !dirty}
             className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-brand px-7 font-black text-white disabled:opacity-50"
@@ -295,6 +301,7 @@ export default function AdminCompanyProfilePage({
           </button>
         </div>
       </form>
+      <CurrencySettings onNotify={onNotify} />
     </div>
   );
 }

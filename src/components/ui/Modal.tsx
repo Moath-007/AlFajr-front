@@ -3,6 +3,7 @@ import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 
 interface ModalProps {
+  className?: string;
   open: boolean;
   onClose: () => void;
   title: string;
@@ -47,6 +48,7 @@ export default function Modal({
   size = "md",
   footer,
   mobileFullscreen = false,
+  className = "",
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -123,13 +125,14 @@ export default function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative w-full ${sizeClasses[size]} overflow-hidden bg-white shadow-2xl animate-scale-in flex flex-col outline-none ${mobileFullscreen ? "h-full max-h-none rounded-none sm:h-auto sm:max-h-[90vh] sm:rounded-2xl" : "max-h-[90vh] rounded-2xl"}`}
+        className={`${className} relative w-full ${sizeClasses[size]} overflow-hidden bg-white shadow-2xl animate-scale-in flex flex-col outline-none ${mobileFullscreen ? "h-full max-h-none rounded-none sm:h-auto sm:max-h-[90vh] sm:rounded-2xl" : "max-h-[90vh] rounded-2xl"}`}
       >
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-stone-200 px-5 py-4 sm:px-6">
           <h3 id={titleId} className="text-lg font-bold text-brand">
             {title}
           </h3>
           <button
+            type="button"
             onClick={onClose}
             aria-label="إغلاق النافذة"
             className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100 hover:text-brand transition"

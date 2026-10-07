@@ -15,14 +15,12 @@ export const ownerNavigation: NavItem[] = [
   { path: "/owner", label: "لوحة التحكم", icon: LayoutDashboard },
   { label: "المبيعات", icon: ShoppingBasket, children: [
     { path: "/owner/orders", label: "الطلبات", icon: ClipboardList },
-    { path: "/owner/create-order", label: "إنشاء طلب", icon: ShoppingBasket, children: [
-      { path: "/owner/create-order/retail", label: "بيع مفرق", icon: ShoppingBasket },
-      { path: "/owner/create-order/wholesale", label: "بيع جملة", icon: ShoppingBasket },
-    ] },
+    { path: "/owner/create-order", label: "إنشاء طلب", icon: ShoppingBasket, aliases: ["/owner/create-order/retail", "/owner/create-order/wholesale", "/owner/store-sale"] },
   ] },
   { label: "الحسابات", icon: Users, children: [
     { path: "/owner/accounts", label: "جميع الحسابات", icon: Users },
     { path: "/owner/vouchers", label: "سندات القبض والصرف والقيد", icon: FileText },
+    { path: "/owner/cash-vouchers", label: "السندات النقدية", icon: Banknote },
     { path: "/owner/checks", label: "الشيكات", icon: Banknote },
     { path: "/owner/treasury", label: "الخزينة", icon: Banknote },
     { path: "/owner/returns", label: "المردودات", icon: ReceiptText },
@@ -41,7 +39,6 @@ export const ownerNavigation: NavItem[] = [
 ];
 
 export const repNavigation: NavItem[] = [
-  { path: "/rep", label: "لوحة التحكم", icon: LayoutDashboard },
   { label: "المبيعات", icon: ShoppingCart, children: [
     { path: "/rep/products", label: "منتجات الجملة", icon: Boxes },
     { path: "/rep/orders/new", label: "إنشاء طلب", icon: ShoppingCart, badge: true, aliases: ["/rep/create-order"] },
@@ -49,7 +46,7 @@ export const repNavigation: NavItem[] = [
   ] },
   { label: "الحسابات", icon: Users, children: [
     { path: "/rep/accounts", label: "الحسابات", icon: Users },
-    { path: "/rep/payments", label: "قبض وصرف", icon: FileText },
+    { path: "/rep/vouchers", label: "سندات القبض والصرف والقيد", icon: FileText, aliases: ["/rep/payments"] },
     { path: "/rep/purchases", label: "المشتريات", icon: ClipboardList },
     { path: "/rep/returns", label: "المردودات", icon: FileText },
   ] },

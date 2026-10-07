@@ -31,7 +31,7 @@ const idempotentCreate = (path: string) => [
 ].some((pattern) => pattern.test(normalizePath(path)));
 
 async function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  const returnMutation = (options.method === 'PUT' || options.method === 'DELETE') && /^\/returns\/\d+(?:\/permanent)?$/.test(normalizePath(path));
+  const returnMutation = (options.method === 'PUT' || options.method === 'DELETE') && /^\/(?:returns|purchase-returns)\/\d+(?:\/permanent)?$/.test(normalizePath(path));
   const accountMutation = (options.method === 'PUT' || options.method === 'DELETE') && /^(?:\/accounts\/\d+\/opening-balance|\/account-discounts\/\d+(?:\/permanent)?)$/.test(normalizePath(path));
   if (!(options.method === 'POST' && idempotentCreate(path)) && !returnMutation && !accountMutation) return performRequest<T>(path, options);
   const intent = `${normalizePath(path)}|${JSON.stringify(options.body ?? null)}`;

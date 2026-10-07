@@ -1,5 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
-import { Eye, ImageOff, Plus, Power, PowerOff, RefreshCw, Search } from "lucide-react";
+import ZoomableProductImage from '@/components/ui/ProductImage';
+import { createPortal } from "react-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Eye,
+  ImageOff,
+  Plus,
+  Power,
+  PowerOff,
+  RefreshCw,
+  Search,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   categoriesService,
   colorsService,
@@ -17,6 +30,8 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { RepSelect } from "@/components/rep/RepFormControls";
 import { apiMessages, formatOrderDate } from "@/components/rep/repOrderUtils";
 
+import CheckFiltersPopover from "@/components/finance/CheckFiltersPopover";
+import "./AdminProductsPage.css";
 const emptyPage: AdminProductsPaginationDto = {
   page: 1,
   limit: 20,
@@ -28,6 +43,12 @@ export default function AdminProductsPage({
 }: {
   onNavigate: (path: string) => void;
 }) {
+  const [advanced, setAdvanced] = useState(false);
+  const filterTrigger = useRef<HTMLButtonElement>(null);
+  const closeAdvanced = useCallback(() => {
+    setAdvanced(false);
+    filterTrigger.current?.focus();
+  }, []);
   const [products, setProducts] = useState<ProductResponseDto[]>([]);
   const [pagination, setPagination] = useState(emptyPage);
   const [page, setPage] = useState(1);
@@ -48,6 +69,10 @@ export default function AdminProductsPage({
   const [statusTarget, setStatusTarget] = useState<ProductResponseDto | null>(
     null,
   );
+  const [deleteTarget, setDeleteTarget] = useState<ProductResponseDto | null>(
+    null,
+  );
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
   const [notice, setNotice] = useState("");
   useEffect(() => {
@@ -107,6 +132,8 @@ export default function AdminProductsPage({
           if (signal?.aborted) return;
           setProducts(r.products);
           setPagination(r.pagination);
+          if (page > Math.max(1, r.pagination.total_pages))
+            setPage(Math.max(1, r.pagination.total_pages));
         })
         .catch((e) => {
           if (!signal?.aborted)
@@ -137,8 +164,72 @@ export default function AdminProductsPage({
     setSort("created_at:desc");
     setPage(1);
   };
+  const advancedCount = [
+    category,
+    color,
+    stock,
+    sort !== "created_at:desc" ? sort : "",
+  ].filter(Boolean).length;
+  const chips = [
+    {
+      key: "search",
+      value: search.trim(),
+      label: `البحث: ${search.trim()}`,
+      clear: () => {
+        setSearch("");
+        setQuery("");
+        setPage(1);
+      },
+    },
+    {
+      key: "active",
+      value: active,
+      label: active === "true" ? "فعال" : "غير فعال",
+      clear: () => change(setActive)(""),
+    },
+    {
+      key: "category",
+      value: category,
+      label: `التصنيف: ${categories.find((c) => String(c.category_id) === category)?.name ?? "محدد"}`,
+      clear: () => change(setCategory)(""),
+    },
+    {
+      key: "color",
+      value: color,
+      label: `اللون: ${colors.find((c) => String(c.color_id) === color)?.name ?? "محدد"}`,
+      clear: () => change(setColor)(""),
+    },
+    {
+      key: "stock",
+      value: stock,
+      label: `المخزون: ${{ in_stock: "متوفر", low_stock: "منخفض", out_of_stock: "نفد" }[stock] ?? ""}`,
+      clear: () => change(setStock)(""),
+    },
+    {
+      key: "sort",
+      value: sort === "created_at:desc" ? "" : sort,
+      label: `الترتيب: ${{ "created_at:asc": "الأقدم", "name:asc": "الاسم", "code:asc": "الكود" }[sort] ?? ""}`,
+      clear: () => change(setSort)("created_at:desc"),
+    },
+  ].filter((chip) => chip.value);
+  const deleteProduct = async () => {
+    if (!deleteTarget || deleteBusy) return;
+    setDeleteBusy(true);
+    setErrors([]);
+    try {
+      const result = await productsService.permanentDelete(deleteTarget.id);
+      setNotice(result.message);
+      setDeleteTarget(null);
+      await load();
+    } catch (error) {
+      setDeleteTarget(null);
+      setErrors(apiMessages(error, "تعذر الحذف؛ استخدم تعطيل المنتج."));
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
   const toggleStatus = async () => {
-    if (!statusTarget) return;
+    if (!statusTarget || statusBusy) return;
     setStatusBusy(true);
     setErrors([]);
     try {
@@ -156,13 +247,13 @@ export default function AdminProductsPage({
     }
   };
   return (
-    <div className="space-y-6">
+    <div className="products-page space-y-4" dir="rtl">
       <header className="flex flex-wrap items-end justify-between gap-4 border-b pb-5">
         <div>
           <p className="text-xs font-black text-gold-dark">إدارة الكتالوج</p>
           <h1 className="mt-1 text-3xl font-black text-brand">المنتجات</h1>
           <p className="mt-2 text-sm text-stone-500">
-            عرض وإدارة المنتجات والخيارات من بيانات النظام الفعلية.
+            إدارة المنتجات وأصنافها وحالتها.
           </p>
         </div>
         <button
@@ -179,7 +270,7 @@ export default function AdminProductsPage({
         </div>
       )}
       <section className="rounded-2xl border bg-white p-4">
-        <div className="grid items-end gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="products-quick-filters">
           <label>
             <span className="rep-label">البحث</span>
             <span className="relative block">
@@ -193,30 +284,6 @@ export default function AdminProductsPage({
             </span>
           </label>
           <RepSelect
-            label="التصنيف"
-            value={category}
-            onChange={change(setCategory)}
-            options={[
-              { value: "", label: "كل التصنيفات" },
-              ...categories.map((x) => ({
-                value: String(x.category_id),
-                label: x.name,
-              })),
-            ]}
-          />
-          <RepSelect
-            label="اللون"
-            value={color}
-            onChange={change(setColor)}
-            options={[
-              { value: "", label: "كل الألوان" },
-              ...colors.map((x) => ({
-                value: String(x.color_id),
-                label: x.name,
-              })),
-            ]}
-          />
-          <RepSelect
             label="الحالة"
             value={active}
             onChange={change(setActive)}
@@ -226,44 +293,103 @@ export default function AdminProductsPage({
               { value: "false", label: "غير فعال" },
             ]}
           />
-          <RepSelect
-            label="المخزون"
-            value={stock}
-            onChange={change(setStock)}
-            options={[
-              { value: "", label: "كل الحالات" },
-              { value: "in_stock", label: "متوفر" },
-              { value: "low_stock", label: "منخفض" },
-              { value: "out_of_stock", label: "نفد" },
-            ]}
-          />
-          <RepSelect
-            label="الترتيب"
-            value={sort}
-            onChange={change(setSort)}
-            options={[
-              { value: "created_at:desc", label: "الأحدث" },
-              { value: "created_at:asc", label: "الأقدم" },
-              { value: "name:asc", label: "الاسم" },
-              { value: "code:asc", label: "الكود" },
-            ]}
-          />
-        </div>
-        {(search ||
-          query ||
-          category ||
-          color ||
-          active ||
-          stock ||
-          sort !== "created_at:desc") && (
           <button
+            ref={filterTrigger}
             type="button"
-            onClick={clear}
-            className="mt-3 text-xs font-black text-gold-dark"
+            className="btn-outline products-filter-trigger"
+            aria-expanded={advanced}
+            onClick={() => setAdvanced(!advanced)}
           >
-            مسح الفلاتر
-          </button>
-        )}
+            <SlidersHorizontal size={18} />
+            فلاتر إضافية{advancedCount > 0 && <span>{advancedCount}</span>}
+          </button>{" "}
+        </div>
+        <CheckFiltersPopover
+          open={advanced}
+          onClose={closeAdvanced}
+          trigger={filterTrigger}
+          footer={
+            <button
+              type="button"
+              onClick={clear}
+              className="text-sm font-bold text-brand"
+            >
+              مسح الكل
+            </button>
+          }
+        >
+          <div className="grid gap-3">
+            {" "}
+            <RepSelect
+              floating
+              label="التصنيف"
+              value={category}
+              onChange={change(setCategory)}
+              options={[
+                { value: "", label: "كل التصنيفات" },
+                ...categories.map((x) => ({
+                  value: String(x.category_id),
+                  label: x.name,
+                })),
+              ]}
+            />
+            <RepSelect
+              floating
+              label="اللون"
+              value={color}
+              onChange={change(setColor)}
+              options={[
+                { value: "", label: "كل الألوان" },
+                ...colors.map((x) => ({
+                  value: String(x.color_id),
+                  label: x.name,
+                })),
+              ]}
+            />
+            <RepSelect
+              floating
+              label="المخزون"
+              value={stock}
+              onChange={change(setStock)}
+              options={[
+                { value: "", label: "كل الحالات" },
+                { value: "in_stock", label: "متوفر" },
+                { value: "low_stock", label: "منخفض" },
+                { value: "out_of_stock", label: "نفد" },
+              ]}
+            />
+            <RepSelect
+              floating
+              label="الترتيب"
+              value={sort}
+              onChange={change(setSort)}
+              options={[
+                { value: "created_at:desc", label: "الأحدث" },
+                { value: "created_at:asc", label: "الأقدم" },
+                { value: "name:asc", label: "الاسم" },
+                { value: "code:asc", label: "الكود" },
+              ]}
+            />
+          </div>
+        </CheckFiltersPopover>
+        <div className="products-chips">
+          {chips.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={chip.clear}
+              aria-label={`إزالة فلتر ${chip.label}`}
+            >
+              <span>{chip.label}</span>
+              <X size={14} />
+            </button>
+          ))}
+          {chips.length > 0 && (
+            <button type="button" onClick={clear}>
+              مسح الكل
+            </button>
+          )}
+        </div>{" "}
         {auxErrors.length > 0 && (
           <div className="mt-3 flex flex-wrap justify-between gap-2 rounded-lg bg-amber-50 p-2 text-xs font-bold text-amber-800">
             <span>{auxErrors.join("، ")}</span>
@@ -277,7 +403,7 @@ export default function AdminProductsPage({
         )}
       </section>
       {errors.length > 0 && (
-        <div className="rep-error text-center">
+        <div role="alert" className="rep-error text-center">
           {errors.join("، ")}
           <button
             onClick={() => setRetry((v) => v + 1)}
@@ -288,23 +414,44 @@ export default function AdminProductsPage({
           </button>
         </div>
       )}
+      <p className="text-xs text-stone-500">
+        {pagination.total} منتج · صفحة {page} من{" "}
+        {Math.max(1, pagination.total_pages)}
+      </p>
       {loading ? (
-        <Skeleton className="h-96" />
-      ) : products.length === 0 ? (
-        <EmptyState title="لا توجد منتجات مطابقة" />
+        <div role="status">
+          <span className="sr-only">جارٍ تحميل المنتجات…</span>
+          <Skeleton className="h-96" />
+        </div>
+      ) : errors.length > 0 ? null : products.length === 0 ? (
+        <EmptyState
+          title={
+            chips.length ? "لا توجد منتجات مطابقة" : "لا توجد منتجات حتى الآن"
+          }
+          action={
+            <button
+              className="btn-outline"
+              onClick={
+                chips.length ? clear : () => onNavigate("/owner/products/new")
+              }
+            >
+              {chips.length ? "مسح الكل" : "منتج جديد"}
+            </button>
+          }
+        />
       ) : (
         <>
           <div className="hidden overflow-x-auto rounded-2xl border bg-white lg:block">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="products-table">
               <thead className="bg-stone-50">
                 <tr>
                   {[
                     "المنتج",
                     "التصنيف",
                     "الحالة",
-                    "الخيارات",
-                    "إجمالي المخزون",
-                    "تاريخ الإنشاء",
+                    "الأصناف",
+                    "المخزون",
+                    "تاريخ الإضافة",
                     "الإجراء",
                   ].map((x) => (
                     <th key={x} className="px-4 py-3 text-right text-stone-500">
@@ -320,44 +467,65 @@ export default function AdminProductsPage({
                     product={p}
                     onOpen={() => onNavigate(`/owner/products/${p.id}/edit`)}
                     onStatus={() => setStatusTarget(p)}
+                    onDelete={() => setDeleteTarget(p)}
                   />
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="space-y-3 lg:hidden">
+          <div className="products-cards lg:hidden">
             {products.map((p) => (
               <ProductCard
                 key={p.id}
                 product={p}
                 onOpen={() => onNavigate(`/owner/products/${p.id}/edit`)}
                 onStatus={() => setStatusTarget(p)}
+                onDelete={() => setDeleteTarget(p)}
               />
             ))}
           </div>
         </>
       )}
-      {pagination.total_pages > 1 && (
-        <div className="flex justify-center gap-3">
-          <button
-            className="btn-outline"
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
+      {pagination.total_pages > 1 &&
+        createPortal(
+          <div
+            dir="rtl"
+            className="products-pagination"
+            role="navigation"
+            aria-label="صفحات المنتجات"
           >
-            السابق
-          </button>
-          <span className="py-2 text-sm font-bold">
-            {page} / {pagination.total_pages}
-          </span>
-          <button
-            className="btn-outline"
-            disabled={page >= pagination.total_pages}
-            onClick={() => setPage(page + 1)}
-          >
-            التالي
-          </button>
-        </div>
-      )}
+            <button
+              dir="rtl"
+              className="btn-outline"
+              disabled={loading || page <= 1}
+              onClick={() => setPage(page - 1)}
+            >
+              السابق
+            </button>
+            <span className="py-2 text-sm font-bold">
+              صفحة {page} من {pagination.total_pages}
+            </span>
+            <button
+              dir="rtl"
+              className="btn-outline"
+              disabled={loading || page >= pagination.total_pages}
+              onClick={() => setPage(page + 1)}
+            >
+              التالي
+            </button>
+          </div>,
+          document.body,
+        )}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void deleteProduct()}
+        loading={deleteBusy}
+        severity="destructive"
+        title="حذف المنتج نهائيًا"
+        message={`حذف «${deleteTarget?.name ?? ""}»؟ يرفض النظام حذف أي منتج له مخزون أو تاريخ أعمال.`}
+        confirmLabel="حذف نهائي"
+      />
       <ConfirmDialog
         open={statusTarget !== null}
         onClose={() => setStatusTarget(null)}
@@ -385,8 +553,16 @@ function image(p: ProductResponseDto) {
 }
 function ProductImage({ product }: { product: ProductResponseDto }) {
   const src = image(product);
-  return src ? (
-    <img src={src} alt="" className="h-12 w-12 rounded-xl object-cover" />
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  return src && !failed ? (
+    <ZoomableProductImage
+      src={src}
+      alt=""
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-12 w-12 rounded-xl object-cover"
+    />
   ) : (
     <span className="grid h-12 w-12 place-items-center rounded-xl bg-stone-100">
       <ImageOff className="h-5 w-5 text-stone-400" />
@@ -397,13 +573,28 @@ function ProductRow({
   product,
   onOpen,
   onStatus,
+  onDelete,
 }: {
   product: ProductResponseDto;
   onOpen: () => void;
   onStatus: () => void;
+  onDelete: () => void;
 }) {
   return (
-    <tr>
+    <tr
+      tabIndex={0}
+      aria-label={`فتح المنتج ${product.name}`}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (
+          e.target === e.currentTarget &&
+          (e.key === "Enter" || e.key === " ")
+        ) {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+    >
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           <ProductImage product={product} />
@@ -423,7 +614,7 @@ function ProductRow({
         {formatOrderDate(product.created_at)}
       </td>
       <td className="px-4">
-        <div className="flex items-center gap-2">
+        <div className="products-actions" onClick={(e) => e.stopPropagation()}>
           <button
             type="button"
             onClick={onOpen}
@@ -433,6 +624,7 @@ function ProductRow({
             <Eye className="h-4 w-4" />
           </button>
           <ProductStatusAction product={product} onClick={onStatus} />
+          <ProductDeleteAction product={product} onClick={onDelete} />
         </div>
       </td>
     </tr>
@@ -442,34 +634,40 @@ function ProductCard({
   product,
   onOpen,
   onStatus,
+  onDelete,
 }: {
   product: ProductResponseDto;
   onOpen: () => void;
   onStatus: () => void;
+  onDelete: () => void;
 }) {
   return (
     <article className="rounded-2xl border bg-white p-4">
-      <div className="flex gap-3">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="products-card-identity flex gap-3"
+      >
         <ProductImage product={product} />
         <div className="min-w-0 flex-1">
           <div className="flex justify-between gap-2">
-            <b className="truncate text-brand">{product.name}</b>
+            <b className="products-name text-brand">{product.name}</b>
             <Status active={product.is_active} />
           </div>
           <p className="text-xs text-stone-500">
             {product.code} · {product.category.name}
           </p>
         </div>
-      </div>
+      </button>
       <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-stone-50 p-3 text-center text-xs">
         <span>
-          الخيارات<b className="block text-lg">{product.variants.length}</b>
+          الأصناف<b className="block text-lg">{product.variants.length}</b>
         </span>
         <span>
           المخزون<b className="block text-lg">{totalStock(product)}</b>
         </span>
       </div>
-      <div className="mt-3 flex gap-2">
+      <div className="products-actions mt-3 flex gap-2">
         <button
           onClick={onOpen}
           className="min-h-11 flex-1 rounded-xl bg-brand font-black text-white"
@@ -477,21 +675,55 @@ function ProductCard({
           عرض وتعديل
         </button>
         <ProductStatusAction product={product} onClick={onStatus} mobile />
+        <ProductDeleteAction product={product} onClick={onDelete} />
       </div>
     </article>
   );
 }
-function ProductStatusAction({ product, onClick, mobile = false }: {
+function ProductDeleteAction({
+  product,
+  onClick,
+}: {
+  product: ProductResponseDto;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="products-delete-action"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+      aria-label={`حذف نهائي ${product.name}`}
+      title="حذف نهائي"
+    >
+      <Trash2 size={16} />
+    </button>
+  );
+}
+function ProductStatusAction({
+  product,
+  onClick,
+  mobile = false,
+}: {
   product: ProductResponseDto;
   onClick: () => void;
   mobile?: boolean;
 }) {
   const Icon = product.is_active ? PowerOff : Power;
   const label = product.is_active ? "تعطيل" : "تفعيل";
-  return <button type="button" onClick={onClick} aria-label={`${label} ${product.name}`}
-    className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${mobile ? "min-h-11 flex-1" : "min-h-9"} ${product.is_active ? "border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100" : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-300 hover:bg-emerald-100"}`}>
-    <Icon className="h-4 w-4 shrink-0" />{label}
-  </button>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`${label} ${product.name}`}
+      title={label}
+      className={`products-status-action inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold ${mobile ? "min-h-11 flex-1" : "min-h-9"} ${product.is_active ? "border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100" : "border-emerald-200 bg-emerald-50 text-emerald-800 hover:border-emerald-300 hover:bg-emerald-100"}`}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+    </button>
+  );
 }
 function Status({ active }: { active: boolean }) {
   return (

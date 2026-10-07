@@ -62,10 +62,23 @@ export async function printA4Element({
       .print-document .statement-section { margin-top: 6mm !important; }
       .print-document .statement-section > h2 { margin: 0 0 3mm !important; padding-bottom: 2mm !important; border-bottom: 1.5px solid #333 !important; font-size: 13pt !important; }
       .print-document .statement-card { margin-bottom: 3mm !important; padding: 3mm !important; border: 1px solid #bbb !important; border-radius: 0 !important; break-inside: avoid-page; page-break-inside: avoid; }
+      .print-document .statement-print-movement { margin-top: 5mm; padding-top: 3mm; border-top: 1px solid #999; }
+      .print-document .statement-print-movement p { overflow-wrap: anywhere; }
       .print-document .statement-card table { margin-top: 2mm !important; font-size: 8pt !important; }
       .print-document .print-summary { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3mm; margin-bottom: 5mm; }
       .print-document .print-summary > * { padding: 3mm !important; border: 1px solid #bbb !important; border-radius: 0 !important; break-inside: avoid-page; }
       .print-document .bg-brand { background: #fff !important; color: #162e21 !important; }
+      .report-print-document { font-size: 10pt !important; line-height: 1.45 !important; }
+      .report-print-document > * { margin-top: 0 !important; margin-bottom: 4mm !important; }
+      .report-print-document > section { display: block !important; break-inside: auto !important; }
+      .report-print-document h2 { font-size: 12pt !important; margin: 4mm 0 2mm !important; }
+      .report-print-document .report-print-list { display: block !important; break-inside: auto !important; }
+      .report-print-document .report-print-card { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2mm 5mm; padding: 3mm 4mm !important; margin: 0 0 2mm !important; border: 1px solid #d1d5db !important; border-radius: 2mm !important; background: #fff !important; }
+      .report-print-field { min-width: 0; overflow-wrap: anywhere; }
+      .report-print-label { display: block; font-size: 8pt; font-weight: 500; color: #666; margin-bottom: .5mm; }
+      .report-print-field > div { font-size: 10pt; font-weight: 600; color: #172e22; }
+      .report-print-field small { font-size: 8pt; font-weight: 400; line-height: 1.4; }
+      .report-print-document .print-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2mm; }
       .statement-table th:nth-child(1) { width: 16%; }
       .statement-table th:nth-child(2) { width: 28%; }
       .statement-table th:nth-child(3) { width: 12%; }
@@ -209,20 +222,22 @@ export const thermalReceiptPrintCss = `
   .receipt-logo { display: block; width: 24mm; max-height: 16mm; margin: 0 auto 2mm; object-fit: contain; filter: grayscale(1); }
   .receipt-header { padding-bottom: 3mm; border-bottom: 1px dashed #111; text-align: center; }
   .receipt-header h1 { margin: 0 0 1.5mm; font-size: 16pt; font-weight: 900; line-height: 1.25; }
-  .receipt-header p { margin: .5mm 0; font-size: 9pt; }
+  .receipt-header p { margin: .5mm 0; font-size: 9pt; overflow-wrap: anywhere; }
   .receipt-meta, .receipt-summary, .receipt-debt { padding: 3mm 0; border-bottom: 1px dashed #111; }
   .receipt-row { display: flex; justify-content: space-between; align-items: baseline; gap: 3mm; margin: 1mm 0; }
-  .receipt-row span { min-width: 0; }
+  .receipt-row span { min-width: 0; flex: 0 0 28%; }
   .receipt-row b { flex: 1; text-align: left; overflow-wrap: anywhere; }
   .receipt-row-strong { margin-top: 1.5mm; font-size: 11.5pt; font-weight: 900; }
   .receipt-items { padding: 3mm 0; border-bottom: 1px dashed #111; }
   .receipt-items h2 { margin: 0 0 2mm; font-size: 11.5pt; font-weight: 900; }
   .receipt-item { padding: 2mm 0; border-bottom: 1px dotted #999; break-inside: avoid; page-break-inside: avoid; }
   .receipt-item:last-child { border-bottom: 0; }
-  .receipt-item strong, .receipt-variant, .receipt-item small { display: block; }
+  .receipt-item strong, .receipt-variant, .receipt-item small { display: block; overflow-wrap: anywhere; }
   .receipt-variant { margin-top: .5mm; color: #444; font-size: 9.5pt; }
   .receipt-item-total { display: flex; justify-content: space-between; gap: 3mm; margin-top: 1.5mm; font-size: 10.5pt; }
-  .receipt-item-total b { text-align: left; }
+  .receipt-item-total b { text-align: left; white-space: nowrap; }
+  .receipt-summary { break-inside: avoid; page-break-inside: avoid; }
+  .receipt-items h2 { break-after: avoid; page-break-after: avoid; }
   .receipt-item small { margin-top: 1mm; color: #555; font-size: 8.5pt; }
   .receipt-debt { margin-top: 1mm; border-top: 2px solid #111; }
   .receipt-footer { padding-top: 4mm; text-align: center; font-size: 10.5pt; font-weight: 700; }

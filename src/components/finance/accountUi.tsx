@@ -10,6 +10,7 @@ import {
 } from '@/api';
 import Modal from '@/components/ui/Modal';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { RepSelect } from '@/components/rep/RepFormControls';
 import {
   apiMessages,
   formatMoney,
@@ -17,38 +18,44 @@ import {
 } from '@/components/rep/repOrderUtils';
 import {
   accountKindLabels,
-  balanceMeaning,
+  accountAmountColor,
+
   movementLabels,
 } from './accountUiUtils';
 export function Balance({
   value,
-  kind,
 }: {
   value: string;
   kind: UserAccountKind;
 }) {
   return (
     <div>
-      <strong className="block text-3xl font-bold" dir="ltr">
-        {formatMoney(Math.abs(Number(value)))}
+      <strong className={'block text-3xl font-bold ' + accountAmountColor(value)} dir="ltr">
+        {(Number(value) > 0 ? '+' : Number(value) < 0 ? '-' : '') + formatMoney(Math.abs(Number(value)))}
       </strong>
-      <span className="text-sm text-stone-500">
-        {balanceMeaning(value, kind)}
-      </span>
     </div>
   );
 }
 export function Pager({
+  floating = false,
   page,
   pages,
   total,
   onPage,
 }: {
+  floating?: boolean;
   page: number;
   pages: number;
   total: number;
   onPage: (page: number) => void;
 }) {
+  if (floating) return <div className="flex flex-col items-center gap-2 pt-1">
+    <nav aria-label="صفحات النتائج" className="inline-flex max-w-full items-center gap-2 rounded-2xl border border-stone-200 bg-white p-2 shadow-sm">
+      <button className="btn-ghost min-h-11" disabled={page <= 1} onClick={()=>onPage(page-1)}>السابق</button>
+      <span className="rounded-xl bg-brand-50 px-3 py-2 text-sm font-bold tabular-nums text-brand" aria-current="page">{page} من {Math.max(1,pages)}</span>
+      <button className="btn-ghost min-h-11" disabled={page >= pages} onClick={()=>onPage(page+1)}>التالي</button>
+    </nav><span className="text-xs text-stone-500">{total} نتيجة</span>
+  </div>;
   return (
     <nav
       aria-label="صفحات النتائج"
@@ -129,44 +136,32 @@ export function AccountIdentityEditor({
           void save();
         }}
       >
+        <fieldset disabled={busy} className="min-w-0 space-y-4">
         {account ? (
           <p className="text-stone-500">
             {account.account_number} · {accountKindLabels[account.kind]}
           </p>
         ) : admin ? (
-          <label className="block">
-            نوع الحساب
-            <select
-              className="rep-control"
-              aria-label="نوع الحساب"
-              value={form.kind}
-              onChange={(e) =>
-                setForm({ ...form, kind: e.target.value as UserAccountKind })
-              }
-            >
-              {Object.entries(accountKindLabels).map(([key, label]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <RepSelect label="نوع الحساب" disabled={busy} value={form.kind} onChange={(kind:UserAccountKind)=>setForm({...form,kind})} options={(Object.entries(accountKindLabels) as [UserAccountKind,string][]).map(([value,label])=>({value,label}))} />
         ) : null}
         <label className="block">
-          الاسم
+          <span className="rep-label">الاسم <span aria-hidden="true">*</span></span>
           <input
             required
             autoFocus
             className="rep-control"
+            placeholder="اسم الحساب"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
         </label>
         {form.kind === 'General' && (
           <label className="block">
-            الهاتف <span className="text-stone-400">(اختياري)</span>
+            <span className="rep-label">الهاتف <span className="text-stone-400">(اختياري)</span></span>
             <input
               dir="ltr"
+              type="tel"
+              placeholder="رقم الهاتف"
               className="rep-control"
               value={form.phone ?? ''}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -174,22 +169,25 @@ export function AccountIdentityEditor({
           </label>
         )}
         <label className="block">
-          ملاحظات
+          <span className="rep-label">ملاحظات <span className="text-stone-400">(اختياري)</span></span>
           <textarea
             className="rep-control"
+            placeholder="ملاحظات إضافية"
             rows={3}
             value={form.notes ?? ''}
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
         </label>
+        </fieldset>
         {error && (
           <p role="alert" className="rep-error">
             {error}
           </p>
         )}
-        <button className="btn-primary w-full" disabled={busy}>
+        <div className="grid grid-cols-2 gap-2 border-t border-stone-100 pt-4"><button type="submit" className="btn-primary min-h-11" disabled={busy}>
           {busy ? 'جارٍ الحفظ…' : 'حفظ'}
         </button>
+        <button type="button" className="btn-outline min-h-11" disabled={busy} onClick={onClose}>إلغاء</button></div>
       </form>
     </Modal>
   );
@@ -265,7 +263,7 @@ function MovementDescription({
               data-print-ignore
               className="text-brand underline"
             >
-              فتح المصدر ↗
+              عرض التفاصيل ↗
             </Link>
           )}
         </p>
@@ -310,13 +308,12 @@ export function MovementTable({
               {[
                 ['مدين', e.debit],
                 ['دائن', e.credit],
-                ['الأثر', e.effect],
                 ['الرصيد بعد الحركة', e.balance_after],
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt className="text-xs text-stone-500">{label}</dt>
-                  <dd dir="ltr" className="mt-1 text-right font-semibold">
-                    {formatMoney(value)}
+                  <dd dir="rtl" className={'mt-1 text-right font-semibold ' + accountAmountColor(value, label === 'مدين' ? 'debit' : label === 'دائن' ? 'credit' : 'balance')}>
+                    {label === 'الرصيد بعد الحركة' ? <MovementBalance value={value} /> : <bdi>{formatMoney(value)}</bdi>}
                   </dd>
                 </div>
               ))}
@@ -335,10 +332,9 @@ export function MovementTable({
             <tr>
               {[
                 'التاريخ',
-                'الحركة / المرجع',
+                'الحركة / رقم المستند',
                 'مدين',
                 'دائن',
-                'الأثر',
                 'الرصيد بعد الحركة',
               ].map((label) => (
                 <th key={label} className="px-3 py-3">
@@ -359,14 +355,14 @@ export function MovementTable({
                 <td className="px-3 py-3">
                   <MovementDescription entry={e} base={base} admin={admin} />
                 </td>
-                {[e.debit, e.credit, e.effect, e.balance_after].map(
+                {[e.debit, e.credit, e.balance_after].map(
                   (value, index) => (
                     <td
                       key={index}
-                      className="px-3 py-3 whitespace-nowrap"
-                      dir="ltr"
+                      className={'px-3 py-3 whitespace-nowrap ' + accountAmountColor(value, index === 0 ? 'debit' : index === 1 ? 'credit' : 'balance')}
+                      dir="rtl"
                     >
-                      {formatMoney(value)}
+                      {index === 2 ? <MovementBalance value={value} /> : <bdi>{formatMoney(value)}</bdi>}
                     </td>
                   ),
                 )}
@@ -374,7 +370,7 @@ export function MovementTable({
             ))}
             {!entries.length && (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-stone-500">
+                <td colSpan={5} className="p-8 text-center text-stone-500">
                   لا توجد حركات ضمن الفترة والفلاتر المحددة.
                 </td>
               </tr>
@@ -384,4 +380,11 @@ export function MovementTable({
       </div>
     </>
   );
+}
+
+function MovementBalance({ value }: { value: string }) {
+  const amount = Number(value);
+  return <div className={accountAmountColor(value)}>
+    <bdi dir="ltr" className="block font-semibold">{(amount > 0 ? '+' : amount < 0 ? '-' : '') + formatMoney(Math.abs(amount))}</bdi>
+  </div>;
 }

@@ -9,8 +9,6 @@ import type {
 export const categoriesService = {
   list: (signal?: AbortSignal) =>
     apiClient.get<CategoryResponseDto[]>('/categories', { signal }),
-  getById: (id: number, signal?: AbortSignal) =>
-    apiClient.get<CategoryResponseDto>(`/categories/${id}`, { signal }),
   create: (data: CreateCategoryDto, signal?: AbortSignal) =>
     apiClient.post<CategoryResponseDto>('/categories', categoryFormData(data), { signal }),
   update: (id: number, data: UpdateCategoryDto, signal?: AbortSignal) =>

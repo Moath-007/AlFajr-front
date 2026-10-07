@@ -7,7 +7,6 @@ import type {
   OrderMessageResponseDto,
   OrdersQuery,
   OrdersSummaryListResponseDto,
-  RepresentativeOrderStatsResponseDto,
   UpdateOrderDto,
 } from "../types";
 const queryPath = (path: string, query: OrdersQuery) => {
@@ -24,15 +23,6 @@ export const ordersService = {
     apiClient.post<OrderActionResponseDto>("/orders/online", data, { signal }),
   list: (query: OrdersQuery = {}, signal?: AbortSignal) =>
     apiClient.get<OrdersSummaryListResponseDto>(queryPath("/orders", query), {
-      signal,
-    }),
-  listMine: (query: OrdersQuery = {}, signal?: AbortSignal) =>
-    apiClient.get<OrdersSummaryListResponseDto>(
-      queryPath("/orders/my", query),
-      { signal },
-    ),
-  getMyStats: (signal?: AbortSignal) =>
-    apiClient.get<RepresentativeOrderStatsResponseDto>("/orders/my/stats", {
       signal,
     }),
   getById: (id: number, signal?: AbortSignal) =>

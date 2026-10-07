@@ -5,9 +5,9 @@ export interface LedgerAccount { account_id: number; code: string; name: string;
 export interface SaleAccountOption { id: number; name: string; account_number?: string | null; phone?: string | null }
 export interface StatementSourceItem { product_name: string; product_code: string; size: string; color: string; quantity: number; unit_price: string; unit_discount?: string; line_total: string; is_bonus?: boolean }
 export interface StatementSourceDetails { kind: 'Order' | 'Purchase' | 'Return' | 'Payment' | 'CheckMovement'; reference_id: number; is_reversal: boolean; status?: string; return_type?: string; payment_type?: string; method?: string; action?: string; subtotal?: string; product_discount_total?: string; order_discount?: string; total?: string; amount?: string; base_amount?: string | null; exchange_rate?: string | null; currency?: { code: string; name: string } | null; check?: { number: string; due_date: string; bank_name: string | null; location: string } | null; items?: StatementSourceItem[]; return_number?: string; return_date?: string; purchase_id?: number | null; cancelled?: boolean; notes?: string | null }
-export interface TreasuryLocation extends LedgerAccount { balance: string }
+export interface TreasuryLocation extends LedgerAccount { balance: string; opening_balance?: string; incoming?: string; outgoing?: string }
 export interface CashAccountDto { account_id: number; name: string; balance_base: string; is_default: boolean }
-export interface TreasuryOverview { total: string; locations: TreasuryLocation[] }
+export interface TreasuryOverview { total: string; locations: TreasuryLocation[]; receivable?: string; payable?: string; period?: boolean }
 export interface VoucherInput { type: 'Receipt' | 'Disbursement' | 'Journal'; notes?: string; occurred_at?: string; lines: Array<{ account_id: number; debit?: number; credit?: number }> }
 export type ManagedCheckLocation = 'TREASURY' | 'BANK' | 'COLLECTION' | 'ENDORSED_PARTY' | 'SOURCE_PARTY' | 'CASHED' | 'CANCELLED' | 'ISSUED' | 'CLEARED' | 'RETURNED_OUTGOING';
 export interface ManagedCheckEvent { check_event_id: number; action: string; from_location: string | null; to_location: string; from_account_id: number | null; to_account_id: number | null; bank_account_id: number | null; party_account_id: number | null; journal_entry_id: number | null; reversal_journal_entry_id: number | null; operation_date: string; notes: string | null; details: unknown; created_by: number | null; created_at: string; cancelled_at: string | null; cancelled_by: number | null; cancel_reason: string | null; cancels_event_id: number | null }
@@ -19,4 +19,5 @@ export interface IncomingCheckMovementDto { bank_account_id?: number; cash_accou
 export interface CheckUndoDto { operation_date: string; reason?: string }
 export interface OutgoingCheckMovementDto { operation_date: string }
 export interface ManagedChecksResponse { items: ManagedCheck[]; pagination: PaginationResponseDto }
-export interface ManagedChecksQuery { search?: string; location?: ManagedCheckLocation; due_status?: 'Due' | 'NotDue'; currency_id?: number; due_from?: string; due_to?: string; page?: number; limit?: number }
+export interface ManagedChecksQuery { search?: string; direction?: 'Incoming' | 'Outgoing'; location?: ManagedCheckLocation; due_status?: 'Due' | 'NotDue'; currency_id?: number; due_from?: string; due_to?: string; page?: number; limit?: number }
+

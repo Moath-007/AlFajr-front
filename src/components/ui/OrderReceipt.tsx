@@ -12,6 +12,7 @@ const money = (value: string | number) =>
 export default function OrderReceipt({ order }: { order: OrderResponseDto }) {
   const [company, setCompany] = useState<CompanyProfileDataDto | null>(null);
   const [printError, setPrintError] = useState("");
+  const [receiptRequested, setReceiptRequested] = useState(false);
   const receiptRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -21,23 +22,21 @@ export default function OrderReceipt({ order }: { order: OrderResponseDto }) {
       .catch(() => undefined);
     return () => controller.abort();
   }, []);
-  const print = async () => {
-    const receipt = receiptRef.current;
-    if (!receipt) return;
+  useEffect(() => {
+    if (!receiptRequested || !receiptRef.current) return;
     setPrintError("");
-    try {
-      await printThermalReceipt(receipt, `فاتورة الطلب ${order.id}`);
-    } catch {
-      setPrintError("تعذر تجهيز الفاتورة للطباعة. حاول مرة أخرى.");
-    }
-  };
+    void printThermalReceipt(receiptRef.current, `فاتورة الطلب ${order.id}`)
+      .catch(() => setPrintError("تعذر تجهيز الفاتورة للطباعة. حاول مرة أخرى."))
+      .finally(() => setReceiptRequested(false));
+  }, [receiptRequested, order.id]);
   const subtotal = Number(order.total_amount) + Number(order.order_discount);
   return (
     <>
       <div className="flex flex-wrap gap-2 print:hidden">
         <button
           type="button"
-          onClick={() => void print()}
+          disabled={receiptRequested}
+          onClick={() => setReceiptRequested(true)}
           className="btn-outline"
         >
           <Printer className="h-4 w-4" /> طباعة الفاتورة
@@ -45,7 +44,8 @@ export default function OrderReceipt({ order }: { order: OrderResponseDto }) {
         <button
           type="button"
 
-          onClick={() => void print()}
+          disabled={receiptRequested}
+          onClick={() => setReceiptRequested(true)}
           className="btn-outline"
           title="اختر حفظ كملف PDF من نافذة الطباعة"
         >
@@ -57,7 +57,7 @@ export default function OrderReceipt({ order }: { order: OrderResponseDto }) {
           {printError}
         </p>
       ) : null}
-      <section
+      {receiptRequested && <section
         ref={receiptRef}
         className="receipt-print-root receipt-print-source"
         dir="rtl"
@@ -143,7 +143,7 @@ export default function OrderReceipt({ order }: { order: OrderResponseDto }) {
           />
         </div>
         <footer className="receipt-footer">شكرًا لتعاملكم معنا</footer>
-      </section>
+      </section>}
     </>
   );
 }
