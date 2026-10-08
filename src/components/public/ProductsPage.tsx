@@ -324,17 +324,31 @@ export default function ProductsPage() {
       </div>
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
+        <form
+          role="search"
+          className="relative flex-1"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const normalized = searchInput.trim();
+            if (normalized !== searchParam)
+              updateParams({ search: normalized || null, page: null });
+            event.currentTarget.querySelector<HTMLInputElement>('input')?.blur();
+          }}
+        >
           <Search className="absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-stone-400" />
           <input
             type="search"
+            name="search"
+            enterKeyHint="search"
+            aria-label="ابحث باسم المنتج أو الكود"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder="ابحث باسم المنتج أو الكود…"
-            className="w-full rounded-xl border border-stone-200 bg-white py-3 pe-12 ps-11 text-sm font-semibold outline-none transition focus:border-[#C2A66D] focus:ring-4 focus:ring-[#C2A66D]/10"
+            className="w-full rounded-xl border border-stone-200 bg-white py-3 pe-12 ps-11 text-sm font-semibold outline-none transition focus:border-[#C2A66D] focus:ring-4 focus:ring-[#C2A66D]/10 [&::-webkit-search-cancel-button]:hidden [&::-webkit-search-cancel-button]:appearance-none"
           />
           {searchInput && (
             <button
+              type="button"
               onClick={() => setSearchInput("")}
               aria-label="مسح البحث"
               className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
@@ -342,7 +356,7 @@ export default function ProductsPage() {
               <X className="h-4 w-4" />
             </button>
           )}
-        </div>
+        </form>
         <PublicSelect
           ariaLabel="ترتيب المنتجات"
           value={sort}
