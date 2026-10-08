@@ -1,3 +1,4 @@
+import { matchesSearchText } from '@/utils/searchText';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search } from 'lucide-react';
 import type { AccountKind, LedgerAccount } from '@/api';
@@ -25,8 +26,7 @@ export default function AccountPicker({ accounts, value, onChange, label, kinds,
   const chosen = accounts.find((account) => account.account_id === value);
   const options = useMemo(() => accounts.filter((account) =>
     (!kinds || kinds.includes(account.kind)) && !exclude?.includes(account.account_id) &&
-    `${account.name} ${account.account_number ?? account.code ?? ''} ${account.phone ?? ''}`
-      .toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())), [accounts, exclude, kinds, search]);
+    matchesSearchText(`${account.name} ${account.account_number ?? account.code ?? ''} ${account.phone ?? ''}`, search)), [accounts, exclude, kinds, search]);
 
   useEffect(() => {
     if (!open) return;

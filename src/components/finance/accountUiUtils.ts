@@ -31,17 +31,6 @@ export function currentMonth() {
   const to = businessToday();
   return { from: to.slice(0, 7) + '-01', to };
 }
-export function balanceMeaning(value: string, kind: UserAccountKind) {
-  const n = Number(value);
-  if (n === 0) return 'الرصيد صفر';
-  return kind === 'General'
-    ? n < 0
-      ? 'مستحق لنا على الحساب'
-      : 'مستحق للحساب علينا'
-    : n > 0
-      ? 'رصيد مدين'
-      : 'رصيد دائن';
-}
 
 export function statementAmount(value: string, mode: 'balance' | 'change') {
   const amount = Number(value);

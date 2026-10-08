@@ -106,6 +106,7 @@ function toCreateProductFormData(data: CreateProductDto): FormData {
   if (data.description !== undefined)
     formData.append("description", data.description);
   formData.append("category_id", String(data.category_id));
+  if (data.is_featured !== undefined) formData.append("is_featured", String(data.is_featured));
   formData.append("variants", JSON.stringify(data.variants));
   formData.append("primary_image", data.primary_image);
   data.additional_images?.forEach((image) =>

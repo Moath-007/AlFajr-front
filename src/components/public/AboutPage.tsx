@@ -1,3 +1,4 @@
+import { resolveCompanyPageImage } from '@/public/companyPageImage';
 import { usePublicCompany } from '@/public/usePublicCompany';
 
 const offerings = [
@@ -19,10 +20,12 @@ export default function AboutPage() {
   const { company } = usePublicCompany();
   const companyName = company?.company_name?.trim();
 
+  const pageImage = resolveCompanyPageImage(company?.about_image_url);
+
   return (
     <div className="min-h-screen bg-white">
       <section className="relative overflow-hidden bg-[#0B1720] text-white">
-        <img src="/assets/al-fajr-store-hero.webp" alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover object-[45%_center] sm:object-center" />
+        {pageImage && (<img src={pageImage} alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover object-[45%_center] sm:object-center" />)}
         <div className="absolute inset-0 bg-[linear-gradient(270deg,rgba(8,17,25,0.96)_0%,rgba(8,17,25,0.90)_32%,rgba(8,17,25,0.55)_55%,rgba(8,17,25,0.08)_100%)] sm:bg-[linear-gradient(270deg,rgba(8,17,25,0.96)_0%,rgba(8,17,25,0.90)_24%,rgba(8,17,25,0.65)_40%,rgba(8,17,25,0.12)_62%,transparent_100%)]" aria-hidden="true" />
         <div className="relative mx-auto flex min-h-[300px] max-w-7xl items-center px-6 py-12 sm:min-h-[340px] sm:px-8 lg:min-h-[400px] lg:px-8 lg:py-16">
           <div className="w-full max-w-[22rem] text-right">

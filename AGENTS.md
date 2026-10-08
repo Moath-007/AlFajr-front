@@ -18,7 +18,7 @@ Do not touch source `alfajrdb`, hosted/Production databases or Production upload
 - Frontend: `npm run typecheck`, `npm run build`, `npm run lint`. Build does not include typecheck; no frontend test script exists.
 - Backend: `npm run build`, `npm run lint`, `npm test`; optional `npx tsc --noEmit -p tsconfig.json`. No backend typecheck npm script exists.
 - Prisma: `npx prisma validate --config prisma7.config.ts`; generate with `npx prisma generate --config prisma7.config.ts`. Deploy writes to the database and needs explicit target authorization. No automatic `db push`, reset or seed.
-- Never modify applied migrations. `prisma/migrations` is the active history; archive directories are historical evidence.
+- Never modify applied migrations. The explicit 2026-10-08 user-approved squash replaced the old 41 migrations and archive with `000000000000_current_baseline`. Existing fully migrated databases must mark this baseline applied with `prisma migrate resolve`; never clear their `_prisma_migrations` or replay baseline SQL on existing tables. Historical QA/cutover scripts referencing removed migrations are retired evidence, not deployment steps.
 - `npm run format` and image optimization write files and are not validation commands.
 - Database-writing suites run serially: their rollback/concurrency assertions inspect shared state. Independent CPU/build checks may run together.
 - Check existing processes/ports before starting or stopping servers. Do not assume an existing process runs the newest build.

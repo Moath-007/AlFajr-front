@@ -1,3 +1,4 @@
+import { resolveCompanyPageImage } from '@/public/companyPageImage';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowUpLeft, Building2, PackageOpen, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -46,7 +47,7 @@ export default function HomePage() {
     const controller = new AbortController();
     setProducts({ status: 'loading', data: [] });
 
-    productsService.listRetail({ page: 1, limit: RETAIL_PREVIEW_LIMIT, sort: 'random' }, controller.signal)
+    productsService.listRetail({ page: 1, limit: RETAIL_PREVIEW_LIMIT, sort: 'default' }, controller.signal)
       .then((response) => setProducts({ status: 'ready', data: response.products }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -56,6 +57,7 @@ export default function HomePage() {
     return () => controller.abort();
   }, [requestVersion]);
 
+  const pageImage = resolveCompanyPageImage(company?.home_image_url);
   const companyName = company?.company_name?.trim() || 'شركة الفجر';
   const orderedCategories = [...categories]
     .map((category, originalIndex) => ({ category, originalIndex }))
@@ -69,7 +71,7 @@ export default function HomePage() {
   return (
     <div className="overflow-hidden bg-white">
       <section className="relative isolate min-h-[420px] bg-[#0B1720] text-white sm:min-h-[460px] lg:min-h-[500px]">
-        <img src="/assets/al-fajr-store-hero.webp" alt="معرض شركة الفجر للصناعة والتجارة" decoding="async" className="absolute inset-0 -z-20 h-full w-full object-cover object-[45%_center] sm:object-center" />
+        {pageImage && (<img src={pageImage} alt="معرض شركة الفجر للصناعة والتجارة" decoding="async" className="absolute inset-0 -z-20 h-full w-full object-cover object-[45%_center] sm:object-center" />)}
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(8,17,25,0.95)_0%,rgba(8,17,25,0.85)_45%,rgba(8,17,25,0.40)_75%,rgba(8,17,25,0.15)_100%)] sm:bg-[linear-gradient(270deg,rgba(8,17,25,0.96)_0%,rgba(8,17,25,0.88)_28%,rgba(8,17,25,0.65)_48%,rgba(8,17,25,0.12)_72%,transparent_100%)]" />
 
 

@@ -34,6 +34,7 @@ export interface ProductVariantResponseDto {
 }
 
 export interface ProductResponseDto {
+  is_featured: boolean;
   id: NumericId;
   name: string;
   code: string;
@@ -101,6 +102,7 @@ export interface CatalogVariantResponseDto {
 }
 
 export interface CatalogProductSummaryDto {
+  is_featured: boolean;
   id: NumericId;
   name: string;
   code: string;
@@ -136,6 +138,7 @@ export interface CatalogProductsListResponseDto {
 }
 
 export interface CatalogProductDetailsDto {
+  is_featured: boolean;
   id: NumericId;
   name: string;
   code: string;
@@ -165,6 +168,7 @@ export interface UpdateProductVariantDto extends ProductVariantWriteDto {
 }
 
 export interface CreateProductDto {
+  is_featured?: boolean;
   name: string;
   code: string;
   description?: string;
@@ -175,6 +179,7 @@ export interface CreateProductDto {
 }
 
 export interface CreatedProductDataDto {
+  is_featured: boolean;
   product_id: NumericId;
   name: string;
   code: string;
@@ -190,6 +195,7 @@ export interface CreateProductResponseDto {
 }
 
 export interface UpdateProductDto {
+  is_featured?: boolean;
   name: string;
   code: string;
   description?: string;

@@ -1,3 +1,4 @@
+import { matchesSearchText } from '@/utils/searchText';
 import {
   useCallback,
   useEffect,
@@ -74,9 +75,7 @@ export default function AdminProductSettingsPage({
   const filtered = categories.filter(
     (item) =>
       (!search.trim() ||
-        item.name
-          .toLocaleLowerCase()
-          .includes(search.trim().toLocaleLowerCase())) &&
+        matchesSearchText(item.name, search)) &&
       (!status || String(item.is_active) === status),
   );
   const openEdit = (item: CategoryResponseDto) => {

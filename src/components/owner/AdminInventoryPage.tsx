@@ -523,21 +523,10 @@ export default function AdminInventoryPage() {
           {openingReady && (
             <div className="space-y-2">
               <p>
-                الحركة الافتتاحية إدخال مستقل؛ يمكن إضافتها حتى بعد حركات أخرى
-                أو مع مخزون سالب.
+                {openingRows.length > 0
+                  ? "يوجد مخزون افتتاحي لهذا الصنف. يمكنك تعديل الحركة أو حذفها."
+                  : "يمكن تسجيل حركة افتتاحية واحدة لهذا الصنف، حتى مع وجود حركات أخرى أو مخزون سالب."}
               </p>
-              <button
-                type="button"
-                className="btn-outline"
-                onClick={() => {
-                  setSelectedOpeningId(null);
-                  setExistingOpeningCost(null);
-                  setOpeningQuantity("");
-                  setOpeningCost("");
-                }}
-              >
-                حركة جديدة
-              </button>
               {openingRows.map((row) => (
                 <div
                   key={row.id}
@@ -548,7 +537,9 @@ export default function AdminInventoryPage() {
                   </span>
                   <button
                     type="button"
+                    disabled={saving}
                     onClick={() => {
+                      setStockErrors([]);
                       setSelectedOpeningId(row.id);
                       setExistingOpeningCost(row.unit_cost);
                       setOpeningQuantity(String(row.quantity));
@@ -564,7 +555,7 @@ export default function AdminInventoryPage() {
                       if (
                         !openingItem ||
                         !window.confirm(
-                          "إلغاء هذه الحركة وإعادة حساب أثر التكلفة والحركات اللاحقة؟",
+                          "حذف هذه الحركة الافتتاحية وإعادة حساب أثر التكلفة والحركات اللاحقة؟",
                         )
                       )
                         return;
@@ -582,7 +573,7 @@ export default function AdminInventoryPage() {
                         .finally(() => setSaving(false));
                     }}
                   >
-                    إلغاء
+                    حذف
                   </button>
                 </div>
               ))}
@@ -593,49 +584,53 @@ export default function AdminInventoryPage() {
               {stockErrors.join("، ")}
             </div>
           )}
-          {
-            <label>
-              <span className="rep-label">الكمية الافتتاحية المضافة</span>
-              <input
-                autoFocus
-                type="number"
-                min="0"
-                step="1"
-                className="rep-control"
-                value={openingQuantity}
-                onChange={(e) => setOpeningQuantity(e.target.value)}
-                placeholder="مثال: 10"
-              />
-            </label>
-          }
-          {openingItem &&
-            existingOpeningCost === null &&
-            Number.isInteger(Number(openingQuantity)) &&
-            Number(openingQuantity) > 0 && (
-              <p className="rounded-xl bg-brand-50 p-3 text-sm font-bold text-brand">
-                الرصيد المتوقع:{" "}
-                {openingItem.stock_quantity + Number(openingQuantity)}
-              </p>
-            )}
-          <label className="block">
-            <span className="rep-label">سعر شراء القطعة الافتتاحي</span>
-            <input
-              className="rep-control"
-              type="number"
-              min="0"
-              step="0.000001"
-              value={openingCost}
-              onChange={(event) => setOpeningCost(event.target.value)}
-            />
-          </label>
-          <button
-            disabled={saving || !openingReady}
-            className="min-h-11 w-full rounded-xl bg-brand font-black text-white"
-          >
-            {existingOpeningCost === null
-              ? "متابعة إضافة المخزون"
-              : "متابعة تصحيح الحركة"}
-          </button>
+          {openingReady && (openingRows.length === 0 || selectedOpeningId !== null) && (
+            <fieldset disabled={saving} className="space-y-4">
+              {
+                <label>
+                  <span className="rep-label">{selectedOpeningId === null ? "الكمية الافتتاحية المضافة" : "كمية الحركة الافتتاحية"}</span>
+                  <input
+                    autoFocus
+                    type="number"
+                    min="0"
+                    step="1"
+                    className="rep-control"
+                    value={openingQuantity}
+                    onChange={(e) => setOpeningQuantity(e.target.value)}
+                    placeholder="مثال: 10"
+                  />
+                </label>
+              }
+              {openingItem &&
+                existingOpeningCost === null &&
+                Number.isInteger(Number(openingQuantity)) &&
+                Number(openingQuantity) > 0 && (
+                  <p className="rounded-xl bg-brand-50 p-3 text-sm font-bold text-brand">
+                    الرصيد المتوقع:{" "}
+                    {openingItem.stock_quantity + Number(openingQuantity)}
+                  </p>
+                )}
+              <label className="block">
+                <span className="rep-label">سعر شراء القطعة الافتتاحي</span>
+                <input
+                  className="rep-control"
+                  type="number"
+                  min="0"
+                  step="0.000001"
+                  value={openingCost}
+                  onChange={(event) => setOpeningCost(event.target.value)}
+                />
+              </label>
+              <button
+                disabled={saving || !openingReady}
+                className="min-h-11 w-full rounded-xl bg-brand font-black text-white"
+              >
+                {existingOpeningCost === null
+                  ? "متابعة إضافة المخزون"
+                  : "متابعة تصحيح الحركة"}
+              </button>
+            </fieldset>
+          )}
         </form>
       </Modal>
       <ConfirmDialog

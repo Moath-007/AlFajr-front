@@ -53,6 +53,7 @@ export default function AdminProductFormPage({
     description: "",
     category_id: "",
     is_active: true,
+    is_featured: false,
   });
   const [variants, setVariants] = useState<VariantDraft[]>([blankVariant()]);
   const [existingImages, setExistingImages] = useState<
@@ -162,6 +163,7 @@ export default function AdminProductFormPage({
       description: p.description || "",
       category_id: String(p.category.id),
       is_active: p.is_active,
+      is_featured: p.is_featured ?? false,
     };
     const nextVariants = p.variants.map((v) => ({
       key: `existing-${v.id}`,
@@ -276,6 +278,7 @@ export default function AdminProductFormPage({
           code: fields.code.trim(),
           description: fields.description.trim() || undefined,
           category_id: Number(fields.category_id),
+          is_featured: fields.is_featured,
           is_active: fields.is_active,
           variants: payloadVariants(),
         });
@@ -420,9 +423,15 @@ export default function AdminProductFormPage({
                   }
                 />
               </label>
+              <div className={`product-editor-toggles grid gap-3 ${editing ? "sm:grid-cols-2" : ""}`}>
+              <label className={`product-editor-status flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 transition ${fields.is_featured ? "border-emerald-200 bg-emerald-50/60" : "border-stone-200 bg-stone-50"}`}>
+                <span><b className="block text-sm text-brand">منتج مميز</b><small className="text-stone-500">يظهر قبل المنتجات العادية في ترتيب المنتجات.</small></span>
+                <input type="checkbox" aria-label="منتج مميز" className="peer sr-only" checked={fields.is_featured} onChange={e => setFields({ ...fields, is_featured: e.target.checked })} />
+                <span className="relative h-7 w-12 shrink-0 rounded-full bg-stone-300 transition peer-checked:bg-emerald-600 peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 after:absolute after:right-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:-translate-x-5" aria-hidden="true" />
+              </label>
               {editing && (
                 <label
-                  className={`product-editor-status flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 transition sm:col-span-2 ${fields.is_active ? "border-emerald-200 bg-emerald-50/60" : "border-stone-200 bg-stone-50"}`}
+                  className={`product-editor-status flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 transition ${fields.is_active ? "border-emerald-200 bg-emerald-50/60" : "border-stone-200 bg-stone-50"}`}
                 >
                   <span>
                     <b className="block text-sm text-brand">حالة المنتج</b>
@@ -446,6 +455,7 @@ export default function AdminProductFormPage({
                   />
                 </label>
               )}
+              </div>
             </div>
           </section>
           <ImageEditor

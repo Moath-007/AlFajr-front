@@ -1,3 +1,4 @@
+import { matchesSearchText } from '@/utils/searchText';
 import { createPortal } from "react-dom";
 import {
   useCallback,
@@ -79,13 +80,13 @@ export default function AdminRepresentativesPage({
     return () => c.abort();
   }, [load, retry]);
   const shown = useMemo(() => {
-    const q = search.trim().toLocaleLowerCase();
+    const q = search.trim();
     return q
       ? representatives.filter(
           (x) =>
-            x.name.toLocaleLowerCase().includes(q) ||
-            x.email.toLocaleLowerCase().includes(q) ||
-            (x.phone || "").includes(q),
+            matchesSearchText(x.name, q) ||
+            matchesSearchText(x.email, q) ||
+            matchesSearchText(x.phone || "", q),
         )
       : representatives;
   }, [representatives, search]);

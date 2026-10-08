@@ -1,3 +1,6 @@
+
+import CompanyPageImages from './CompanyPageImages';
+import { companyImageSlots, emptyCompanyImageDrafts, imagesFromProfile, type CompanyImageDrafts, type CompanyImages } from './companyPageImageFields';
 import {
   useCallback,
   useEffect,
@@ -51,13 +54,17 @@ export default function AdminCompanyProfilePage({
     announcement_enabled: false,
     phones: [],
   });
+
+  const [images, setImages] = useState<CompanyImages>({ home_image_url: null, about_image_url: null, contact_image_url: null });
+  const [imageDrafts, setImageDrafts] = useState<CompanyImageDrafts>(emptyCompanyImageDrafts);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [retry, setRetry] = useState(0);
   const initial = useRef("");
   const snapshot = useMemo(() => JSON.stringify(fields), [fields]);
-  const dirty = initial.current !== "" && snapshot !== initial.current;
+  const dirty = initial.current !== "" && (snapshot !== initial.current ||
+    companyImageSlots.some(slot => imageDrafts[slot.key].file || imageDrafts[slot.key].remove));
   useEffect(() => {
     onDirtyChange(dirty);
     return () => onDirtyChange(false);
@@ -87,6 +94,8 @@ export default function AdminCompanyProfilePage({
       const response = await companyProfileService.get(signal);
       const next = fromProfile(response.company);
       setFields(next);
+      setImages(imagesFromProfile(response.company));
+      setImageDrafts(emptyCompanyImageDrafts());
       initial.current = JSON.stringify(next);
     } catch (e) {
       if (!signal?.aborted)
@@ -102,6 +111,7 @@ export default function AdminCompanyProfilePage({
   }, [load, retry]);
   const save = async (e: FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!fields.company_name.trim()) return setErrors(["اسم الشركة مطلوب."]);
     if (fields.phones.some((x) => !x.trim()))
       return setErrors(["احذف أسطر الهاتف الفارغة أو أدخل رقمًا فيها."]);
@@ -117,11 +127,19 @@ export default function AdminCompanyProfilePage({
         announcement_text: fields.announcement_text.trim() || undefined,
         announcement_enabled: fields.announcement_enabled,
         phones: fields.phones.map((x) => x.trim()),
+        home_image: imageDrafts.home_image_url.file ?? undefined,
+        about_image: imageDrafts.about_image_url.file ?? undefined,
+        contact_image: imageDrafts.contact_image_url.file ?? undefined,
+        remove_home_image: imageDrafts.home_image_url.remove || undefined,
+        remove_about_image: imageDrafts.about_image_url.remove || undefined,
+        remove_contact_image: imageDrafts.contact_image_url.remove || undefined,
       });
-      const refreshed = await companyProfileService.get();
-      const next = fromProfile(refreshed.company);
+      const next = fromProfile(response.company);
       setFields(next);
+      setImages(imagesFromProfile(response.company));
+      setImageDrafts(emptyCompanyImageDrafts());
       initial.current = JSON.stringify(next);
+
       onDirtyChange(false);
       onNotify(response.message, "success");
     } catch (error) {
@@ -154,7 +172,7 @@ export default function AdminCompanyProfilePage({
         <p className="text-xs font-black text-gold-dark">بيانات الموقع</p>
         <h1 className="mt-1 text-3xl font-black text-brand">الإعدادات</h1>
         <p className="mt-2 text-sm text-stone-500">
-          بيانات الشركة والتواصل والإعلان والعملات.
+          بيانات الشركة والتواصل والإعلان وصور الموقع والعملات.
         </p>
       </header>
       {errors.length > 0 && (
@@ -288,6 +306,8 @@ export default function AdminCompanyProfilePage({
             />
           </label>
         </section>
+        <CompanyPageImages images={images} drafts={imageDrafts} disabled={saving}
+          onChange={(key, draft) => setImageDrafts(current => ({ ...current, [key]: draft }))} />
         <div className="company-save-bar sticky bottom-3 z-20 rounded-2xl border bg-white/95 p-3 shadow-xl backdrop-blur">
           <span className="text-xs text-stone-500" role="status">
             {dirty ? "تغييرات غير محفوظة" : "كل التغييرات محفوظة"}

@@ -1,3 +1,4 @@
+import { matchesSearchText } from '@/utils/searchText';
 import type { SaleAccountOption } from "@/api";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -34,7 +35,7 @@ export default function GeneralSaleAccountSelect({
   const menu = useRef<HTMLDivElement>(null);
   const [placement, setPlacement] = useState<{ left: number; width: number; top?: number; bottom?: number; maxHeight: number } | null>(null);
   const chosen = accounts.find((account) => account.id === value);
-  const options = searchOptions ?? accounts.filter((account) => `${account.name} ${account.account_number ?? ''} ${account.phone ?? ''}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
+  const options = searchOptions ?? accounts.filter((account) => matchesSearchText(`${account.name} ${account.account_number ?? ''} ${account.phone ?? ''}`, search));
 
   useEffect(() => { onSearch?.(search); }, [search, onSearch]);
 

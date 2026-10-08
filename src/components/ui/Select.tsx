@@ -1,3 +1,4 @@
+import { matchesSearchText } from '@/utils/searchText';
 import {
   useEffect,
   useId,
@@ -57,10 +58,9 @@ export default function Select<T extends string | number>({
   const selected = options.find((option) => option.value === value);
   const trimmed = query.trim();
   const filtered = useMemo(() => {
-    const needle = trimmed.toLocaleLowerCase();
-    return needle
+    return trimmed
       ? options.filter((option) =>
-          option.label.toLocaleLowerCase().includes(needle),
+          matchesSearchText(option.label, trimmed),
         )
       : options;
   }, [options, trimmed]);
