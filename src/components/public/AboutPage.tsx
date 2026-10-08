@@ -21,14 +21,14 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <section className="relative overflow-hidden bg-[#162E21] text-white">
-        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full border-[64px] border-[#C2A66D]/10" />
-        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-          <p className="text-sm font-extrabold text-[#E8DCC2]">تعرف علينا عن قرب</p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">من نحن</h1>
-          <p className="mt-5 max-w-2xl text-base leading-8 text-stone-300 sm:text-lg">
-            {companyName ? `${companyName} تقدم` : 'نقدم'} حلولًا متكاملة من منتجات وتجهيزات المنزل بتصاميم عصرية وخيارات متنوعة تلائم مختلف المساحات والاحتياجات.
-          </p>
+      <section className="relative overflow-hidden bg-[#0B1720] text-white">
+        <img src="/assets/al-fajr-store-hero.webp" alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover object-[45%_center] sm:object-center" />
+        <div className="absolute inset-0 bg-[linear-gradient(270deg,rgba(8,17,25,0.96)_0%,rgba(8,17,25,0.90)_32%,rgba(8,17,25,0.55)_55%,rgba(8,17,25,0.08)_100%)] sm:bg-[linear-gradient(270deg,rgba(8,17,25,0.96)_0%,rgba(8,17,25,0.90)_24%,rgba(8,17,25,0.65)_40%,rgba(8,17,25,0.12)_62%,transparent_100%)]" aria-hidden="true" />
+        <div className="relative mx-auto flex min-h-[300px] max-w-7xl items-center px-6 py-12 sm:min-h-[340px] sm:px-8 lg:min-h-[400px] lg:px-8 lg:py-16">
+          <div className="w-full max-w-[22rem] text-right">
+            <h1 className="text-4xl font-bold leading-tight sm:text-5xl">من نحن</h1>
+            <p className="mt-5 text-base font-normal leading-8 text-[#F1F3F5] sm:text-lg sm:leading-9">{companyName ? `${companyName} تقدم` : 'نقدم'} حلولًا متكاملة للمنزل، بتصاميم عصرية وخيارات تناسب احتياجاتك.</p>
+          </div>
         </div>
       </section>
 

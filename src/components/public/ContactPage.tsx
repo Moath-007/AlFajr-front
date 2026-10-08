@@ -1,6 +1,6 @@
 import { AlertCircle, Building2, Clock, Mail, MapPin, Phone, RefreshCw } from 'lucide-react';
 import { getPublicCompanyDetails, usePublicCompany } from '@/public';
-import { heroImage } from '@/data/publicContent';
+
 
 const iconBox = 'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#C2A66D]/10 text-[#C2A66D]';
 
@@ -12,14 +12,13 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-stone-50/70">
-      <section className="relative overflow-hidden bg-[#162E21] text-white">
-        <img src={heroImage} alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover object-center" />
-        <div className="absolute inset-0 bg-[#162E21]/60 lg:bg-gradient-to-l lg:from-[#162E21] lg:from-[28%] lg:via-[#162E21]/82 lg:via-[58%] lg:to-[#162E21]/5" />
-        <div className="relative mx-auto flex min-h-72 max-w-7xl items-center px-4 py-12 sm:min-h-80 sm:px-6 lg:min-h-[360px] lg:px-8 lg:py-16">
-          <div className="relative z-10 max-w-xl py-2">
-            <span className="mb-4 inline-flex rounded-full border border-[#C2A66D]/35 bg-[#C2A66D]/15 px-3 py-1 text-xs font-bold text-[#E8DCC2]">تواصل مباشر وواضح</span>
-            <h1 className="text-3xl font-black tracking-tight sm:text-4xl">اتصل بنا</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-stone-300 sm:text-base">اختر وسيلة التواصل المناسبة، وسيكون فريق الشركة جاهزًا لمساعدتك.</p>
+      <section className="relative overflow-hidden bg-[#0B1720] text-white">
+        <img src="/assets/al-fajr-store-hero.webp" alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover object-[45%_center] sm:object-center" />
+        <div className="absolute inset-0 bg-[linear-gradient(270deg,rgba(8,17,25,0.96)_0%,rgba(8,17,25,0.90)_32%,rgba(8,17,25,0.55)_55%,rgba(8,17,25,0.08)_100%)] sm:bg-[linear-gradient(270deg,rgba(8,17,25,0.96)_0%,rgba(8,17,25,0.90)_24%,rgba(8,17,25,0.65)_40%,rgba(8,17,25,0.12)_62%,transparent_100%)]" aria-hidden="true" />
+        <div className="relative mx-auto flex min-h-[300px] max-w-7xl items-center px-6 py-12 sm:min-h-[340px] sm:px-8 lg:min-h-[400px] lg:px-8 lg:py-16">
+          <div className="w-full max-w-[22rem] text-right">
+            <h1 className="text-4xl font-bold leading-tight sm:text-5xl">اتصل بنا</h1>
+            <p className="mt-5 text-base font-normal leading-8 text-[#F1F3F5] sm:text-lg sm:leading-9">اختر وسيلة التواصل المناسبة،<br /> وفريقنا جاهز لمساعدتك.</p>
           </div>
         </div>
       </section>

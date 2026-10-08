@@ -68,19 +68,19 @@ export default function HomePage() {
 
   return (
     <div className="overflow-hidden bg-white">
-      <section className="relative isolate min-h-[500px] bg-[#162E21] text-white sm:min-h-[620px] lg:min-h-[680px]">
-        <img src="/assets/al-fajr-store-hero.webp" alt="معرض شركة الفجر للصناعة والتجارة" decoding="async" className="absolute inset-0 -z-20 h-full w-full object-cover object-[55%_center] sm:object-center" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-l from-[#10251a]/90 via-[#10251a]/65 to-[#10251a]/25 sm:from-[#10251a]/85 sm:via-[#10251a]/60 sm:to-[#10251a]/15" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#10251a]/55 via-transparent to-[#06110c]/25" />
+      <section className="relative isolate min-h-[420px] bg-[#0B1720] text-white sm:min-h-[460px] lg:min-h-[500px]">
+        <img src="/assets/al-fajr-store-hero.webp" alt="معرض شركة الفجر للصناعة والتجارة" decoding="async" className="absolute inset-0 -z-20 h-full w-full object-cover object-[45%_center] sm:object-center" />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(8,17,25,0.95)_0%,rgba(8,17,25,0.85)_45%,rgba(8,17,25,0.40)_75%,rgba(8,17,25,0.15)_100%)] sm:bg-[linear-gradient(270deg,rgba(8,17,25,0.96)_0%,rgba(8,17,25,0.88)_28%,rgba(8,17,25,0.65)_48%,rgba(8,17,25,0.12)_72%,transparent_100%)]" />
 
-        <div className="mx-auto flex min-h-[500px] max-w-7xl items-center px-4 py-10 sm:min-h-[620px] sm:px-6 sm:py-16 lg:min-h-[680px] lg:px-8">
-          <div className="relative w-full max-w-3xl">
+
+        <div className="mx-auto flex min-h-[420px] max-w-7xl items-start px-6 py-10 sm:min-h-[460px] sm:px-6 sm:pt-16 sm:pb-12 lg:min-h-[500px] lg:px-8 lg:pt-20">
+          <div className="relative w-full max-w-2xl">
             <p className="mb-3 text-xs font-extrabold tracking-wide text-[#E8DCC2] [text-shadow:0_1px_8px_rgba(0,0,0,0.45)] sm:mb-4 sm:text-sm">{companyName}</p>
-            <h1 className="max-w-2xl text-[2rem] font-black leading-[1.22] tracking-tight [text-shadow:0_2px_12px_rgba(0,0,0,0.45)] sm:text-5xl lg:text-6xl">الفجر للصناعة والتجارة</h1>
-            <h2 className="mt-4 max-w-xl text-base font-black leading-8 text-[#F3EBDD] [text-shadow:0_2px_10px_rgba(0,0,0,0.6)] sm:mt-5 sm:max-w-2xl sm:text-2xl sm:leading-9">حلول متكاملة للمنزل بتصاميم تجمع بين الجودة والأناقة</h2>
+            <h1 className="max-w-2xl text-[1.75rem] font-bold leading-[1.35] tracking-tight sm:text-[2.625rem] lg:text-[3.25rem]">الفجر للصناعة والتجارة</h1>
+            <p className="mt-4 max-w-xl text-base font-medium leading-7 text-[#F3EBDD] [text-shadow:0_2px_10px_rgba(0,0,0,0.6)] sm:mt-5 sm:text-xl sm:leading-8">حلول متكاملة للمنزل<br className="sm:hidden" /> بتصاميم تجمع بين الجودة والأناقة</p>
             <div className="mt-7 flex flex-col gap-3 sm:mt-9 sm:flex-row">
               <Link to="/products" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#C2A66D] px-5 py-2.5 text-sm font-extrabold text-[#162E21] shadow-lg shadow-black/15 transition hover:-translate-y-0.5 hover:bg-[#D0B982] focus:outline-none focus:ring-4 focus:ring-[#E8DCC2]/30 sm:min-h-12 sm:px-6 sm:py-3 sm:text-base">تصفح المنتجات <ArrowLeft className="h-5 w-5" /></Link>
-              <Link to="/contact" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/30 bg-[#10251a]/45 px-5 py-2.5 text-sm font-extrabold text-white backdrop-blur-sm transition hover:border-white/50 hover:bg-white/15 focus:outline-none focus:ring-4 focus:ring-white/20 sm:min-h-12 sm:px-6 sm:py-3 sm:text-base">تواصل معنا</Link>
+              <Link to="/contact" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/30 bg-[#0B1720]/45 px-5 py-2.5 text-sm font-extrabold text-white backdrop-blur-sm transition hover:border-white/50 hover:bg-white/15 focus:outline-none focus:ring-4 focus:ring-white/20 sm:min-h-12 sm:px-6 sm:py-3 sm:text-base">تواصل معنا</Link>
             </div>
           </div>
         </div>
