@@ -530,13 +530,17 @@ export default function AdminInventoryPage() {
               {openingRows.map((row) => (
                 <div
                   key={row.id}
-                  className="flex flex-wrap gap-2 rounded border p-2"
+                  className={`opening-movement-card ${selectedOpeningId === row.id ? "is-editing" : ""}`}
                 >
-                  <span>
-                    #{row.id}: {row.quantity} × {row.unit_cost} ₪
-                  </span>
+                  <div className="opening-movement-heading"><b>الحركة الافتتاحية</b><span>رقم {row.id}</span></div>
+                  <dl className="opening-movement-details">
+                    <div><dt>الكمية الافتتاحية</dt><dd><bdi>{row.quantity}</bdi> قطعة</dd></div>
+                    <div><dt>سعر شراء القطعة</dt><dd><bdi>{row.unit_cost}</bdi> شيكل</dd></div>
+                  </dl>
+                  <div className="opening-movement-actions">
                   <button
                     type="button"
+                    className="opening-movement-edit"
                     disabled={saving}
                     onClick={() => {
                       setStockErrors([]);
@@ -550,6 +554,7 @@ export default function AdminInventoryPage() {
                   </button>
                   <button
                     type="button"
+                    className="opening-movement-delete"
                     disabled={saving}
                     onClick={() => {
                       if (
@@ -575,6 +580,7 @@ export default function AdminInventoryPage() {
                   >
                     حذف
                   </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -585,7 +591,8 @@ export default function AdminInventoryPage() {
             </div>
           )}
           {openingReady && (openingRows.length === 0 || selectedOpeningId !== null) && (
-            <fieldset disabled={saving} className="space-y-4">
+            <fieldset disabled={saving} className="opening-edit-fields space-y-4">
+              {selectedOpeningId !== null && <p className="opening-edit-title">تعديل بيانات الحركة</p>}
               {
                 <label>
                   <span className="rep-label">{selectedOpeningId === null ? "الكمية الافتتاحية المضافة" : "كمية الحركة الافتتاحية"}</span>
