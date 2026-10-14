@@ -1,5 +1,8 @@
+import { validCheckBusinessDate } from './checkRequiredInput';
 import { useEffect, useState } from "react";
 import {
+  accountsService,
+  type AccountIdentityOption,
   currenciesService,
   paymentsService,
   type CurrencyDto,
@@ -8,6 +11,8 @@ import {
 import { apiMessages } from "@/components/rep/repOrderUtils";
 import Modal from "@/components/ui/Modal";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+
+import AccountPicker from "./AccountPicker";
 
 // Voucher correction keeps the payment identity; managed-check movement rules remain authoritative.
 export default function EditPaymentModal({
@@ -19,6 +24,16 @@ export default function EditPaymentModal({
   onClose: () => void;
   onSaved: (id: number) => void;
 }) {
+  const [banks, setBanks] = useState<AccountIdentityOption[]>([]);
+  const [bankId, setBankId] = useState<number | null>(payment.money_account?.account_id ?? null);
+  useEffect(() => {
+    if (payment.payment_method !== "BankTransfer") return;
+    const controller = new AbortController();
+    accountsService.allOptions({ type: "Bank" }, controller.signal).then(setBanks).catch(e => {
+      if (!controller.signal.aborted) setError(apiMessages(e, "تعذر تحميل البنوك.").join("، "));
+    });
+    return () => controller.abort();
+  }, [payment.payment_method]);
   const [currencies, setCurrencies] = useState<CurrencyDto[]>([]),
     [error, setError] = useState("");
   const [amount, setAmount] = useState(payment.amount),
@@ -58,8 +73,9 @@ export default function EditPaymentModal({
   const currency = currencies.find((c) => c.currency_id === currencyId);
   const validate = () => {
     if (
+      (payment.payment_method === "BankTransfer" && !banks.some(bank => bank.account_id === bankId && bank.kind === "Bank")) ||
       !currency ||
-      !date ||
+      !date || (isCheck && !validCheckBusinessDate(date)) ||
       !/^\d+(?:\.\d{1,2})?$/.test(amount) ||
       Number(amount) <= 0 ||
       (!currency.is_base &&
@@ -89,6 +105,7 @@ export default function EditPaymentModal({
         currency_id: currencyId,
         exchange_rate: currency.is_base ? 1 : Number(rate),
         payment_method: payment.payment_method,
+        ...(payment.payment_method === "BankTransfer" ? { money_account_id: bankId! } : {}),
         paid_at: date,
         notes: notes.trim(),
         ...(isCheck && check
@@ -137,6 +154,7 @@ export default function EditPaymentModal({
               ? "يُعدّل نفس السند والشيك مع الحفاظ على أرقامهما. يجب التراجع عن حركات الشيك اللاحقة أولًا."
               : "يُعدّل نفس السند مع الحفاظ على رقمه وتحديث أثره على الحساب والصندوق أو البنك."}
           </p>
+          {payment.payment_method === "BankTransfer" && <AccountPicker accounts={banks} label="بنك الحوالة (مطلوب)" kinds={["Bank"]} value={bankId} onChange={setBankId} showIdentity />}
           {isCheck && check && (
             <section className="rounded-xl border bg-stone-50 p-3 text-sm">
               <p className="font-semibold text-brand">
@@ -155,7 +173,7 @@ export default function EditPaymentModal({
           )}
           <div className="grid gap-3 sm:grid-cols-2">
             <label>
-              <span className="rep-label">المبلغ</span>
+              <span className="rep-label">المبلغ{isCheck && " (مطلوب)"}</span>
               <input
                 className="rep-control"
                 value={amount}
@@ -164,7 +182,7 @@ export default function EditPaymentModal({
               />
             </label>
             <label>
-              <span className="rep-label">العملة</span>
+              <span className="rep-label">العملة{isCheck && " (مطلوب)"}</span>
               <select
                 className="rep-control"
                 value={currencyId}
@@ -179,7 +197,7 @@ export default function EditPaymentModal({
             </label>
             {!currency?.is_base && (
               <label>
-                <span className="rep-label">سعر الصرف</span>
+                <span className="rep-label">سعر الصرف{isCheck && " (مطلوب)"}</span>
                 <input
                   className="rep-control"
                   value={rate}
@@ -189,7 +207,7 @@ export default function EditPaymentModal({
               </label>
             )}
             <label>
-              <span className="rep-label">تاريخ السند</span>
+              <span className="rep-label">تاريخ السند{isCheck && " (مطلوب)"}</span>
               <input
                 className="rep-control"
                 type="date"
@@ -199,7 +217,7 @@ export default function EditPaymentModal({
             </label>
           </div>
           <label className="block">
-            <span className="rep-label">ملاحظات</span>
+            <span className="rep-label">ملاحظات (اختيارية)</span>
             <textarea
               className="rep-control"
               value={notes}

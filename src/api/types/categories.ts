@@ -5,10 +5,12 @@ export interface CategoryResponseDto {
   name: string;
   image_url?: string | null;
   is_active: boolean;
+  is_visible_online: boolean;
   products_count: number;
 }
 
 export interface CreateCategoryDto {
+  is_visible_online?: boolean;
   name: string;
   image?: File;
 }

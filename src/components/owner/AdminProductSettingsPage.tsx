@@ -46,6 +46,7 @@ export default function AdminProductSettingsPage({
     name: string;
     image: File | null;
     removeImage: boolean;
+    hiddenOnline: boolean;
   } | null>(null);
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -80,7 +81,7 @@ export default function AdminProductSettingsPage({
   );
   const openEdit = (item: CategoryResponseDto) => {
     setFormErrors([]);
-    setForm({ item, name: item.name, image: null, removeImage: false });
+    setForm({ item, name: item.name, image: null, removeImage: false, hiddenOnline: !item.is_visible_online });
   };
   const preview = useMemo(
     () => (form?.image ? URL.createObjectURL(form.image) : null),
@@ -101,12 +102,14 @@ export default function AdminProductSettingsPage({
       if (form.item)
         await categoriesService.update(form.item.category_id, {
           name: form.name.trim(),
+          is_visible_online: !form.hiddenOnline,
           image: form.image ?? undefined,
           remove_image: form.removeImage,
         });
       else
         await categoriesService.create({
           name: form.name.trim(),
+          is_visible_online: !form.hiddenOnline,
           image: form.image ?? undefined,
         });
       onNotify(form.item ? "تم تحديث التصنيف" : "تم إنشاء التصنيف", "success");
@@ -166,7 +169,7 @@ export default function AdminProductSettingsPage({
           type="button"
           onClick={() => {
             setFormErrors([]);
-            setForm({ item: null, name: "", image: null, removeImage: false });
+            setForm({ item: null, name: "", image: null, removeImage: false, hiddenOnline: false });
           }}
           className="btn-primary shrink-0"
         >
@@ -311,6 +314,7 @@ export default function AdminProductSettingsPage({
                               name: item.name,
                               image: null,
                               removeImage: false,
+                              hiddenOnline: !item.is_visible_online,
                             });
                           }}
                           status={() => setStatusTarget(item)}
@@ -354,6 +358,7 @@ export default function AdminProductSettingsPage({
                           name: item.name,
                           image: null,
                           removeImage: false,
+                              hiddenOnline: !item.is_visible_online,
                         });
                       }}
                       status={() => setStatusTarget(item)}
@@ -406,6 +411,11 @@ export default function AdminProductSettingsPage({
                 form && setForm({ ...form, name: event.target.value })
               }
             />
+          </label>
+          <label className="flex items-center gap-3 text-sm">
+            <input type="checkbox" checked={form?.hiddenOnline ?? false}
+              onChange={(event) => form && setForm({ ...form, hiddenOnline: event.target.checked })} />
+            إخفاء منتجات التصنيف من الكتالوج الإلكتروني
           </label>
           <div>
             <span className="rep-label">

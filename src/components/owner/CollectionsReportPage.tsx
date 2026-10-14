@@ -19,7 +19,7 @@ const kindName: Record<string, string> = {
   Receipt: 'سند قبض', ReceiptReversal: 'إلغاء أثر سند قبض', ReturnedToSource: 'إعادة الشيك إلى مصدره',
   RetrievedFromSource: 'استرجاع الشيك من مصدره', CheckAdjustmentReversal: 'تصحيح تسوية الشيك',
 };
-const methodName = (method: string) => ({ Cash: 'نقدي', Check: 'شيك' })[method as 'Cash' | 'Check'] ?? method;
+const methodName = (method: string) => ({ Cash: 'نقدي', Check: 'شيك', BankTransfer: 'حوالة بنكية' })[method as 'Cash' | 'Check' | 'BankTransfer'] ?? method;
 const localTime = (value: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'Asia/Hebron', year: 'numeric', month: '2-digit', day: '2-digit',
   hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
@@ -90,7 +90,7 @@ export default function CollectionsReportPage() {
       <RepDateInput label="من تاريخ" value={draft.from} onChange={(from) => setDraft({ ...draft, from })} max={draft.to || undefined} />
       <RepDateInput label="إلى تاريخ" value={draft.to} onChange={(to) => setDraft({ ...draft, to })} min={draft.from || undefined} />
       <Select label="عرض المجاميع" value={draft.group} onChange={(group) => setDraft({ ...draft, group: group as Draft['group'] })} options={[["day", "يوم"], ["week", "أسبوع"], ["month", "شهر"]]} />
-      <Select label="طريقة القبض" value={draft.method} onChange={(method) => setDraft({ ...draft, method })} options={[["", "كل الطرق"], ["Cash", "نقدي"], ["Check", "شيك"]]} />
+      <Select label="طريقة القبض" value={draft.method} onChange={(method) => setDraft({ ...draft, method })} options={[["", "كل الطرق"], ["Cash", "نقدي"], ["Check", "شيك"], ["BankTransfer", "حوالة بنكية"]]} />
       <Select label="الصندوق النقدي" value={draft.cash} onChange={(cash) => setDraft({ ...draft, cash })} options={[["", "كل الصناديق"], ...cashAccounts.map((account) => [String(account.account_id), account.name])]} />
       <Select label="العملة" value={draft.currency} onChange={(currency) => setDraft({ ...draft, currency })} options={[["", "كل العملات"], ...currencies.map((currency) => [String(currency.currency_id), currency.code])]} />
       <SearchableSelect label="الحساب" searchable searchPlaceholder="ابحث باسم الحساب أو رقمه" value={draft.account} onChange={(account) => setDraft({ ...draft, account })} options={[

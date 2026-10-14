@@ -16,3 +16,4 @@ export { purchasesService } from "./purchases.service";
 export { returnsService } from "./returns.service";
 export { ledgerService } from './ledger.service';
 export { accountsService } from './accounts.service';
+export { citiesService } from './cities.service';

@@ -1,3 +1,4 @@
+import { requiredCheckInputError } from './checkRequiredInput';
 import { checksService, currenciesService, ledgerService, type CurrencyDto, type IncomingCheckMovementAction, type IncomingCheckMovementDto, type LedgerAccount, type ManagedCheck, type ManagedCheckEditDto, type ManagedCheckEvent, type ManagedCheckLocation, type ManagedChecksQuery } from '@/api';
 import { ApiError } from '@/api/errors';
 import { RepDateInput, RepSelect } from '@/components/rep/RepFormControls';
@@ -149,9 +150,8 @@ export default function ChecksPage() {
     event?.preventDefault();
     if (!selected || editSaving) return;
     const number = editNumber.trim();
-    if (!number) { setEditError('رقم الشيك مطلوب.'); return; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(editDueDate)) { setEditError('اختر تاريخ استحقاق صالحًا.'); return; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(editReceivedDate)) { setEditError('اختر تاريخ استلام صالحًا.'); return; }
+    const checkError = requiredCheckInputError({checkNumber:editNumber,bankNumber:editBankNumber,branchNumber:editBranchNumber,accountNumber:editAccountNumber,paidAt:editReceivedDate,dueDate:editDueDate}, identifyingLocked);
+    if (checkError) { setEditError(checkError); return; }
     if (!/^\d+(?:\.\d{1,2})?$/.test(editAmount) || Number(editAmount) <= 0) { setEditError('أدخل مبلغًا صالحًا.'); return; }
     if (!/^\d+(?:\.\d{1,6})?$/.test(editRate) || Number(editRate) <= 0) { setEditError('أدخل سعر صرف صالحًا.'); return; }
     if (!editCurrencyId || !editSourceId || selected.direction === 'Outgoing' && !editBankId) { setEditError('اختر العملة والحساب المرتبط والبنك للشيك الصادر.'); return; }
@@ -508,10 +508,10 @@ export default function ChecksPage() {
           <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-4 sm:p-5" aria-label="البيانات الأساسية">
             <div><h3 className="font-black text-brand">البيانات الأساسية</h3><p className="text-xs text-stone-500">رقم الشيك وقيمته</p></div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block"><span className="rep-label">رقم الشيك</span><input className="rep-control" dir="ltr" value={editNumber} onChange={(event) => setEditNumber(event.target.value)} required disabled={editSaving || identifyingLocked} /></label>
-              <label className="block"><span className="rep-label">المبلغ</span><input className="rep-control" dir="ltr" inputMode="decimal" value={editAmount} onChange={(event) => setEditAmount(event.target.value)} required disabled={editSaving} /></label>
-              <RepSelect floating label="العملة" value={editCurrencyId} onChange={setEditCurrencyId} disabled={editSaving || !!currencyError} options={[{ value: '', label: 'اختر العملة' }, ...currencies.map((currency) => ({ value: String(currency.currency_id), label: `${currency.name} (${currency.code})` }))]} />
-              <label className="block"><span className="rep-label">سعر الصرف</span><input className="rep-control" dir="ltr" inputMode="decimal" value={editRate} onChange={(event) => setEditRate(event.target.value)} required disabled={editSaving} /></label>
+              <label className="block"><span className="rep-label">رقم الشيك (مطلوب)</span><input className="rep-control" dir="ltr" value={editNumber} onChange={(event) => setEditNumber(event.target.value)} required disabled={editSaving || identifyingLocked} /></label>
+              <label className="block"><span className="rep-label">المبلغ (مطلوب)</span><input className="rep-control" dir="ltr" inputMode="decimal" value={editAmount} onChange={(event) => setEditAmount(event.target.value)} required disabled={editSaving} /></label>
+              <RepSelect floating label="العملة (مطلوب)" value={editCurrencyId} onChange={setEditCurrencyId} disabled={editSaving || !!currencyError} options={[{ value: '', label: 'اختر العملة' }, ...currencies.map((currency) => ({ value: String(currency.currency_id), label: `${currency.name} (${currency.code})` }))]} />
+              <label className="block"><span className="rep-label">سعر الصرف (مطلوب)</span><input className="rep-control" dir="ltr" inputMode="decimal" value={editRate} onChange={(event) => setEditRate(event.target.value)} required disabled={editSaving} /></label>
             </div>
             {Number(editAmount) > 0 && Number(editRate) > 0 && <div className="rounded-lg bg-brand/5 px-4 py-3 text-sm text-brand">القيمة بالعملة الأساسية <b className="mr-2 text-base">{number((Number(editAmount) * Number(editRate)).toFixed(2))}</b></div>}
           </section>
@@ -519,25 +519,25 @@ export default function ChecksPage() {
           <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-4 sm:p-5" aria-label="الحساب والتواريخ">
             <h3 className="font-black text-brand">الحساب والتواريخ</h3>
             <div className="grid gap-4 sm:grid-cols-2">
-              <AccountPicker accounts={accounts.filter((account) => ['General'].includes(account.kind) && !account.is_system)} kinds={['General']} label="الحساب المرتبط" value={editSourceId} onChange={setEditSourceId} disabled={editSaving || !!accountsError} />
-              {selected.direction === 'Outgoing' && <AccountPicker accounts={accounts.filter((account) => account.kind === 'Bank')} kinds={['Bank']} label="البنك المسحوب عليه" value={editBankId} onChange={setEditBankId} disabled={editSaving || !!accountsError} />}
-              <RepDateInput label="تاريخ الاستلام/الإصدار" value={editReceivedDate} onChange={setEditReceivedDate} disabled={editSaving} />
-              <RepDateInput label="تاريخ الاستحقاق" value={editDueDate} onChange={setEditDueDate} disabled={editSaving || identifyingLocked} />
+              <AccountPicker accounts={accounts.filter((account) => ['General'].includes(account.kind) && !account.is_system)} kinds={['General']} label="الحساب المرتبط (مطلوب)" value={editSourceId} onChange={setEditSourceId} disabled={editSaving || !!accountsError} />
+              {selected.direction === 'Outgoing' && <AccountPicker accounts={accounts.filter((account) => account.kind === 'Bank')} kinds={['Bank']} label="البنك المسحوب عليه (مطلوب)" value={editBankId} onChange={setEditBankId} disabled={editSaving || !!accountsError} />}
+              <RepDateInput label="تاريخ الاستلام/الإصدار (مطلوب)" value={editReceivedDate} onChange={setEditReceivedDate} disabled={editSaving} />
+              <RepDateInput label="تاريخ الاستحقاق (مطلوب)" value={editDueDate} onChange={setEditDueDate} disabled={editSaving || identifyingLocked} />
             </div>
           </section>
 
           <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-4 sm:p-5" aria-label="الأرقام على الشيك">
             <h3 className="font-black text-brand">الأرقام على الشيك</h3>
             <div className="grid gap-4 sm:grid-cols-3">
-              <label className="block"><span className="rep-label">رقم البنك</span><input className="rep-control" dir="ltr" inputMode="numeric" value={editBankNumber} onChange={(event) => setEditBankNumber(event.target.value)} disabled={editSaving || identifyingLocked} /></label>
-              <label className="block"><span className="rep-label">رقم الفرع</span><input className="rep-control" dir="ltr" inputMode="numeric" value={editBranchNumber} onChange={(event) => setEditBranchNumber(event.target.value)} disabled={editSaving || identifyingLocked} /></label>
-              <label className="block"><span className="rep-label">رقم الحساب</span><input className="rep-control" dir="ltr" inputMode="numeric" value={editAccountNumber} onChange={(event) => setEditAccountNumber(event.target.value)} disabled={editSaving || identifyingLocked} /></label>
+              <label className="block"><span className="rep-label">رقم البنك (مطلوب)</span><input className="rep-control" dir="ltr" inputMode="numeric" required value={editBankNumber} onChange={(event) => setEditBankNumber(event.target.value)} disabled={editSaving || identifyingLocked} /></label>
+              <label className="block"><span className="rep-label">رقم الفرع (مطلوب)</span><input className="rep-control" dir="ltr" inputMode="numeric" required value={editBranchNumber} onChange={(event) => setEditBranchNumber(event.target.value)} disabled={editSaving || identifyingLocked} /></label>
+              <label className="block"><span className="rep-label">رقم الحساب (مطلوب)</span><input className="rep-control" dir="ltr" inputMode="numeric" required value={editAccountNumber} onChange={(event) => setEditAccountNumber(event.target.value)} disabled={editSaving || identifyingLocked} /></label>
             </div>
           </section>
 
           <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-4 sm:p-5" aria-label="الملاحظات">
             <h3 className="font-black text-brand">الملاحظات</h3>
-            <label className="block"><span className="rep-label">ملاحظة السند</span><textarea className="rep-control min-h-20" value={editPaymentNotes} onChange={(event) => setEditPaymentNotes(event.target.value)} disabled={editSaving || identifyingLocked} /></label>
+            <label className="block"><span className="rep-label">ملاحظة السند (اختيارية)</span><textarea className="rep-control min-h-20" value={editPaymentNotes} onChange={(event) => setEditPaymentNotes(event.target.value)} disabled={editSaving || identifyingLocked} /></label>
             <label className="block"><span className="rep-label">سبب التعديل (اختياري)</span><input className="rep-control" value={editNote} onChange={(event) => setEditNote(event.target.value)} disabled={editSaving} /></label>
           </section>
 

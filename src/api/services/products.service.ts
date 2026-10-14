@@ -34,6 +34,10 @@ export const productsService = {
     apiClient.get<CatalogProductDetailsResponseDto>(`/products/retail/${id}`, {
       signal,
     }),
+  listInternalRetail: (query: CatalogProductsQuery = {}, signal?: AbortSignal) =>
+    apiClient.get<CatalogProductsListResponseDto>(withCatalogQuery("/products/internal/retail", query), { signal }),
+  getInternalRetailById: (id: number, signal?: AbortSignal) =>
+    apiClient.get<CatalogProductDetailsResponseDto>(`/products/internal/retail/${id}`, { signal }),
   listWholesale: (query: CatalogProductsQuery = {}, signal?: AbortSignal) =>
     apiClient.get<CatalogProductsListResponseDto>(
       withCatalogQuery("/products/wholesale", query),

@@ -48,7 +48,7 @@ export default function StatementSourceDetailsView({ details }: { details: State
       {(details.kind === 'Order' || details.kind === 'Purchase' || details.kind === 'Return') && <Detail label="الإجمالي النهائي" value={details.total ? formatMoney(details.total) : null} />}
       {details.kind === 'Return' && <><Detail label="تاريخ المردود" value={details.return_date?.slice(0,10)} /><Detail label="العملية الأصلية" value={details.purchase_id ? `شراء #${details.purchase_id}` : null} /></>}
       {details.kind === 'Payment' && <>
-        <Detail label="الطريقة" value={details.method === 'Check' ? 'شيك' : 'نقد'} />
+        <Detail label="الطريقة" value={details.method === 'Check' ? 'شيك' : details.method === 'BankTransfer' ? 'حوالة بنكية' : 'نقد'} />
         <Detail label="المبلغ الأصلي" value={details.amount ? `${formatMoney(details.amount)} ${details.currency?.code ?? ''}` : null} />
         <Detail label="سعر الصرف" value={details.exchange_rate} />
         <Detail label="المبلغ المعتمد في الحساب" value={details.base_amount ? formatMoney(details.base_amount) : null} />

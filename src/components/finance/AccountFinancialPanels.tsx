@@ -6,7 +6,7 @@ import {
   type OpeningBalanceInput,
   type PaginationResponseDto,
 } from '@/api';
-import { RepDateInput, RepSelect } from '@/components/rep/RepFormControls';
+import { AccountFinancialFields } from './AccountFinancialFields';
 import Modal from '@/components/ui/Modal';
 import {
   apiMessages,
@@ -14,13 +14,7 @@ import {
   formatOrderDate,
 } from '@/components/rep/repOrderUtils';
 import { FinancialConfirmation, Pager } from './accountUi';
-import { businessToday } from './accountUiUtils';
-const directionLabels = {
-  Debit: 'مستحق لنا على الحساب (مدين)',
-  Credit: 'مستحق للحساب علينا (دائن)',
-  ReduceReceivable: 'تخفيض ما يدين به الحساب لنا',
-  ReducePayable: 'تخفيض ما ندين به للحساب',
-};
+import { businessToday, financialDirectionLabels as directionLabels } from './accountUiUtils';
 export function DocumentSummary({
   document,
 }: {
@@ -123,31 +117,8 @@ export function FinancialDocumentEditor({
             setConfirm(true);
           }}
         >
-          <label className="block">
-            <span className="rep-label">المبلغ (₪)</span>
-            <input
-              required
-              type="number"
-              inputMode="decimal"
-              disabled={busy}
-              min={kind === 'Opening' ? 0 : 0.01}
-              step="0.01"
-              className="rep-control"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-          </label>
-          <RepSelect label="الاتجاه" value={direction} onChange={setDirection} disabled={busy} options={(kind === 'Opening' ? (['Debit','Credit'] as const) : (['ReduceReceivable','ReducePayable'] as const)).map(value=>({value,label:directionLabels[value]}))} />
-          <RepDateInput label="تاريخ المستند" value={date} onChange={setDate} disabled={busy} />
-          <label className="block">
-            <span className="rep-label">السبب / ملاحظات</span>
-            <textarea
-              rows={3}
-              className="rep-control"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
-          </label>
+          <AccountFinancialFields kind={kind} amount={amount} direction={direction} date={date} notes={notes} busy={busy}
+            onAmount={setAmount} onDirection={setDirection} onDate={setDate} onNotes={setNotes} />
           {error && (
             <p role="alert" className="rep-error">
               {error}

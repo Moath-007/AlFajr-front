@@ -102,7 +102,7 @@ export default function PaymentDetailsModal({
             <div className="relative mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-white/15 pt-4 text-xs text-white/75">
               <span className="inline-flex items-center gap-2">
                 <Banknote className="h-4 w-4" />
-                {payment.payment_method === "Cash" ? "دفعة نقدية" : "دفعة بشيك"}
+                {payment.payment_method === "Cash" ? "دفعة نقدية" : payment.payment_method === "BankTransfer" ? "حوالة بنكية" : "دفعة بشيك"}
               </span>
               <span className="inline-flex items-center gap-2">
                 <CalendarDays className="h-4 w-4" />
@@ -126,6 +126,7 @@ export default function PaymentDetailsModal({
             </div>
           )}
 
+          {payment.payment_method === "BankTransfer" && <DetailRow label="بنك الحوالة" value={payment.money_account?.name ?? "—"} />}
           {payment.check && <CheckDetails check={payment.check} />}
 
           <section>
@@ -187,7 +188,7 @@ export default function PaymentDetailsModal({
               )}
               {payment.effective_state === "Effective" && (
                 <>
-                  {(payment.payment_method === "Cash" ||
+                  {(payment.payment_method === "Cash" || payment.payment_method === "BankTransfer" ||
                     (payment.check?.managed_check_id &&
                       ["TREASURY", "ISSUED"].includes(
                         payment.check.location ?? "",

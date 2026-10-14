@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   accountsService,
+  citiesService,
+  type CityResponseDto,
   type AccountIdentity,
   type AccountIdentityInput,
   type AccountStatementEntry,
@@ -9,6 +11,7 @@ import {
   type UserAccountKind,
 } from '@/api';
 import Modal from '@/components/ui/Modal';
+import Select from '@/components/ui/Select';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { RepSelect } from '@/components/rep/RepFormControls';
 import {
@@ -22,15 +25,20 @@ import {
 
   movementLabels,
 } from './accountUiUtils';
+import { AccountFinancialFields } from './AccountFinancialFields';
+import { optionalOpeningBalance, type OpeningBalanceDraft } from './openingBalanceInput';
+import { businessToday, financialDirectionLabels } from './accountUiUtils';
+
 export function Balance({
   value,
+  kind,
 }: {
   value: string;
   kind: UserAccountKind;
 }) {
   return (
     <div>
-      <strong className={'block text-3xl font-bold ' + accountAmountColor(value)} dir="ltr">
+      <strong className={'block text-3xl font-bold ' + accountAmountColor(value, 'balance', kind)} dir="ltr">
         {(Number(value) > 0 ? '+' : Number(value) < 0 ? '-' : '') + formatMoney(Math.abs(Number(value)))}
       </strong>
     </div>
@@ -98,30 +106,95 @@ export function AccountIdentityEditor({
     kind: account?.kind ?? 'General',
     name: account?.name ?? '',
     phone: account?.phone ?? '',
+    city_id: account?.city_id ?? undefined,
     notes: account?.notes ?? '',
   });
+  const [openingEnabled, setOpeningEnabled] = useState(false);
+  const [opening, setOpening] = useState<OpeningBalanceDraft>(() => ({ amount: '', direction: 'Debit', business_date: businessToday(), notes: '' }));
+  const [pendingCreate, setPendingCreate] = useState<AccountIdentityInput | null>(null);
+  const submitting = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  async function save() {
+  const [cities, setCities] = useState<CityResponseDto[]>([]);
+  const [citiesLoaded, setCitiesLoaded] = useState(false);
+  const [citiesLoading, setCitiesLoading] = useState(false);
+  const [citiesError, setCitiesError] = useState('');
+  const [cityRevision, setCityRevision] = useState(0);
+  useEffect(() => {
+    if (form.kind !== 'General') return;
+    const controller = new AbortController();
+    setCitiesLoading(true); setCitiesLoaded(false); setCitiesError('');
+    citiesService.list(controller.signal).then(items => {
+      if (!controller.signal.aborted) { setCities(items); setCitiesLoaded(true); }
+    }).catch(e => {
+      if (!controller.signal.aborted) setCitiesError(apiMessages(e, 'تعذر تحميل المدن.').join('، '));
+    }).finally(() => { if (!controller.signal.aborted) setCitiesLoading(false); });
+    return () => controller.abort();
+  }, [form.kind, cityRevision]);
+  async function createCity(name: string) {
+    const trimmedName = name.trim().replace(/\s+/g, ' ');
+    try {
+      const created = await citiesService.create({ name: trimmedName });
+      setCities(current => current.some(city => city.city_id === created.city_id) ? current : [...current, created]);
+      setCitiesLoaded(true); setCitiesError('');
+      // Refresh authoritative options after creation, preserving the new selection.
+      setCityRevision(value => value + 1);
+      return String(created.city_id);
+    } catch (e) {
+      try {
+        const refreshed = await citiesService.list();
+        setCities(refreshed); setCitiesLoaded(true); setCitiesError('');
+        const existing = refreshed.find(city => city.name === trimmedName);
+        if (existing) return String(existing.city_id);
+      } catch { /* Keep the original creation error. */ }
+      throw new Error(apiMessages(e, 'تعذر إضافة المدينة.').join('، '));
+    }
+  }
+  async function save(input?: AccountIdentityInput) {
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     setError('');
     try {
       const identity = {
         name: form.name,
         notes: form.notes || null,
-        ...(form.kind === 'General' ? { phone: form.phone || null } : {}),
+        ...(form.kind === 'General' ? { phone: form.phone || null, city_id: form.city_id } : {}),
       };
       if (account) await accountsService.edit(account.account_id, identity);
-      else await accountsService.create({ ...identity, kind: form.kind });
+      else await accountsService.create(input ?? { ...identity, kind: form.kind });
       onSaved();
       onClose();
     } catch (e) {
       setError(apiMessages(e).join('، '));
+      setPendingCreate(null);
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
+  function submit() {
+    if (busy || submitting.current) return;
+    setError('');
+    if (form.kind === 'General') {
+      if (!citiesLoaded) { setError('انتظر تحميل المدن أو أعد المحاولة.'); return; }
+      if (!form.city_id || !cities.some(city => city.city_id === form.city_id)) {
+        setError('اختر مدينة للحساب العام.'); return;
+      }
+    }
+    if (account) { void save(); return; }
+    try {
+      const opening_balance = optionalOpeningBalance(admin && openingEnabled, opening);
+      const input: AccountIdentityInput = { kind: form.kind, name: form.name, notes: form.notes || null,
+        ...(form.kind === 'General' ? { phone: form.phone || null, city_id: form.city_id } : {}),
+        ...(opening_balance !== undefined ? { opening_balance } : {}),
+      };
+      if (opening_balance !== undefined) setPendingCreate(input);
+      else void save(input);
+    } catch (e) { setError(e instanceof Error ? e.message : 'راجع بيانات الرصيد الافتتاحي.'); }
+  }
   return (
+    <>
     <Modal
       open
       title={account ? 'تعديل بيانات الحساب' : 'حساب جديد'}
@@ -133,7 +206,7 @@ export function AccountIdentityEditor({
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          void save();
+          submit();
         }}
       >
         <fieldset disabled={busy} className="min-w-0 space-y-4">
@@ -168,6 +241,15 @@ export function AccountIdentityEditor({
             />
           </label>
         )}
+        {form.kind === 'General' && <div className="space-y-2">
+          <Select label="المدينة *" searchable value={form.city_id ? String(form.city_id) : ''}
+            onChange={value => setForm(current => ({ ...current, city_id: value ? Number(value) : undefined }))}
+            onCreate={admin ? createCity : undefined} loading={citiesLoading}
+            placeholder="اختر المدينة" searchPlaceholder={admin ? 'ابحث عن مدينة أو أضف مدينة جديدة' : 'ابحث عن مدينة'}
+            emptyText="لا توجد مدن مطابقة" options={cities.map(city => ({ value: String(city.city_id), label: city.name }))} />
+          {citiesError && <p className="rep-error" role="alert">{citiesError}</p>}
+          {citiesError && <button type="button" className="btn-ghost" onClick={() => setCityRevision(value => value + 1)}>إعادة تحميل المدن</button>}
+        </div>}
         <label className="block">
           <span className="rep-label">ملاحظات <span className="text-stone-400">(اختياري)</span></span>
           <textarea
@@ -178,6 +260,18 @@ export function AccountIdentityEditor({
             onChange={(e) => setForm({ ...form, notes: e.target.value })}
           />
         </label>
+        {!account && admin && <section className="space-y-3 rounded-xl border border-stone-200 p-3">
+          <label className="flex items-center gap-2 font-bold text-brand">
+            <input type="checkbox" checked={openingEnabled} onChange={e => setOpeningEnabled(e.target.checked)} />
+            إضافة رصيد افتتاحي (اختياري)
+          </label>
+          {openingEnabled && <AccountFinancialFields kind="Opening" amount={opening.amount} direction={opening.direction}
+            date={opening.business_date} notes={opening.notes} busy={busy}
+            onAmount={amount => setOpening(current => ({ ...current, amount }))}
+            onDirection={direction => setOpening(current => ({ ...current, direction: direction as OpeningBalanceDraft['direction'] }))}
+            onDate={business_date => setOpening(current => ({ ...current, business_date }))}
+            onNotes={notes => setOpening(current => ({ ...current, notes }))} />}
+        </section>}
         </fieldset>
         {error && (
           <p role="alert" className="rep-error">
@@ -185,11 +279,16 @@ export function AccountIdentityEditor({
           </p>
         )}
         <div className="grid grid-cols-2 gap-2 border-t border-stone-100 pt-4"><button type="submit" className="btn-primary min-h-11" disabled={busy}>
-          {busy ? 'جارٍ الحفظ…' : 'حفظ'}
+          {busy ? 'جارٍ الحفظ…' : !account && admin && openingEnabled ? 'مراجعة وحفظ' : 'حفظ'}
         </button>
         <button type="button" className="btn-outline min-h-11" disabled={busy} onClick={onClose}>إلغاء</button></div>
       </form>
     </Modal>
+    <FinancialConfirmation
+      action={pendingCreate?.opening_balance ? `إنشاء الحساب ${pendingCreate.name} وتسجيل الرصيد الافتتاحي بقيمة ${formatMoney(pendingCreate.opening_balance.amount)}، ${financialDirectionLabels[pendingCreate.opening_balance.direction]} بتاريخ ${formatOrderDate(pendingCreate.opening_balance.business_date)}؟` : null}
+      busy={busy} onClose={() => { if (!busy) setPendingCreate(null); }}
+      onConfirm={() => { if (pendingCreate) void save(pendingCreate); }} />
+    </>
   );
 }
 export function FinancialConfirmation({
@@ -281,10 +380,12 @@ function MovementDescription({
 }
 export function MovementTable({
   entries,
+  kind,
   base,
   admin,
 }: {
   entries: AccountStatementEntry[];
+  kind: UserAccountKind;
   base: string;
   admin: boolean;
 }) {
@@ -312,8 +413,8 @@ export function MovementTable({
               ].map(([label, value]) => (
                 <div key={label}>
                   <dt className="text-xs text-stone-500">{label}</dt>
-                  <dd dir="rtl" className={'mt-1 text-right font-semibold ' + accountAmountColor(value, label === 'مدين' ? 'debit' : label === 'دائن' ? 'credit' : 'balance')}>
-                    {label === 'الرصيد بعد الحركة' ? <MovementBalance value={value} /> : <bdi>{formatMoney(value)}</bdi>}
+                  <dd dir="rtl" className={'mt-1 text-right font-semibold ' + accountAmountColor(value, label === 'مدين' ? 'debit' : label === 'دائن' ? 'credit' : 'balance', kind)}>
+                    {label === 'الرصيد بعد الحركة' ? <MovementBalance value={value} kind={kind} /> : <bdi>{formatMoney(value)}</bdi>}
                   </dd>
                 </div>
               ))}
@@ -359,10 +460,10 @@ export function MovementTable({
                   (value, index) => (
                     <td
                       key={index}
-                      className={'px-3 py-3 whitespace-nowrap ' + accountAmountColor(value, index === 0 ? 'debit' : index === 1 ? 'credit' : 'balance')}
+                      className={'px-3 py-3 whitespace-nowrap ' + accountAmountColor(value, index === 0 ? 'debit' : index === 1 ? 'credit' : 'balance', kind)}
                       dir="rtl"
                     >
-                      {index === 2 ? <MovementBalance value={value} /> : <bdi>{formatMoney(value)}</bdi>}
+                      {index === 2 ? <MovementBalance value={value} kind={kind} /> : <bdi>{formatMoney(value)}</bdi>}
                     </td>
                   ),
                 )}
@@ -382,9 +483,9 @@ export function MovementTable({
   );
 }
 
-function MovementBalance({ value }: { value: string }) {
+function MovementBalance({ value, kind }: { value: string; kind: UserAccountKind }) {
   const amount = Number(value);
-  return <div className={accountAmountColor(value)}>
+  return <div className={accountAmountColor(value, 'balance', kind)}>
     <bdi dir="ltr" className="block font-semibold">{(amount > 0 ? '+' : amount < 0 ? '-' : '') + formatMoney(Math.abs(amount))}</bdi>
   </div>;
 }

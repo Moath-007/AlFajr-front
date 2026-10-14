@@ -17,7 +17,7 @@ export function PublicCatalogProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     setCategoriesStatus('loading');
     setCategoriesErrors([]);
-    categoriesService.list(controller.signal)
+    categoriesService.listPublic(controller.signal)
       .then((response) => {
         setCategories(response.filter((category) => category.is_active));
         setCategoriesStatus('ready');

@@ -16,6 +16,7 @@ export interface ApiRequestOptions {
 const retryKeys = new Map<string, string>();
 const pendingCreates = new Map<string, Promise<unknown>>();
 const idempotentCreate = (path: string) => [
+  /^\/accounts$/,
   /^\/orders(?:\/online)?$/,
   /^\/inventory\/\d+\/opening-stock$/,
   /^\/purchases(?:\/\d+\/returns)?$/,

@@ -39,8 +39,15 @@ export function statementAmount(value: string, mode: 'balance' | 'change') {
   return formatMoney(Math.abs(amount)) + (label ? ' · ' + label : '');
 }
 
-export function accountAmountColor(value: string, side: 'balance' | 'debit' | 'credit' = 'balance') {
+export function accountAmountColor(value: string, side: 'balance' | 'debit' | 'credit' = 'balance', kind: UserAccountKind = 'General') {
   const amount = Number(value);
   if (amount === 0) return 'text-stone-400';
-  return side === 'debit' || (side === 'balance' && amount < 0) ? 'text-red-700' : 'text-green-700';
+  const debit = side === 'debit' || (side === 'balance' && (kind === 'General' ? amount < 0 : amount > 0));
+  return debit ? 'text-red-600' : 'text-emerald-700';
 }
+export const financialDirectionLabels = {
+  Debit: 'مستحق لنا على الحساب (مدين)',
+  Credit: 'مستحق للحساب علينا (دائن)',
+  ReduceReceivable: 'تخفيض ما يدين به الحساب لنا',
+  ReducePayable: 'تخفيض ما ندين به للحساب',
+};

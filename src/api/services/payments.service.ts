@@ -3,6 +3,7 @@ import type {
   CashVouchersQuery,
   CashVouchersResponse,
   CreatePaymentDto,
+  UpdatePaymentDto,
   CreatePaymentResponseDto,
   PaymentDetailsResponseDto,
 } from "../types";
@@ -40,7 +41,7 @@ export const paymentsService = {
       data,
       { signal },
     ),
-  update: (id: number, data: CreatePaymentDto, signal?: AbortSignal) =>
+  update: (id: number, data: UpdatePaymentDto, signal?: AbortSignal) =>
     apiClient.patch<CreatePaymentResponseDto>(`/payments/${id}`, data, {
       signal,
     }),

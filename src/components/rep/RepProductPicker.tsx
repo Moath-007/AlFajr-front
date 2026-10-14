@@ -109,7 +109,7 @@ export default function RepProductPicker({
       setErrors([]);
       const request =
         priceMode === "retail"
-          ? productsService.listRetail
+          ? productsService.listInternalRetail
           : productsService.listWholesale;
       return request(
         {
@@ -151,7 +151,7 @@ export default function RepProductPicker({
     try {
       const getProduct =
         priceMode === "retail"
-          ? productsService.getRetailById
+          ? productsService.getInternalRetailById
           : productsService.getWholesaleById;
       const product = (await getProduct(id)).product;
       setDetails(product);

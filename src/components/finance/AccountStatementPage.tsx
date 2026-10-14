@@ -237,7 +237,7 @@ export default function AccountStatementPage() {
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-lg border p-3">
                     <p className="text-xs text-stone-500">{label}</p>
-                    <b className={'mt-1 block text-right ' + accountAmountColor(value, label === 'مجموع المدين' ? 'debit' : label === 'مجموع الدائن' ? 'credit' : 'balance')} dir="rtl">
+                    <b className={'mt-1 block text-right ' + accountAmountColor(value, label === 'مجموع المدين' ? 'debit' : label === 'مجموع الدائن' ? 'credit' : 'balance', data.account.kind)} dir="rtl">
                       <bdi dir="ltr">{label.includes('الرصيد') ? statementAmount(value, 'balance') : formatMoney(value)}</bdi>
                     </b>
                   </div>
@@ -247,7 +247,7 @@ export default function AccountStatementPage() {
                 الحركات مرتبة من الأحدث إلى الأقدم. المدين يزيد رصيد الحساب، والدائن يقلله.
                 الرصيد بعد كل حركة يشمل كل أنواع الحركات حتى تاريخها، حتى عند اختيار نوع محدد.
               </p>
-              <MovementTable entries={data.entries} base={base} admin={admin} />
+              <MovementTable kind={data.account.kind} entries={data.entries} base={base} admin={admin} />
               <footer className="flex flex-wrap justify-between gap-3 border-t pt-3 text-xs text-stone-500">
                 <span>
                   الصفحة {page} من {Math.max(1, data.pagination.total_pages)} ·

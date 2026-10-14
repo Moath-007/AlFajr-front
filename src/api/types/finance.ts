@@ -12,10 +12,10 @@ export interface CurrencyDto {
 }
 export interface PaymentCheckInputDto {
   check_number: string;
-  account_number?: string;
-  bank_number?: string;
-  branch_number?: string;
-  due_date?: string;
+  account_number: string;
+  bank_number: string;
+  branch_number: string;
+  due_date: string;
 }
 export interface CreatePaymentDto {
   amount: number;
@@ -29,6 +29,7 @@ export interface CreatePaymentDto {
   notes?: string;
   paid_at?: string;
 }
+export type UpdatePaymentDto = Omit<CreatePaymentDto, 'check'> & { check?: Partial<PaymentCheckInputDto> & { bank_name?: string } };
 export type CheckDisplayStatus = "NotDue" | "Due" | "Returned";
 export interface PaymentCheckDto {
   bank_name?: string | null;
@@ -45,6 +46,7 @@ export interface PaymentCheckDto {
   return_reason?: string | null;
 }
 export interface PaymentDto {
+  money_account?: { account_id: number; name: string; kind: string } | null;
   id: NumericId;
   voucher_number?: string;
   payment_type: "Receipt" | "Disbursement";
@@ -161,6 +163,7 @@ export interface CreateAccountReturnDto {
   notes?: string;
 }
 export interface CashVouchersQuery {
+  payment_method?: "Cash" | "BankTransfer";
   page?: number;
   limit?: number;
   search?: string;

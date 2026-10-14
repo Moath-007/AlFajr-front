@@ -1,3 +1,5 @@
+import { accountAmountColor } from './accountUiUtils';
+import { requiredCheckInputError } from './checkRequiredInput';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '@/auth';
 import Modal from '@/components/ui/Modal';
@@ -63,6 +65,8 @@ export default function VouchersPage() {
   const [type, setType] = useState<VoucherType>('Receipt');
   const [accountId, setAccountId] = useState<number | null>(null);
   const [cashId, setCashId] = useState<number | null>(null);
+  const [transferBankId, setTransferBankId] = useState<number | null>(null);
+  const [transferBanks, setTransferBanks] = useState<Array<{ account_id: number; name: string; kind: 'Bank'; account_number: string | null }>>([]);
   const [bankId, setBankId] = useState<number | null>(null);
   const [drafts, setDrafts] = useState<PaymentDraftTableRow[]>([newDraft(1)]);
   const [checksToAdd, setChecksToAdd] = useState('1');
@@ -87,6 +91,8 @@ export default function VouchersPage() {
       const [accountRows, response] = await Promise.all([admin ? ledgerService.accounts() : accountsService.allOptions().then(rows => rows.map(row => ({...row, is_system: false}))), currenciesService.list()]);
       const rows = Array.isArray(response) ? response : response.items ?? response.currencies ?? [];
       const active = rows.filter((currency) => currency.is_active);
+      const bankRows = await accountsService.allOptions({ type: 'Bank' });
+      setTransferBanks(bankRows.filter(row => row.kind === 'Bank').map(row => ({ ...row, kind: 'Bank' as const })));
       setAccounts(accountRows); setCurrencies(active);
       setCashId((current) => {
         return accountRows.some((account) => account.kind === 'Cash' && account.account_id === current) ? current : null;
@@ -116,6 +122,7 @@ export default function VouchersPage() {
   const baseCurrency = currencies.find((currency) => currency.is_base);
   const cashChoices = manualAccounts.filter((account) => account.kind === 'Cash');
   const treasuryAccountIds = accounts.filter((account) => treasuryKinds.includes(account.kind)).map((account) => account.account_id);
+  const hasTransfer = drafts.some(draft => draft.method === 'BankTransfer');
   const hasCash = drafts.some((draft) => draft.method === 'Cash');
   const hasCheck = drafts.some((draft) => draft.method === 'Check');
   const totalCents = useMemo(() => drafts.reduce((sum, draft) => {
@@ -183,6 +190,8 @@ export default function VouchersPage() {
     if (hasCheck && (selectedAccount.is_system || !['General'].includes(selectedAccount.kind))) { setError('اختر حسابًا عامًا للشيك.'); return; }
     if (hasCash && !cashAccount) { setError('اختر صندوقًا نقديًا للسند.'); return; }
     if (type === 'Disbursement' && hasCheck && bankAccount?.kind !== 'Bank') { setError('اختر البنك الذي يُسحب منه مبلغ الشيك.'); return; }
+    const transferBank = transferBanks.find(account => account.account_id === transferBankId);
+    if (hasTransfer && !transferBank) { setError('اختر بنك الحوالة البنكية.'); return; }
     const steps: BatchStep[] = [];
     for (const [index, draft] of drafts.entries()) {
       const currency = currencies.find((item) => item.currency_id === Number(draft.currencyId));
@@ -193,18 +202,20 @@ export default function VouchersPage() {
       }
       const origin = currency.is_base ? '' : `المبلغ الأصلي: ${draft.amount} ${currency.code}، سعر الصرف: ${draft.rate}`;
       const notes = [draft.notes.trim(), origin].filter(Boolean).join('\n') || undefined;
-      if (draft.method === 'Check' && (!draft.checkNumber.trim() || !draft.dueDate)) {
-        setError(`رقم الشيك وتاريخ استحقاقه مطلوبان في السطر ${index + 1}.`); return;
+      if (draft.method === 'Check') {
+        const checkError = requiredCheckInputError(draft);
+        if (checkError) { setError(`${checkError} السطر ${index + 1}.`); return; }
       }
       {
         const input: CreatePaymentDto = {
           amount: Number(draft.amount), currency_id: currency.currency_id, exchange_rate: rate,
           payment_method: draft.method, paid_at: draft.paidAt || undefined,
           notes,
+          ...(draft.method === 'BankTransfer' ? { money_account_id: transferBank!.account_id } : {}),
           ...(draft.method === 'Cash' ? { money_account_id: cashAccount!.account_id } : {}),
           ...(draft.method === 'Check' ? { check: {
-            check_number: draft.checkNumber.trim(), account_number: draft.accountNumber.trim() || undefined,
-            bank_number: draft.bankNumber.trim() || undefined, branch_number: draft.branchNumber.trim() || undefined,
+            check_number: draft.checkNumber.trim(), account_number: draft.accountNumber.trim(),
+            bank_number: draft.bankNumber.trim(), branch_number: draft.branchNumber.trim(),
             due_date: draft.dueDate,
           }, ...(type === 'Disbursement' ? { bank_account_id: bankId! } : {}) } : {}),
         };
@@ -214,11 +225,11 @@ export default function VouchersPage() {
     const details = drafts.map((draft, index) => {
       const currency = currencies.find((item) => item.currency_id === Number(draft.currencyId))!;
       const base = convertedCents(draft.amount, currency.is_base ? '1' : draft.rate)! / 100;
-      return `${index + 1}. ${draft.method === 'Check' ? 'شيك' : 'نقد'}: ${draft.amount} ${currency.code}${currency.is_base ? '' : ` × ${draft.rate} = ${formatMoney(base, baseCurrency)}`}`;
+      return `${index + 1}. ${draft.method === 'Check' ? 'شيك' : draft.method === 'BankTransfer' ? 'حوالة بنكية' : 'نقد'}: ${draft.amount} ${currency.code}${currency.is_base ? '' : ` × ${draft.rate} = ${formatMoney(base, baseCurrency)}`}`;
     }).join('\n');
     const cashLocation = hasCash ? `\n${type === 'Receipt' ? 'صندوق الاستلام' : 'صندوق الدفع'}: ${cashAccount?.name}` : '';
     const checkBank = hasCheck ? (type === 'Disbursement' ? `\nالبنك الذي يُسحب منه مبلغ الشيك: ${bankAccount?.name}` : '\nوجهة الشيكات: خزنة الشيكات') : '';
-    const summary = `${type === 'Receipt' ? 'سند قبض' : 'سند صرف'} — ${selectedAccount.name}\n${steps.length} سطر، منها ${drafts.filter((draft) => draft.method === 'Check').length} شيك${cashLocation}${checkBank}\n${details}\nالإجمالي بالعملة الأساسية: ${formatMoney(total, baseCurrency)}`;
+    const summary = `${type === 'Receipt' ? 'سند قبض' : 'سند صرف'} — ${selectedAccount.name}\n${steps.length} سطر، منها ${drafts.filter((draft) => draft.method === 'Check').length} شيك${cashLocation}${checkBank}${hasTransfer ? `\nبنك الحوالة: ${transferBank?.name}` : ''}\n${details}\nالإجمالي بالعملة الأساسية: ${formatMoney(total, baseCurrency)}`;
     setPending({ kind: 'batch', steps, summary });
   };
 
@@ -281,13 +292,14 @@ export default function VouchersPage() {
         {type === 'Journal' ? <div className="space-y-4">
           <div className="border-b border-stone-100 pb-4"><h2 className="font-black text-brand">أطراف القيد</h2><p className="text-xs text-stone-500">اختر الحساب والمبلغ لكل طرف. في تحويل الصندوق أو البنك: المصدر دائن، والوجهة مدين.</p></div>
           <div className="grid gap-4 lg:grid-cols-2">{renderJournalColumn('credit')}{renderJournalColumn('debit')}</div>
-          <div className="flex flex-wrap gap-6 rounded-xl bg-brand-50 p-3 text-sm font-bold text-brand" aria-live="polite"><span>المدين: {formatMoney(debitCents / 100, baseCurrency)}</span><span>الدائن: {formatMoney(creditCents / 100, baseCurrency)}</span><span className={balanced ? 'text-emerald-700' : 'text-red-700'}>{balanced ? 'القيد متوازن' : `الفرق: ${formatMoney(Math.abs(debitCents - creditCents) / 100, baseCurrency)}`}</span></div>
+          <div className="flex flex-wrap gap-6 rounded-xl bg-brand-50 p-3 text-sm font-bold text-brand" aria-live="polite"><span className={accountAmountColor(String(debitCents / 100), 'debit')}>المدين: {formatMoney(debitCents / 100, baseCurrency)}</span><span className={accountAmountColor(String(creditCents / 100), 'credit')}>الدائن: {formatMoney(creditCents / 100, baseCurrency)}</span><span className={balanced ? 'text-emerald-700' : 'text-red-700'}>{balanced ? 'القيد متوازن' : `الفرق: ${formatMoney(Math.abs(debitCents - creditCents) / 100, baseCurrency)}`}</span></div>
           <RepDateInput label="تاريخ القيد" value={journalDate} onChange={setJournalDate} /><label className="block"><span className="rep-label">سبب القيد</span><textarea className="rep-control min-h-24" rows={3} value={journalNotes} onChange={(event) => { setJournalNotes(event.target.value); clearMessage(); }} /></label>
         </div> : <div className="space-y-5">
-          <AccountPicker accounts={manualAccounts} kinds={['General']} label={type === 'Receipt' ? 'المقبوض منه · حساب عام' : 'المدفوع له · حساب عام'} exclude={treasuryAccountIds} value={accountId} onChange={(id) => { setAccountId(id); clearMessage(); }} disabled={loading || !!loadError} showIdentity />
+          <AccountPicker accounts={manualAccounts} kinds={['General']} label={(type === 'Receipt' ? 'المقبوض منه · حساب عام' : 'المدفوع له · حساب عام') + (hasCheck ? ' (مطلوب)' : '')} exclude={treasuryAccountIds} value={accountId} onChange={(id) => { setAccountId(id); clearMessage(); }} disabled={loading || !!loadError} showIdentity />
           <div className="grid items-start gap-3 md:grid-cols-2">
+            {hasTransfer && <section className="min-w-0 rounded-xl border border-stone-200 bg-stone-50/60 p-3"><div className="mb-2 flex items-center justify-between gap-2"><h2 className="font-bold text-brand">الحوالات البنكية</h2><span className="text-sm font-bold text-brand">{formatMoney(methodTotal('BankTransfer'), baseCurrency)}</span></div><AccountPicker accounts={transferBanks} label={type === 'Receipt' ? 'بنك استلام الحوالة (مطلوب)' : 'بنك دفع الحوالة (مطلوب)'} kinds={['Bank']} value={transferBankId} onChange={id => { setTransferBankId(id); clearMessage(); }} disabled={loading || !!loadError} showIdentity /></section>}
             {hasCash && <section className="min-w-0 rounded-xl border border-stone-200 bg-stone-50/60 p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-brand">النقد</h2><span className="text-sm font-bold text-brand">{formatMoney(methodTotal('Cash'), baseCurrency)}</span></div><AccountPicker accounts={cashChoices} label={type === 'Receipt' ? 'صندوق استلام النقد' : 'صندوق الصرف'} kinds={['Cash']} value={cashId} onChange={(id) => { setCashId(id); clearMessage(); }} disabled={loading || !!loadError || !cashChoices.length} showIdentity />{!loading && !loadError && !cashChoices.length && <p className="mt-2 text-sm text-stone-500">لا توجد صناديق نقد. اطلب من الأدمن إنشاء صندوق من {admin ? <Link className="underline" to="/owner/accounts?type=Cash&page=1">الحسابات</Link> : 'الحسابات'}.</p>}</section>}
-            {hasCheck && <section className="min-w-0 rounded-xl border border-stone-200 bg-stone-50/60 p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-brand">الشيكات</h2><span className="text-sm font-bold text-brand">{formatMoney(methodTotal('Check'), baseCurrency)}</span></div>{type === 'Receipt' ? <div><p className="font-bold text-brand">خزنة الشيكات</p><p className="mt-1 text-xs leading-6 text-stone-500">تُحفظ الشيكات هنا. إيداعها بالبنك من {admin ? <Link to="/owner/checks" className="underline">صفحة الشيكات</Link> : 'صفحة الشيكات'}.</p></div> : <><AccountPicker accounts={manualAccounts} label="البنك الذي يُسحب منه مبلغ الشيك" kinds={['Bank']} value={bankId} onChange={(id) => { setBankId(id); clearMessage(); }} disabled={loading || !!loadError} showIdentity /></>}</section>}
+            {hasCheck && <section className="min-w-0 rounded-xl border border-stone-200 bg-stone-50/60 p-3"><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-brand">الشيكات</h2><span className="text-sm font-bold text-brand">{formatMoney(methodTotal('Check'), baseCurrency)}</span></div>{type === 'Receipt' ? <div><p className="font-bold text-brand">خزنة الشيكات</p><p className="mt-1 text-xs leading-6 text-stone-500">تُحفظ الشيكات هنا. إيداعها بالبنك من {admin ? <Link to="/owner/checks" className="underline">صفحة الشيكات</Link> : 'صفحة الشيكات'}.</p></div> : <><AccountPicker accounts={manualAccounts} label="البنك الذي يُسحب منه مبلغ الشيك (مطلوب)" kinds={['Bank']} value={bankId} onChange={(id) => { setBankId(id); clearMessage(); }} disabled={loading || !!loadError} showIdentity /></>}</section>}
           </div>
           <div><div className="mb-2 flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-black text-brand">جدول الدفعات</h2><p className="text-xs text-stone-500">العملات النشطة تُحمّل من قاعدة البيانات. أدخل سعر الصرف إذا اخترت عملة غير أساسية.</p></div><button type="button" className="btn-outline" onClick={() => { setDrafts((current) => [...current, newDraft(nextKey.current++, String(baseCurrency?.currency_id ?? ''))]); clearMessage(); }}><Plus className="h-4 w-4" /> إضافة دفعة</button></div><PaymentDraftTable scrollable rows={drafts} currencies={currencies} onChange={editDraft} onRemove={(index) => { setDrafts((current) => current.filter((_, i) => i !== index)); clearMessage(); }} /></div>
           <div className="flex flex-wrap items-center gap-2"><div className="flex items-center overflow-hidden rounded-lg border border-brand/15 bg-white"><input aria-label="عدد الشيكات المراد إضافتها" className="h-11 w-16 border-0 px-2 text-center text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-gold" type="number" min="1" value={checksToAdd} onChange={(event) => setChecksToAdd(event.target.value)} /><button type="button" className="inline-flex min-h-11 items-center gap-2 bg-brand-50 px-3 text-xs font-black text-brand hover:bg-brand-100" onClick={addChecks}><CopyPlus className="h-4 w-4" /> إضافة شيكات</button></div><span className="text-xs text-stone-500">تُنسخ بيانات آخر شيك مع زيادة الرقم والاستحقاق، دون حد ثابت لعدد الشيكات.</span></div>
@@ -312,10 +324,10 @@ export default function VouchersPage() {
             {pending.steps.map((step,index)=>{
               const input=step.input;
               const currency=currencies.find(item=>item.currency_id===input.currency_id);
-              const location= input.payment_method==='Cash' ? accounts.find(account=>account.account_id===input.money_account_id)?.name : step.type==='Receipt' ? 'خزنة الشيكات' : accounts.find(account=>account.account_id===input.bank_account_id)?.name;
+              const location= input.payment_method==='BankTransfer' ? transferBanks.find(account=>account.account_id===input.money_account_id)?.name : input.payment_method==='Cash' ? accounts.find(account=>account.account_id===input.money_account_id)?.name : step.type==='Receipt' ? 'خزنة الشيكات' : accounts.find(account=>account.account_id===input.bank_account_id)?.name;
               return <li key={step.key} className="min-w-0 rounded-xl bg-stone-50 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-bold">{index+1}. {input.payment_method==='Check'?'شيك':'نقد'}</span><b dir="ltr" className="text-base tabular-nums">{formatMoney(input.amount,currency)}</b></div>
-                <p className="mt-2 break-words text-sm"><span className="text-stone-500">{input.payment_method==='Cash' ? step.type==='Receipt'?'صندوق الاستلام: ':'صندوق الصرف: ' : step.type==='Receipt'?'الوجهة: ':'البنك المسحوب منه: '}</span>{location}</p>
+                <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-bold">{index+1}. {input.payment_method==='Check'?'شيك':input.payment_method==='BankTransfer'?'حوالة بنكية':'نقد'}</span><b dir="ltr" className="text-base tabular-nums">{formatMoney(input.amount,currency)}</b></div>
+                <p className="mt-2 break-words text-sm"><span className="text-stone-500">{input.payment_method==='BankTransfer' ? 'بنك الحوالة: ' : input.payment_method==='Cash' ? step.type==='Receipt'?'صندوق الاستلام: ':'صندوق الصرف: ' : step.type==='Receipt'?'الوجهة: ':'البنك المسحوب منه: '}</span>{location}</p>
                 {input.check && <p className="mt-1 break-words text-xs text-stone-500">رقم الشيك: {input.check.check_number} · الاستحقاق: {input.check.due_date}</p>}
                 {currency && !currency.is_base && <p className="mt-1 text-xs text-stone-500">سعر الصرف: {input.exchange_rate} · بالعملة الأساسية: {formatMoney(convertedCents(String(input.amount),String(input.exchange_rate))! / 100,baseCurrency)}</p>}
               </li>;
@@ -326,7 +338,7 @@ export default function VouchersPage() {
         </>}
         {pending?.kind === 'journal' && <>
           <p className="text-sm text-stone-500">راجع أطراف القيد قبل الاعتماد.</p>
-          <div className="grid gap-3 sm:grid-cols-2">{(['debit','credit'] as const).map(side=><section key={side} className="min-w-0 rounded-xl border border-stone-200 p-3"><h3 className="mb-3 text-sm font-bold">{side==='debit'?'المدين':'الدائن'}</h3><ul className="space-y-3">{pending.input.lines.filter(line=>line[side]).map((line,index)=><li key={index} className="min-w-0 border-t border-stone-100 pt-2"><p className="break-words text-sm">{accounts.find(account=>account.account_id===line.account_id)?.name}</p><b dir="ltr" className="mt-1 block text-right tabular-nums">{formatMoney(line[side]!,baseCurrency)}</b></li>)}</ul><p className="mt-3 border-t pt-3 text-sm font-bold">الإجمالي: {formatMoney(pending.input.lines.reduce((sum,line)=>sum+(line[side]??0),0),baseCurrency)}</p></section>)}</div>
+          <div className="grid gap-3 sm:grid-cols-2">{(['debit','credit'] as const).map(side=><section key={side} className="min-w-0 rounded-xl border border-stone-200 p-3"><h3 className="mb-3 text-sm font-bold">{side==='debit'?'المدين':'الدائن'}</h3><ul className="space-y-3">{pending.input.lines.filter(line=>line[side]).map((line,index)=><li key={index} className="min-w-0 border-t border-stone-100 pt-2"><p className="break-words text-sm">{accounts.find(account=>account.account_id===line.account_id)?.name}</p><b dir="ltr" className={'mt-1 block text-right tabular-nums ' + accountAmountColor(String(line[side]!), side)}>{formatMoney(line[side]!,baseCurrency)}</b></li>)}</ul><p className={'mt-3 border-t pt-3 text-sm font-bold ' + accountAmountColor(String(pending.input.lines.reduce((sum,line)=>sum+(line[side]??0),0)), side)}>الإجمالي: {formatMoney(pending.input.lines.reduce((sum,line)=>sum+(line[side]??0),0),baseCurrency)}</p></section>)}</div>
           <p className="whitespace-pre-wrap break-words text-sm text-stone-500">{pending.input.notes}</p>
         </>}
       </div>

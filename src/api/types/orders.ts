@@ -5,7 +5,7 @@ import type {
   PaginationResponseDto,
 } from "./common";
 export type ApiOrderStatus = "Pending" | "Completed" | "Cancelled";
-export type PaymentMethod = "Cash" | "Check";
+export type PaymentMethod = "Cash" | "Check" | "BankTransfer";
 export interface InvoiceItemDto {
   product_variant_id: NumericId;
   quantity: number;

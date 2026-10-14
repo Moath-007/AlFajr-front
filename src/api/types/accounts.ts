@@ -11,6 +11,8 @@ export interface AccountIdentity {
   name: string;
   kind: UserAccountKind;
   phone: string | null;
+  city_id: number | null;
+  city: { city_id: number; name: string } | null;
   notes: string | null;
   created_at: IsoDateTimeString;
 }
@@ -25,13 +27,15 @@ export interface AccountsQuery {
   limit?: number;
 }
 export interface AccountIdentityInput {
+  city_id?: number;
+  opening_balance?: OpeningBalanceInput;
   kind: UserAccountKind;
   name: string;
   phone?: string | null;
   notes?: string | null;
 }
 export type AccountIdentityEdit = Partial<
-  Pick<AccountIdentityInput, "name" | "phone" | "notes">
+  Pick<AccountIdentityInput, "name" | "phone" | "notes" | "city_id">
 >;
 export interface AccountIdentityList {
   items: AccountIdentity[];

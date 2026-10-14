@@ -34,7 +34,7 @@ export interface SalesReportResponseDto {
 
 export interface CollectionsReportQuery extends GroupedReportQuery {
   account_id?: NumericId;
-  payment_method?: "Cash" | "Check";
+  payment_method?: "Cash" | "Check" | "BankTransfer";
   cash_account_id?: NumericId;
   currency_id?: NumericId;
   check_number?: string;

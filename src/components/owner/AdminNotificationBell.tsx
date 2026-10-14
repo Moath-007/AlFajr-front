@@ -186,7 +186,7 @@ export default function AdminNotificationBell({
                     </b>
                     {item.payment_method && (
                       <span>
-                        {item.payment_method === "Cash" ? "نقدًا" : "شيك"}
+                        {item.payment_method === "Cash" ? "نقدًا" : item.payment_method === "BankTransfer" ? "حوالة بنكية" : "شيك"}
                       </span>
                     )}
                     <span>الطلب #{item.order_id}</span>
