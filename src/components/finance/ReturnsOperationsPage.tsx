@@ -15,7 +15,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import AccountReturnLauncher from "./AccountReturnLauncher";
-import CheckFiltersPopover from './CheckFiltersPopover';
 import { ReturnItems, ReturnNotes } from './ReturnDetailsSections';
 import ReturnHistory from "./ReturnHistory";
 import ReturnsList from './ReturnsList';
@@ -32,6 +31,7 @@ export default function ReturnsOperationsPage() {
   const sourceId = Number(sourceParams.get("return"));
 
   const [advanced, setAdvanced] = useState(false);
+  const [draftFilters,setDraftFilters]=useState<{account:number|null;from:string;to:string}>({account:null,from:'',to:''});
   const advancedTrigger = useRef<HTMLButtonElement>(null);
   const closeAdvanced = useCallback(() => { setAdvanced(false); advancedTrigger.current?.focus(); }, []);
   const [createOpen, setCreateOpen] = useState(false);
@@ -249,8 +249,8 @@ export default function ReturnsOperationsPage() {
                 { value: "Cancelled", label: "ملغى" },
               ]}
             />
-            <button ref={advancedTrigger} type="button" className="btn-outline return-filter-trigger" aria-haspopup="dialog" aria-expanded={advanced} onClick={() => setAdvanced(open => !open)}><SlidersHorizontal className="h-4 w-4" />
-              فلاتر إضافية
+            <button ref={advancedTrigger} type="button" className="btn-outline return-filter-trigger" aria-haspopup="dialog" aria-expanded={advanced} onClick={() => {setDraftFilters({account:account,from,to});setAdvanced(true);}}><SlidersHorizontal className="h-4 w-4" />
+              الفلاتر
               {account || from || to
                 ? " (" + (Number(!!account) + Number(!!from || !!to)) + ")"
                 : ""}
@@ -362,44 +362,7 @@ export default function ReturnsOperationsPage() {
             )}
         </>
       )}
-      <CheckFiltersPopover open={advanced} onClose={closeAdvanced} trigger={advancedTrigger} footer={<button type="button" className="btn-ghost" onClick={() => { setAccount(0); setFrom(''); setTo(''); setPage(1); }}>مسح الفلاتر</button>}>
-        <div dir="rtl" className="space-y-4">
-          <RepSelect
-            floating
-            label="الحساب"
-            value={String(account)}
-            onChange={(v) => {
-              setAccount(Number(v));
-              setPage(1);
-            }}
-            options={[
-              { value: "0", label: "كل الحسابات" },
-              ...accounts.map((a) => ({
-                value: String(a.account_id),
-                label: a.name,
-              })),
-            ]}
-          />
-          <RepDateInput
-            label="من تاريخ"
-            value={from}
-            onChange={(v) => {
-              setFrom(v);
-              setPage(1);
-            }}
-          />
-          <RepDateInput
-            label="إلى تاريخ"
-            min={from || undefined}
-            value={to}
-            onChange={(v) => {
-              setTo(v);
-              setPage(1);
-            }}
-          />
-          <p className="text-xs text-stone-500">الفلاتر تُطبّق تلقائيًا.</p>
-        </div>
-      </CheckFiltersPopover>
+      <Modal open={advanced} onClose={closeAdvanced} title="فلاتر المردودات" className="filters-drawer" footer={<div dir="rtl" className="grid grid-cols-2 gap-3"><button type="button" className="btn-primary" disabled={!!(draftFilters.from&&draftFilters.to&&draftFilters.from>draftFilters.to)} onClick={()=>{setAccount(draftFilters.account??0);setFrom(draftFilters.from);setTo(draftFilters.to);setPage(1);closeAdvanced();}}>تطبيق الفلاتر</button><button type="button" className="btn-outline" onClick={()=>setDraftFilters({account:null,from:'',to:''})}>مسح الكل</button></div>}><div dir="rtl" className="space-y-5"><p className="text-sm text-stone-500">حدّد خياراتك، ثم اضغط تطبيق لتحديث النتائج.</p><RepSelect label="الحساب" value={String(draftFilters.account??0)} onChange={value=>setDraftFilters(v=>({...v,account:Number(value)||null}))} options={[{value:'0',label:'كل الحسابات'},...accounts.map(a=>({value:String(a.account_id),label:a.name}))]}/><RepDateInput label="من تاريخ" value={draftFilters.from} max={draftFilters.to||undefined} onChange={from=>setDraftFilters(v=>({...v,from}))}/><RepDateInput label="إلى تاريخ" value={draftFilters.to} min={draftFilters.from||undefined} onChange={to=>setDraftFilters(v=>({...v,to}))}/>{draftFilters.from&&draftFilters.to&&draftFilters.from>draftFilters.to&&<p role="alert" className="text-sm text-red-700">تاريخ البداية يجب أن يسبق تاريخ النهاية.</p>}</div></Modal>
       <Modal
         open={createOpen}
         className="return-choice-modal"

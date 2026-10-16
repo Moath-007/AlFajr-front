@@ -114,13 +114,14 @@ export default function InvoiceDetails({
           <h1 className="text-2xl font-black">فاتورة #{order.id}</h1>
           <OrderStatusBadge status={order.status} />
         </div>
-        <p className="flex items-baseline gap-2 text-sm text-stone-500">الإجمالي <b className="text-xl font-black tabular-nums text-brand">{formatMoney(order.total_amount)}</b></p>
+        <p className="flex items-baseline gap-2 text-sm text-stone-500">الإجمالي <bdi dir="ltr" className="text-xl font-black tabular-nums text-brand">{formatMoney(order.total_amount)}</bdi></p>
       </header>
       {error && (
         <p role="alert" className="rep-error">
           {error}
         </p>
       )}
+      {order.status === "Pending" && <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">طلب معلّق: لا يُخصم المخزون ولا يُسجّل البيع ماليًا حتى تأكيد الطلب.</p>}
       <section ref={actionsSection} tabIndex={-1} id="invoice-actions" aria-label="إجراءات الفاتورة" className="rep-section scroll-mt-24 p-3 outline-none">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="sr-only">إدارة الفاتورة</h2><div className="flex flex-wrap gap-2">
@@ -147,13 +148,13 @@ export default function InvoiceDetails({
         <p>المنشئ: {order.creator?.name ?? "طلب عام"}</p>
         {order.contact_text && <p className="whitespace-pre-wrap">التواصل: {order.contact_text}</p>}
         {order.delivery_address && <p>العنوان: {order.delivery_address}</p>}
-        <p>التاريخ: {formatOrderDate(order.created_at)}</p>
+        <p>التاريخ: <bdi dir="ltr">{formatOrderDate(order.created_at)}</bdi></p>
         {order.notes && <details className="sm:col-span-2 lg:col-span-3" open={order.notes.length <= 300 ? true : undefined}><summary className="w-fit cursor-pointer rounded-lg py-1 text-sm font-bold text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">ملاحظات الفاتورة</summary><p className="mt-2 whitespace-pre-wrap break-words leading-7 text-stone-600">{order.notes}</p></details>}
         {order.items.length > 5 && <button type="button" className="btn-ghost w-fit" onClick={() => goToSection(itemsSection.current)}>الانتقال إلى المنتجات</button>}
       </section>
       <div ref={itemsSection} tabIndex={-1} id="invoice-items" className="rep-section overflow-hidden scroll-mt-24 outline-none">
         <div className="border-b border-stone-100 px-3 py-3"><h2 className="text-sm font-bold text-brand">المنتجات والكميات <span className="font-normal text-stone-500">({order.items.length})</span></h2></div>
-        <table className="orders-table w-full table-fixed text-right">
+        <table aria-label="منتجات الفاتورة" className="orders-table w-full table-fixed text-right tabular-nums">
           <thead className="bg-stone-50 text-xs text-stone-500">
             <tr>
               {[
@@ -163,7 +164,7 @@ export default function InvoiceDetails({
                 "خصم الوحدة",
                 "قيمة البند",
               ].map((label) => (
-                <th className={`p-3 ${label === "المنتج" ? "md:w-[44%]" : ""}`} key={label}>
+                <th scope="col" className={`p-3 ${label === "المنتج" ? "md:w-[44%]" : ""}`} key={label}>
                   {label}
                 </th>
               ))}
@@ -178,17 +179,17 @@ export default function InvoiceDetails({
                   {i.is_bonus && <b className="block text-gold-dark">بونص</b>}
                 </td>
                 <td data-label="الكمية" className="p-3">{i.quantity}</td>
-                <td data-label="سعر الوحدة" className="p-3">{formatMoney(i.unit_price)}</td>
-                <td data-label="خصم الوحدة" className="p-3">{formatMoney(i.product_discount)}</td>
-                <td data-label="قيمة البند" className="p-3 font-bold">{formatMoney(i.line_total)}</td>
+                <td data-label="سعر الوحدة" className="p-3"><bdi dir="ltr">{formatMoney(i.unit_price)}</bdi></td>
+                <td data-label="خصم الوحدة" className="p-3"><bdi dir="ltr">{formatMoney(i.product_discount)}</bdi></td>
+                <td data-label="قيمة البند" className="p-3 font-bold"><bdi dir="ltr">{formatMoney(i.line_total)}</bdi></td>
               </tr>
             ))}
           </tbody>
         </table>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-stone-200 bg-stone-50 px-3 py-3">
-          <p className="text-sm text-stone-500">خصم الفاتورة: {formatMoney(order.order_discount)}</p>
+          <p className="text-sm text-stone-500">خصم الفاتورة: <bdi dir="ltr">{formatMoney(order.order_discount)}</bdi></p>
           <p className="text-base font-black text-brand">
-            الإجمالي: {formatMoney(order.total_amount)}
+            الإجمالي: <bdi dir="ltr">{formatMoney(order.total_amount)}</bdi>
           </p>
           {order.items.length > 5 && <button type="button" className="btn-outline" onClick={() => goToSection(actionsSection.current)}>العودة لأزرار الفاتورة</button>}
         </div>

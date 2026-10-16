@@ -6,6 +6,7 @@ export interface DateReportQuery {
   date_to?: string;
 }
 export interface GroupedReportQuery extends DateReportQuery {
+  commercial_classification?:'Customer'|'Supplier';
   group_by?: ReportGroupBy;
 }
 
@@ -84,6 +85,7 @@ export interface CollectionsReportResponseDto {
   activity: { items: CollectionsReportActivityDto[]; pagination: PaginationResponseDto };
 }
 export interface AccountBalancesReportQuery {
+  commercial_classification?:'Customer'|'Supplier';
   account_id?: number;
   search?: string;
   balance_side?: 'All' | 'Debit' | 'Credit' | 'Zero';

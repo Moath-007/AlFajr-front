@@ -78,9 +78,9 @@ export default function AccountSourcePage() {
           </p>
           <Link
             className="btn-outline inline-block"
-            to={`${base}/accounts/${discount.account_id}`}
+            to={`${base}/vouchers?discount_account=${discount.account_id}`}
           >
-            تفاصيل الحساب وإدارة الخصومات
+            إدارة المسامحة من صفحة السندات
           </Link>
         </section>
       )}

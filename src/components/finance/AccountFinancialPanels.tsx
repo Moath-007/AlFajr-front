@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { useEffect, useRef, useState } from 'react';
 import {
   accountsService,
   type AccountDiscountInput,
@@ -143,12 +144,18 @@ export function FinancialDocumentEditor({
   );
 }
 export function OpeningPanel({
+  onFailureRefresh,
+  onSuccess,
   accountId,
+  accountLabel,
   document,
   admin,
   onChanged,
 }: {
   accountId: number;
+  accountLabel?: string;
+  onSuccess?: (message:string)=>void;
+  onFailureRefresh?: ()=>void;
   document: AccountFinancialDocument | null;
   admin: boolean;
   onChanged: () => void;
@@ -157,16 +164,26 @@ export function OpeningPanel({
   const [cancel, setCancel] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const cancelling = useRef(false);
+  const [notice, setNotice] = useState('');
   async function cancelDocument() {
+    if (cancelling.current) return;
+    cancelling.current = true;
     setBusy(true);
+    setError('');
+    setNotice('');
     try {
       await accountsService.cancelOpening(accountId);
+      const message='تم حذف الرصيد الافتتاحي وعكس أثره المالي؛ بقي المستند محفوظاً في السجل.';
+      setNotice(message);
+      onSuccess?.(message);
       setCancel(false);
       onChanged();
     } catch (e) {
       setError(apiMessages(e).join('، '));
-      setCancel(false);
+      onFailureRefresh?.();
     } finally {
+      cancelling.current = false;
       setBusy(false);
     }
   }
@@ -180,8 +197,8 @@ export function OpeningPanel({
               {document ? 'تعديل' : 'إضافة'}
             </button>
             {document && (
-              <button className="btn-ghost min-h-11 text-red-700 hover:bg-red-50" onClick={() => setCancel(true)}>
-                إلغاء المستند
+              <button className="btn-ghost min-h-11 text-red-700 hover:bg-red-50" onClick={() => {setError('');setCancel(true);}}>
+                حذف الرصيد الافتتاحي
               </button>
             )}
           </div>
@@ -197,6 +214,7 @@ export function OpeningPanel({
           {error}
         </p>
       )}
+      {notice && <p role="status" className="text-emerald-700">{notice}</p>}
       {editing && (
         <FinancialDocumentEditor
           accountId={accountId}
@@ -206,16 +224,9 @@ export function OpeningPanel({
           onSaved={onChanged}
         />
       )}
-      <FinancialConfirmation
-        action={
-          cancel
-            ? 'إلغاء الرصيد الافتتاحي وعكس أثره المالي؟ يبقى المستند محفوظًا ولا يمكن استعادته.'
-            : null
-        }
-        busy={busy}
-        onClose={() => setCancel(false)}
-        onConfirm={() => void cancelDocument()}
-      />
+      <ConfirmDialog open={cancel} confirmDisabled={document?.status === 'Cancelled'} loading={busy} title="تأكيد حذف الرصيد الافتتاحي" message="هل أنت متأكد من حذف الرصيد الافتتاحي لهذا الحساب؟" confirmLabel="تأكيد الحذف" cancelLabel="إلغاء"
+        details={<>{accountLabel && <p className="font-bold">{accountLabel}</p>}<p>سيُلغى المستند ويُعكس أثره المالي مع الاحتفاظ بالسجل.</p>{error && <p role="alert" className="rep-error">{error}</p>}</>}
+        onClose={() => setCancel(false)} onConfirm={() => void cancelDocument()} />
     </section>
   );
 }

@@ -38,8 +38,21 @@ import "./AdminInventoryPage.css";
 export default function AdminInventoryPage() {
   const { items, pagination, page, setPage, search, setSearch, setQuery, category, setCategory, color, setColor, stock, setStock, threshold, setThreshold, sort, setSort, loading, errors, setRetry, load } = useInventoryList();
   const { movementItem, setMovementItem, movements, movementsLoading, movementSearch, setMovementSearch, movementQuery, movementSource, setMovementSource, setMovementPage, movementPagination, movementError, openMovements } = useInventoryMovements();
-  const { openingItem, setOpeningItem, pendingOpeningItem, setPendingOpeningItem, openingQuantity, setOpeningQuantity, openingCost, setOpeningCost, existingOpeningCost, setExistingOpeningCost, openingRows, selectedOpeningId, setSelectedOpeningId, openingReady, stockErrors, setStockErrors, confirm, setConfirm, saving, setSaving, notice, setNotice, openOpening, prepare, saveOpening } = useOpeningStock(load);
+  const { openingItem, setOpeningItem, pendingOpeningItem, setPendingOpeningItem, openingQuantity, setOpeningQuantity, openingCost, setOpeningCost, existingOpeningCost, setExistingOpeningCost, openingRows, setOpeningRows, selectedOpeningId, setSelectedOpeningId, openingReady, stockErrors, setStockErrors, confirm, setConfirm, saving, setSaving, notice, setNotice, openOpening, prepare, saveOpening } = useOpeningStock(load);
 
+  const [deleteOpeningId, setDeleteOpeningId] = useState<number | null>(null);
+  const deletingOpening = useRef(false);
+  async function deleteOpening() {
+    if (!openingItem || deleteOpeningId === null || deletingOpening.current) return;
+    deletingOpening.current = true;setSaving(true);setStockErrors([]);
+    try {const result = await inventoryService.cancelOpening(openingItem.product_variant_id, deleteOpeningId);setNotice(result.message);setDeleteOpeningId(null);setOpeningItem(null);await load();}
+    catch(error){
+      setStockErrors(apiMessages(error, 'تعذر الإلغاء'));
+      try {const current=await inventoryService.cost(openingItem.product_variant_id);setOpeningRows(current.openings);setOpeningItem({...openingItem,stock_quantity:current.stock_quantity});await load();}
+      catch { /* Keep the original API error if the refresh is also unavailable. */ }
+    }
+    finally {deletingOpening.current=false;setSaving(false);}
+  }
   const [advanced, setAdvanced] = useState(false);
   const filterTrigger = useRef<HTMLButtonElement>(null);
   const closeAdvanced = useCallback(() => {
@@ -500,7 +513,7 @@ export default function AdminInventoryPage() {
         )}
       <Modal
         open={openingItem !== null}
-        onClose={() => setOpeningItem(null)}
+        onClose={() => {if (!saving && deleteOpeningId === null) setOpeningItem(null);}}
         title="المخزون الافتتاحي"
       >
         <form onSubmit={prepare} className="space-y-4">
@@ -556,27 +569,7 @@ export default function AdminInventoryPage() {
                     type="button"
                     className="opening-movement-delete"
                     disabled={saving}
-                    onClick={() => {
-                      if (
-                        !openingItem ||
-                        !window.confirm(
-                          "حذف هذه الحركة الافتتاحية وإعادة حساب أثر التكلفة والحركات اللاحقة؟",
-                        )
-                      )
-                        return;
-                      setSaving(true);
-                      void inventoryService
-                        .cancelOpening(openingItem.product_variant_id, row.id)
-                        .then(async (result) => {
-                          setNotice(result.message);
-                          setOpeningItem(null);
-                          await load();
-                        })
-                        .catch((error) =>
-                          setStockErrors(apiMessages(error, "تعذر الإلغاء")),
-                        )
-                        .finally(() => setSaving(false));
-                    }}
+                    onClick={() => {setStockErrors([]);setDeleteOpeningId(row.id);}}
                   >
                     حذف
                   </button>
@@ -640,6 +633,7 @@ export default function AdminInventoryPage() {
           )}
         </form>
       </Modal>
+      <ConfirmDialog open={deleteOpeningId !== null} confirmDisabled={!openingRows.some(row=>row.id===deleteOpeningId)} loading={saving} title="تأكيد حذف المخزون الافتتاحي" message="هل أنت متأكد من حذف هذه الحركة الافتتاحية وإعادة حساب أثر التكلفة والحركات اللاحقة؟" confirmLabel="تأكيد الحذف" onClose={()=>setDeleteOpeningId(null)} onConfirm={()=>void deleteOpening()} details={<>{openingItem && <p>{openingItem.size} · {openingItem.color.name}</p>}{stockErrors.length>0 && <p role="alert" className="rep-error">{stockErrors.join('، ')}</p>}</>} />
       <ConfirmDialog
         open={confirm}
         onClose={() => {

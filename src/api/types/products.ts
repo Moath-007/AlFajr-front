@@ -34,6 +34,7 @@ export interface ProductVariantResponseDto {
 }
 
 export interface ProductResponseDto {
+  sort_order: number;
   is_featured: boolean;
   id: NumericId;
   name: string;
@@ -61,7 +62,7 @@ export interface AdminProductsQuery {
   color_id?: NumericId;
   is_active?: boolean;
   stock_status?: StockStatus;
-  sort_by?: "created_at" | "name" | "code";
+  sort_by?: "display" | "created_at" | "name" | "code";
   sort_order?: "asc" | "desc";
 }
 export type AdminProductsPaginationDto = PaginationResponseDto;
@@ -102,6 +103,7 @@ export interface CatalogVariantResponseDto {
 }
 
 export interface CatalogProductSummaryDto {
+  sort_order: number;
   is_featured: boolean;
   id: NumericId;
   name: string;
@@ -138,6 +140,7 @@ export interface CatalogProductsListResponseDto {
 }
 
 export interface CatalogProductDetailsDto {
+  sort_order: number;
   is_featured: boolean;
   id: NumericId;
   name: string;
@@ -168,6 +171,7 @@ export interface UpdateProductVariantDto extends ProductVariantWriteDto {
 }
 
 export interface CreateProductDto {
+  sort_order?: number;
   is_featured?: boolean;
   name: string;
   code: string;
@@ -179,6 +183,7 @@ export interface CreateProductDto {
 }
 
 export interface CreatedProductDataDto {
+  sort_order: number;
   is_featured: boolean;
   product_id: NumericId;
   name: string;
@@ -195,6 +200,8 @@ export interface CreateProductResponseDto {
 }
 
 export interface UpdateProductDto {
+  expected_sort_order?: number;
+  sort_order?: number;
   is_featured?: boolean;
   name: string;
   code: string;

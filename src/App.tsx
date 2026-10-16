@@ -1,3 +1,4 @@
+import CatalogOrdering from "@/components/products/CatalogOrdering";
 import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import {
   Routes,
@@ -93,6 +94,7 @@ const ChecksReportPage = lazy(
 const ProductsReportPage = lazy(() => import('@/components/owner/ProductsReportPage'));
 const RepresentativesReportPage = lazy(() => import('@/components/owner/RepresentativesReportPage'));
 const FinancialActivityReportPage = lazy(() => import('@/components/owner/FinancialActivityReportPage'));
+const AccountGroupsPage = lazy(()=>import('@/components/finance/AccountGroupsPage'));
 const AccountsPage = lazy(() => import('@/components/finance/AccountsPage'));
 const AccountStatementPage = lazy(() => import('@/components/finance/AccountStatementPage'));
 const AccountDetailsPage = lazy(() => import('@/components/finance/AccountDetailsPage'));
@@ -107,6 +109,7 @@ const AdminCompanyProfilePage = lazy(
 const AdminNotificationBell = lazy(
   () => import("@/components/owner/AdminNotificationBell"),
 );
+const BanksPage = lazy(() => import("@/components/finance/BanksPage"));
 const ChecksPage = lazy(() => import("@/components/finance/ChecksPage"));
 const PurchasesPage = lazy(
   () => import("@/components/purchases/PurchasesPage"),
@@ -312,6 +315,7 @@ function OwnerLayout({ store }: { store: AppStore }) {
                   path="products"
                   element={<AdminProductsPage onNavigate={ownerNavigate} />}
                 />
+                <Route path="products/ordering" element={<CatalogOrdering standalone />} />
                 <Route
                   path="products/new"
                   element={
@@ -375,7 +379,9 @@ function OwnerLayout({ store }: { store: AppStore }) {
                 <Route path="reports/collections" element={<CollectionsReportPage />} />
                 <Route path="reports/purchases" element={<FinancialActivityReportPage type="purchases" />} />
                 <Route path="reports/disbursements" element={<FinancialActivityReportPage type="disbursements" />} />
-                <Route path="reports/account-balances" element={<AccountBalancesReportPage />} />
+                <Route path="reports/account-balances" element={<AccountBalancesReportPage key="all" />} />
+                <Route path="reports/customers" element={<AccountBalancesReportPage key="customers" classification="Customer" />} />
+                <Route path="reports/suppliers" element={<AccountBalancesReportPage key="suppliers" classification="Supplier" />} />
                 <Route path="reports/returns" element={<ReturnsReportPage />} />
                 <Route path="reports/inventory" element={<InventoryReportPage />} />
                 <Route path="reports/checks" element={<ChecksReportPage />} />
@@ -422,12 +428,16 @@ function OwnerLayout({ store }: { store: AppStore }) {
                 />
                 <Route path="checks" element={<ChecksPage />} />
                 <Route path="checks/:id" element={<ChecksPage />} />
-                <Route path="accounts" element={<AccountsPage />} />
+                <Route path="banks" element={<BanksPage />} />
+                <Route path="account-groups" element={<AccountGroupsPage />} />
+                <Route path="account-groups/:groupId/statement" element={<AccountGroupsPage statementOnly />} />
+                <Route path="accounts" element={<LegacyAccountsRedirect />} />
+                <Route path="commercial-accounts" element={<AccountsPage />} />
                 <Route path="accounts/:id" element={<AccountDetailsPage />} />
                 <Route path="accounts/:id/statement" element={<AccountStatementPage />} />
                 <Route path="cash-vouchers" element={<CashVouchersPage />} />
                 <Route path="account-sources/:kind/:id" element={<AccountSourcePage />} />
-                <Route path="vouchers" element={<VouchersPage />} />
+                <Route path="vouchers" element={<VouchersPage key={location.search} />} />
                 <Route path="treasury" element={<TreasuryPage />} />
                 <Route path="*" element={<Navigate to="/owner" replace />} />
                 <Route path="payments" element={<Navigate to="/owner/vouchers" replace />} />
@@ -463,6 +473,12 @@ function OwnerLayout({ store }: { store: AppStore }) {
       />
     </div>
   );
+}
+
+function LegacyAccountsRedirect() {
+  const { search } = useLocation();
+  const type = new URLSearchParams(search).get('type');
+  return <Navigate replace to={type === 'Cash' ? '/owner/treasury' : type === 'Bank' ? '/owner/banks' : '/owner/commercial-accounts'} />;
 }
 
 function AdminOrderDetailsWrapper({
@@ -615,7 +631,7 @@ function RepLayout() {
                 <Route path="accounts/:id" element={<AccountDetailsPage />} />
                 <Route path="accounts/:id/statement" element={<AccountStatementPage />} />
                 <Route path="account-sources/:kind/:id" element={<AccountSourcePage />} />
-                <Route path="vouchers" element={<VouchersPage />} />
+                <Route path="vouchers" element={<VouchersPage key={location.search} />} />
                 <Route path="payments" element={<Navigate to="/rep/vouchers" replace />} />
                 <Route path="returns" element={<ReturnsOperationsPage />} />
 

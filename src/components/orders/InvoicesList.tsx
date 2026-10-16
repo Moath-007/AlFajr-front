@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { RepDateInput } from "@/components/rep/RepFormControls";
 import Select from "@/components/ui/Select";
 import EmptyState from "@/components/ui/EmptyState";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import {
   ordersService,
   type ApiOrderStatus,
@@ -84,22 +84,24 @@ export default function InvoicesList({
   const reset = () => { setSearch(""); setSubmitted(""); setStatus(""); setFrom(""); setTo(""); setPage(1); };
   return (
     <div className="orders-page space-y-5 min-w-0" dir="rtl">
-      <header className="rep-page-header">
-        <h1 className="text-2xl font-black">جميع فواتير البيع</h1>
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-4">
+        <h1 className="text-xl font-black text-brand sm:text-2xl">جميع فواتير البيع</h1>
         <button
-          className="btn-primary"
+          className="btn-primary min-h-11"
           onClick={() =>
             onNavigate(
               mode === "admin" ? "/owner/store-sale" : "/rep/orders/new",
             )
           }
         >
+          <Plus aria-hidden="true" className="h-4 w-4" />
           فاتورة جديدة
         </button>
       </header>
-      {message && <p role="status">{message}</p>}
+      {message && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
       <form
-        className="rep-section grid items-end gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4"
+        aria-label="بحث وتصفية الفواتير"
+        className="grid items-end gap-3 rounded-xl border border-stone-200 bg-white p-4 sm:grid-cols-2 xl:grid-cols-4"
         onSubmit={(e) => {
           e.preventDefault();
           setPage(1);
@@ -111,11 +113,13 @@ export default function InvoicesList({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="رقم الفاتورة / الحساب / جهة التواصل"
-          aria-label="بحث"
+          type="search"
         /></label>
         <Select<ApiOrderStatus | ""> label="الحالة" value={status} options={[{value:"",label:"كل الحالات"},{value:"Pending",label:"قيد الانتظار"},{value:"Completed",label:"مكتمل"},{value:"Cancelled",label:"ملغي"}]} onChange={(value) => { setPage(1); setStatus(value); }} />
-        <RepDateInput label="من تاريخ" value={from} max={to || undefined} onChange={(value) => { setPage(1); setFrom(value); }} />
-        <RepDateInput label="إلى تاريخ" value={to} min={from || undefined} onChange={(value) => { setPage(1); setTo(value); }} />
+        <div className="grid min-w-0 grid-cols-2 gap-3 sm:contents">
+          <RepDateInput label="من تاريخ" value={from} max={to || undefined} onChange={(value) => { setPage(1); setFrom(value); }} />
+          <RepDateInput label="إلى تاريخ" value={to} min={from || undefined} onChange={(value) => { setPage(1); setTo(value); }} />
+        </div>
         <div className="flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3 sm:col-span-2 xl:col-span-4"><span className="text-xs text-stone-500">البحث يتحدّث تلقائياً أثناء الكتابة</span>{(filtered || search) && <button type="button" className="btn-ghost" onClick={reset}>مسح الفلاتر</button>}{!loading && !error && <span className="ms-auto text-sm text-stone-500" role="status">{pagination.total} فاتورة</span>}</div>
       </form>
       {error && (
@@ -133,7 +137,7 @@ export default function InvoicesList({
         <div role="status" className="rep-section flex min-h-64 items-center justify-center gap-3 text-sm text-stone-500"><Loader2 aria-hidden className="h-5 w-5 animate-spin" />جاري تحميل الفواتير…</div>
       ) : (
         <div className="rep-section overflow-hidden">
-          <table className="orders-table w-full table-fixed text-right">
+          <table aria-label="فواتير البيع" className="orders-table w-full table-fixed text-right">
             <thead className="bg-stone-50 text-xs text-stone-500">
               <tr>
                 {[
@@ -143,9 +147,9 @@ export default function InvoicesList({
                   "الحالة",
                   "الإجمالي",
                   "التاريخ",
-                  "",
+                  "الإجراءات",
                 ].map((label, n) => (
-                  <th className={`p-3 ${n === 1 ? "md:w-[28%]" : n === 6 ? "md:w-24" : ""}`} key={n}>
+                  <th scope="col" className={`p-3 ${n === 1 ? "md:w-[28%]" : n === 6 ? "md:w-24" : ""}`} key={n}>
                     {label}
                   </th>
                 ))}
@@ -160,11 +164,11 @@ export default function InvoicesList({
                   <td data-label="الحالة" className="p-3">
                     <OrderStatusBadge status={row.status} />
                   </td>
-                  <td data-label="الإجمالي" className="p-3 font-black tabular-nums">{formatMoney(row.total_amount)}</td>
-                  <td data-label="التاريخ" className="p-3 text-xs text-stone-500">{formatOrderDate(row.created_at)}</td>
+                  <td data-label="الإجمالي" className="p-3 font-black tabular-nums"><bdi dir="ltr">{formatMoney(row.total_amount)}</bdi></td>
+                  <td data-label="التاريخ" className="p-3 text-xs text-stone-500"><bdi dir="ltr">{formatOrderDate(row.created_at)}</bdi></td>
                   <td>
                     <button
-                      className="btn-ghost"
+                      className="btn-ghost min-h-11"
                       aria-label={`تفاصيل فاتورة ${row.id}`}
                       onClick={(e) => { e.stopPropagation(); onNavigate(`${path}/${row.id}`); }}
                     >

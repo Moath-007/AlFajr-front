@@ -1,3 +1,4 @@
+import CatalogOrdering from '@/components/products/CatalogOrdering';
 import {
   useCallback,
   useEffect,
@@ -40,6 +41,7 @@ interface Props {
 const PAGE_SIZE = 20;
 
 export default function WholesaleProductsPage({ onNavigate }: Props) {
+  const [orderingRevision, setOrderingRevision] = useState(0);
   const { totalQuantity } = useWholesaleCart();
   const {
     showWholesaleStock: showStock,
@@ -217,7 +219,7 @@ export default function WholesaleProductsPage({ onNavigate }: Props) {
     setLoadingMore(false);
     void fetchBatch(1, version);
     return () => request.current?.abort();
-  }, [fetchBatch]);
+  }, [fetchBatch, orderingRevision]);
   useEffect(() => {
     if (
       !hasMore ||
@@ -262,6 +264,7 @@ export default function WholesaleProductsPage({ onNavigate }: Props) {
 
   return (
     <div className="space-y-5 pb-20 lg:pb-0">
+      <CatalogOrdering onChanged={() => {setOrderingRevision(v=>v+1);void loadFilters();}} />
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="text-sm font-black text-gold-dark">كتالوج المندوب</p>
@@ -597,7 +600,7 @@ export default function WholesaleProductsPage({ onNavigate }: Props) {
   );
 }
 
-function ProductCard({
+export function ProductCard({
   product,
   onOpen,
   onPreview,
@@ -625,7 +628,7 @@ function ProductCard({
             src={image}
             alt={product.name}
             loading="lazy"
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="h-full w-full product-image-fit"
           />
         ) : (
           <span className="grid h-full place-items-center">

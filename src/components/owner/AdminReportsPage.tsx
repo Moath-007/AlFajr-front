@@ -1,28 +1,22 @@
 import { Link } from 'react-router-dom';
-
-const reports = [
-  { path: 'sales', title: 'تقرير المبيعات', description: 'المبيعات والمردودات خلال الفترة، مع إجمالي البيع والمردودات والمبيعات بعد المردودات، وتفصيل حسب الحساب واليوم أو الأسبوع أو الشهر.' },
-  { path: 'collections', title: 'تقرير المقبوضات', description: 'المبالغ المقبوضة نقدًا أو بشيك، مع الإلغاءات وإرجاع الشيكات. يعرض الحساب وطريقة القبض والعملة ومسجل السند.' },
-  { path: 'account-balances', title: 'تقرير أرصدة الحسابات', description: 'من عليه مبلغ لنا ومن له مبلغ علينا الآن، مع رصيد كل حساب والشيكات التي ما زالت معلقة.' },
-  { path: 'purchases', title: 'تقرير المشتريات', description: 'مشتريات البضاعة خلال الفترة، مع الإلغاءات والتعديلات وحساب كل عملية. دفع قيمتها يظهر في تقرير الصرف.' },
-  { path: 'disbursements', title: 'تقرير الصرف', description: 'المبالغ المصروفة خلال الفترة، مع الإلغاءات والتعديلات. قيمة الشيك الصادر تُحسب عند إصداره مرة واحدة.' },
-  { path: 'returns', title: 'تقرير المردودات', description: 'مردودات البيع والشراء خلال الفترة، مع الكميات والمبالغ والإلغاءات والحساب المرتبط.' },
-  { path: 'inventory', title: 'تقرير المخزون', description: 'الكميات المتوفرة الآن حسب المنتج والمقاس واللون، وسجل دخول البضاعة وخروجها خلال الفترة.' },
-  { path: 'checks', title: 'تقرير الشيكات', description: 'الشيكات الواردة والصادرة ومكانها الحالي وموعد استحقاقها، مع سجل انتقالها وإلغائها.' },
-  { path: 'products', title: 'تقرير المنتجات', description: 'كمية البيع والمردود لكل منتج وقيمة المنتجات المباعة. يعتمد على حالة الفواتير الحالية.' },
-  { path: 'representatives', title: 'تقرير المناديب', description: 'عدد الفواتير المكتملة والمعلقة والملغاة التي أنشأها كل مندوب، وقيمة فواتيره المكتملة.' },
+import { ArrowLeft } from 'lucide-react';
+const sections=[
+ {title:'الزبائن والموردون',reports:[
+ {path:'customers',title:'تقرير الزبائن',description:'أرصدة الزبائن، المستحق لنا وعلينا، والشيكات المرتبطة.'},
+ {path:'suppliers',title:'تقرير الموردين',description:'أرصدة الموردين، المستحق لنا وعلينا، والشيكات المرتبطة.'}]},
+ {title:'البيع والشراء',reports:[
+ {path:'sales',title:'تقرير المبيعات',description:'إجمالي البيع، مردود المبيعات، وصافي المبيعات خلال الفترة.'},
+ {path:'purchases',title:'تقرير المشتريات',description:'شراء البضاعة وتصحيحاته وإلغاؤه؛ الدفع في تقرير الصرف.'},
+ {path:'returns',title:'تقرير المردودات',description:'تفاصيل مردود البيع والشراء وكمياته وأثر إلغائه.'}]},
+ {title:'الأموال والشيكات',reports:[
+ {path:'collections',title:'تقرير المقبوضات',description:'النقد والشيكات والحوالات المقبوضة، مع التصحيحات والإلغاءات.'},
+ {path:'disbursements',title:'تقرير الصرف',description:'المبالغ المصروفة والشيكات الصادرة وتصحيحاتها وإلغاؤها.'},
+ {path:'checks',title:'تقرير الشيكات',description:'الشيكات الحالية والاستحقاقات وسجل انتقالها والتراجع عنها.'}]},
+ {title:'المخزون والأداء',reports:[
+ {path:'inventory',title:'أرصدة وحركات المخزون',description:'الكميات الحالية وسجل دخول البضاعة وخروجها خلال الفترة.'},
+ {path:'products',title:'أداء المنتجات',description:'كميات البيع والمردود وقيمة المبيعات حسب المنتج.'},
+ {path:'representatives',title:'تقرير المناديب',description:'الفواتير حسب منشئها وحالتها وقيمة الفواتير المكتملة.'}]}
 ];
-
-export default function AdminReportsPage() {
-  return <main className="mx-auto max-w-[1350px] space-y-6 pb-10" dir="rtl">
-    <header className="border-b pb-5"><h1 className="text-3xl font-black text-brand">التقارير</h1>
-      <p className="mt-2 text-sm text-stone-600">اختر ما تريد معرفته. داخل كل تقرير يمكنك تحديد الفلاتر وفتح التفاصيل وطباعة كل النتائج.</p></header>
-    <nav aria-label="التقارير" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {reports.map((report) => <Link key={report.path} to={`/owner/reports/${report.path}`}
-        className="rounded-2xl border bg-white p-5 transition hover:border-gold-dark hover:shadow-sm">
-        <h2 className="text-lg font-black text-brand">{report.title} ←</h2>
-        <p className="mt-2 text-sm text-stone-600">{report.description}</p>
-      </Link>)}
-    </nav>
-  </main>;
+export default function AdminReportsPage(){
+ return <main dir="rtl" className="mx-auto max-w-[1350px] space-y-7 pb-10"><header className="border-b pb-4"><h1 className="text-3xl font-black text-brand">التقارير</h1><p className="mt-2 text-sm text-stone-500">اختر التقرير، وحدّد فلاتره لعرض التفاصيل والطباعة.</p></header>{sections.map(section=><section key={section.title} className="space-y-3"><h2 className="text-lg font-bold text-brand">{section.title}</h2><nav aria-label={section.title} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{section.reports.map(report=><Link key={report.path} to={'/owner/reports/'+report.path} className="group rounded-xl border bg-white p-4 transition hover:border-gold-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold"><div className="flex items-center justify-between gap-3"><h3 className="font-bold text-brand">{report.title}</h3><ArrowLeft size={17} className="shrink-0 text-stone-400 group-hover:text-brand" aria-hidden/></div><p className="mt-2 text-sm leading-6 text-stone-500">{report.description}</p></Link>)}</nav></section>)}</main>;
 }

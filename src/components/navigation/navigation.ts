@@ -1,7 +1,7 @@
 import type { ComponentType } from "react";
 import {
   Banknote, BarChart3, Boxes, ClipboardList, FileText, LayoutDashboard,
-  Package, ReceiptText, Settings2, ShoppingBasket, ShoppingCart, Store, Users,
+  Package, ReceiptText, Settings2, ShoppingBasket, ShoppingCart, Store, Users, Landmark, Wallet, FolderTree,
 } from "lucide-react";
 
 type Icon = ComponentType<{ className?: string }>;
@@ -17,12 +17,13 @@ export const ownerNavigation: NavItem[] = [
     { path: "/owner/orders", label: "الطلبات", icon: ClipboardList },
     { path: "/owner/create-order", label: "إنشاء طلب", icon: ShoppingBasket, aliases: ["/owner/create-order/retail", "/owner/create-order/wholesale", "/owner/store-sale"] },
   ] },
-  { label: "الحسابات", icon: Users, children: [
-    { path: "/owner/accounts", label: "جميع الحسابات", icon: Users },
-    { path: "/owner/vouchers", label: "سندات القبض والصرف والقيد", icon: FileText },
-    { path: "/owner/cash-vouchers", label: "السندات النقدية", icon: Banknote },
+  { label: "المالية", icon: Wallet, children: [
+    { path: "/owner/treasury", label: "الصندوق الرئيسي", icon: Wallet },
+    { path: "/owner/commercial-accounts", label: "الحسابات التجارية", icon: Users, aliases: ["/owner/accounts"] },
+    { path: "/owner/account-groups", label: "المجموعات والحسابات", icon: FolderTree },
+    { path: "/owner/banks", label: "البنوك", icon: Landmark },
+    { path: "/owner/vouchers", label: "السندات", icon: FileText, aliases: ["/owner/payments", "/owner/cash-vouchers", "/owner/account-sources"] },
     { path: "/owner/checks", label: "الشيكات", icon: Banknote },
-    { path: "/owner/treasury", label: "الخزينة", icon: Banknote },
     { path: "/owner/returns", label: "المردودات", icon: ReceiptText },
     { path: "/owner/purchases", label: "المشتريات", icon: ReceiptText },
   ] },
@@ -31,11 +32,11 @@ export const ownerNavigation: NavItem[] = [
     { path: "/owner/inventory", label: "المخزون", icon: Boxes },
     { path: "/owner/categories", label: "إدارة التصنيفات", icon: Settings2, aliases: ["/owner/product-settings"] },
   ] },
+  { path: "/owner/reports", label: "التقارير", icon: BarChart3 },
   { label: "الإدارة", icon: Settings2, children: [
     { path: "/owner/reps", label: "المناديب", icon: Users },
     { path: "/owner/settings", label: "بيانات الشركة", icon: Store, aliases: ["/owner/company"] },
   ] },
-  { path: "/owner/reports", label: "التقارير", icon: BarChart3 },
 ];
 
 export const repNavigation: NavItem[] = [
@@ -45,8 +46,8 @@ export const repNavigation: NavItem[] = [
     { path: "/rep/orders", label: "الطلبات", icon: ClipboardList },
   ] },
   { label: "الحسابات", icon: Users, children: [
-    { path: "/rep/accounts", label: "الحسابات", icon: Users },
-    { path: "/rep/vouchers", label: "سندات القبض والصرف والقيد", icon: FileText, aliases: ["/rep/payments"] },
+    { path: "/rep/accounts", label: "الحسابات التجارية", icon: Users },
+    { path: "/rep/vouchers", label: "السندات", icon: FileText, aliases: ["/rep/payments"] },
     { path: "/rep/purchases", label: "المشتريات", icon: ClipboardList },
     { path: "/rep/returns", label: "المردودات", icon: FileText },
   ] },

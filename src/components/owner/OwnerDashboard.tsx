@@ -16,6 +16,7 @@ import {
   formatOrderDate,
 } from "@/components/rep/repOrderUtils";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { accountAmountColor } from '@/components/finance/accountUiUtils';
 
 const quickLinks = [
   { path: "orders", label: "الطلبات", icon: ClipboardList },
@@ -54,6 +55,7 @@ export default function OwnerDashboard({
   }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [dateError, setDateError] = useState("");
   const [revision, setRevision] = useState(0);
   const [stockThreshold, setStockThreshold] = useState(savedStockThreshold);
   const [draftThreshold, setDraftThreshold] = useState(() =>
@@ -87,9 +89,10 @@ export default function OwnerDashboard({
   const apply = (event: FormEvent) => {
     event.preventDefault();
     if (draftFrom && draftTo && draftFrom > draftTo) {
-      setError("تاريخ البداية يجب أن يسبق تاريخ النهاية.");
+      setDateError("تاريخ البداية يجب أن يسبق تاريخ النهاية.");
       return;
     }
+    setDateError("");
     setQuery({
       date_from: draftFrom || undefined,
       date_to: draftTo || undefined,
@@ -117,34 +120,38 @@ export default function OwnerDashboard({
     }
   };
   return (
-    <main className="mx-auto max-w-[1500px] space-y-6 pb-10" dir="rtl">
-      <header className="rounded-3xl bg-brand px-5 py-6 text-white sm:px-8">
-        <h1 className="text-3xl font-black">لوحة التحكم</h1>
-        <p className="mt-2 text-sm text-white/80">
+    <div className="mx-auto max-w-[1500px] space-y-5 pb-6" dir="rtl">
+      <header className="border-b border-stone-200 pb-4">
+        <h1 className="text-2xl font-black text-brand">لوحة التحكم</h1>
+        <p className="mt-1 text-sm leading-6 text-stone-600">
           ملخص المبيعات والتحصيلات والأرصدة وتنبيهات المخزون والشيكات
         </p>
       </header>
       <form
         onSubmit={apply}
-        className="grid items-end gap-3 rounded-2xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto_auto]"
+        aria-label="تصفية الفترة"
+        className="grid items-end gap-3 rounded-2xl border border-stone-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto]"
       >
         <RepDateInput
           label="من تاريخ"
           value={draftFrom}
-          onChange={setDraftFrom}
+          onChange={(value) => { setDraftFrom(value); setDateError(""); }}
           max={draftTo || undefined}
         />
         <RepDateInput
           label="إلى تاريخ"
           value={draftTo}
-          onChange={setDraftTo}
+          onChange={(value) => { setDraftTo(value); setDateError(""); }}
           min={draftFrom || undefined}
         />
-        <button className="btn-primary min-h-11">تطبيق</button>
+        <button disabled={loading} className="btn-primary min-h-11">تطبيق الفترة</button>
+        <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
-          className="btn-outline min-h-11"
+          aria-pressed={query.range === "all_time"}
+          className="btn-outline min-h-11 aria-pressed:border-brand aria-pressed:bg-brand-50 aria-pressed:text-brand"
           onClick={() => {
+            setDateError("");
             setDraftFrom("");
             setDraftTo("");
             setQuery({ range: "all_time" });
@@ -154,8 +161,10 @@ export default function OwnerDashboard({
         </button>
         <button
           type="button"
-          className="btn-outline min-h-11"
+          aria-pressed={!query.date_from && !query.date_to && query.range !== "all_time"}
+          className="btn-outline min-h-11 aria-pressed:border-brand aria-pressed:bg-brand-50 aria-pressed:text-brand"
           onClick={() => {
+            setDateError("");
             setDraftFrom("");
             setDraftTo("");
             setQuery({});
@@ -163,6 +172,8 @@ export default function OwnerDashboard({
         >
           الشهر الحالي
         </button>
+        </div>
+        {dateError && <p role="alert" className="text-sm font-bold text-red-700 sm:col-span-2 lg:col-span-4">{dateError}</p>}
       </form>
       {error && (
         <div className="rep-error" role="alert">
@@ -175,22 +186,23 @@ export default function OwnerDashboard({
           </button>
         </div>
       )}
-      {loading && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {loading && !data && (
+        <div role="status" aria-label="جارٍ تحميل لوحة التحكم" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }, (_, i) => (
             <Skeleton key={i} className="h-32" />
           ))}
         </div>
       )}
       {data && (
-        <>
+        <div aria-busy={loading} className="space-y-5">
+          {loading && <p role="status" className="text-sm text-stone-600">جارٍ تحديث البيانات…</p>}
+          {error && <p role="status" className="text-sm text-amber-800">البيانات المعروضة من آخر تحميل ناجح.</p>}
           <section aria-label="الملخص المالي">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
                 <h2 className="text-xl font-black text-brand">الملخص المالي</h2>
                 <p className="mt-1 text-xs text-stone-600">
-                  الفترة: {formatOrderDate(data.period.date_from)} —{" "}
-                  {formatOrderDate(data.period.date_to)}
+                  الفترة: <bdi dir="ltr">{formatOrderDate(data.period.date_from)} — {formatOrderDate(data.period.date_to)}</bdi>
                 </p>
               </div>
               <button
@@ -203,12 +215,14 @@ export default function OwnerDashboard({
             <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <Metric
                 label="صافي المبيعات"
+                signed
                 value={data.financial.net_sales_base}
                 hint="للفترة المختارة"
                 icon={TrendingUp}
               />
               <Metric
                 label="صافي التحصيلات"
+                signed
                 value={data.financial.net_collections_base}
                 hint="للفترة المختارة"
                 icon={Banknote}
@@ -216,6 +230,7 @@ export default function OwnerDashboard({
               <Metric
                 label="المبالغ المستحقة لنا"
                 value={data.financial.account_debit_balances_base}
+                balanceSide="debit"
                 hint="أرصدة الحسابات المدينة الحالية"
                 cumulative
                 icon={Users}
@@ -235,7 +250,7 @@ export default function OwnerDashboard({
               </span>
               <span>
                 المبالغ المستحقة علينا (أرصدة دائنة):{" "}
-                {formatMoney(data.financial.account_credit_balances_base)}
+                <bdi dir="ltr" className={'font-bold tabular-nums ' + accountAmountColor(data.financial.account_credit_balances_base, 'credit')}>{formatMoney(data.financial.account_credit_balances_base)}</bdi>
                 <span className="mr-2">
                   <CumulativeBadge />
                 </span>
@@ -314,7 +329,7 @@ export default function OwnerDashboard({
                     aria-describedby={
                       thresholdError ? "stock-threshold-error" : undefined
                     }
-                    className="mt-1 block min-h-11 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm text-brand"
+                    className="input mt-1 min-h-11 tabular-nums"
                   />
                 </label>
                 <button
@@ -405,7 +420,7 @@ export default function OwnerDashboard({
               </button>
             </section>
           </div>
-          <nav aria-label="روابط سريعة" className="flex flex-wrap gap-2">
+          <nav aria-label="روابط سريعة" className="grid grid-cols-2 gap-2 border-t border-stone-200 pt-4 sm:flex sm:flex-wrap">
             {quickLinks.map(({ path, label, icon: Icon }) => (
               <button
                 key={path}
@@ -423,9 +438,9 @@ export default function OwnerDashboard({
               كل التقارير ←
             </button>
           </nav>
-        </>
+        </div>
       )}
-    </main>
+    </div>
   );
 }
 function Metric({
@@ -434,15 +449,24 @@ function Metric({
   hint,
   icon: Icon,
   cumulative = false,
+  balanceSide,
+  signed = false,
 }: {
   label: string;
   value: string;
   hint: string;
   icon: typeof TrendingUp;
   cumulative?: boolean;
+  balanceSide?: 'debit' | 'credit';
+  signed?: boolean;
 }) {
+  const amountColor = balanceSide
+    ? accountAmountColor(value, balanceSide)
+    : signed
+      ? accountAmountColor(value, Number(value) < 0 ? 'debit' : 'credit')
+      : 'text-brand';
   return (
-    <article className="min-w-0 rounded-2xl border bg-white p-5">
+    <article className="min-w-0 rounded-2xl border border-stone-200 bg-white p-4 sm:p-5">
       <div className="flex min-h-10 items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-bold leading-5 text-stone-600">
@@ -452,9 +476,9 @@ function Metric({
         </div>
         <Icon className="h-5 w-5 shrink-0 text-gold-dark" />
       </div>
-      <b className="mt-3 block break-words text-3xl text-brand">
-        {formatMoney(value)}
-      </b>
+      <bdi dir="ltr" className={'mt-2 block break-words text-right text-2xl font-bold tabular-nums sm:text-3xl ' + amountColor}>
+        {signed ? `${formatMoney(value).replace(/^₪/, '')} ₪` : formatMoney(value)}
+      </bdi>
       <p className="mt-2 text-xs leading-5 text-stone-500">{hint}</p>
     </article>
   );

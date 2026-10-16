@@ -3,9 +3,13 @@ import type {
   NumericId,
   PaginationResponseDto,
 } from "./common";
+export type CommercialClassification = 'Customer' | 'Supplier';
 export type UserAccountKind = "General" | "Cash" | "Bank";
 // Identity contracts never include financial data.
 export interface AccountIdentity {
+  commercial_classification?:CommercialClassification|null;
+  group?: AccountGroupIdentity | null;
+  group_id?:number|null;
   account_id: NumericId;
   account_number: string;
   name: string;
@@ -18,15 +22,20 @@ export interface AccountIdentity {
 }
 export type AccountIdentityOption = Pick<
   AccountIdentity,
-  "account_id" | "account_number" | "name" | "kind" | "phone"
+  "account_id" | "account_number" | "name" | "kind" | "commercial_classification" | "phone" | "group" | "group_id"
 >;
 export interface AccountsQuery {
+  commercial_classification?:CommercialClassification;
+  group_id?:number;
+  scope?:'commercial'|'financial';
   search?: string;
   type?: "All" | UserAccountKind;
   page?: number;
   limit?: number;
 }
 export interface AccountIdentityInput {
+  commercial_classification?:CommercialClassification;
+  group_id?:number;
   city_id?: number;
   opening_balance?: OpeningBalanceInput;
   kind: UserAccountKind;
@@ -35,7 +44,7 @@ export interface AccountIdentityInput {
   notes?: string | null;
 }
 export type AccountIdentityEdit = Partial<
-  Pick<AccountIdentityInput, "name" | "phone" | "notes" | "city_id">
+  Pick<AccountIdentityInput, "name" | "phone" | "notes" | "city_id" | "commercial_classification">
 >;
 export interface AccountIdentityList {
   items: AccountIdentity[];
@@ -89,6 +98,7 @@ export type AccountMovementType =
   | "Reversal"
   | "Other";
 export interface AccountMovementQuery {
+  search?: string;
   from?: string;
   to?: string;
   movement_type?: AccountMovementType;
@@ -105,6 +115,7 @@ export interface AccountPeriodSummary extends AccountMovementTotals {
   categories: Array<AccountMovementTotals & { type: string }>;
 }
 export interface AccountPeriod {
+  search?: string | null;
   from: string | null;
   to: string | null;
   movement_type: string | null;
@@ -118,6 +129,7 @@ export interface AccountFinancialDetail {
 }
 export interface AccountSource {
   kind:
+    | "FinancialVoucher"
     | "Invoice"
     | "Purchase"
     | "SalesReturn"
@@ -129,6 +141,7 @@ export interface AccountSource {
   id: number;
 }
 export interface AccountStatementEntry {
+  source_document_number?: string | null;
   movement_id: string;
   date: string;
   type: string;
@@ -146,6 +159,10 @@ export interface AccountStatementEntry {
   notes: string | null;
 }
 export interface EffectiveAccountStatement {
+  accounting_view?: 'effective_documents';
+  balance_convention?: 'DebitMinusCredit';
+  balance_scope?: 'all_movements_of_selected_accounts';
+  filtered_totals?: AccountMovementTotals;
   account: AccountIdentity;
   current_balance: string;
   opening_balance: string;
@@ -156,4 +173,17 @@ export interface EffectiveAccountStatement {
   available_types: string[];
   entries: AccountStatementEntry[];
   pagination: PaginationResponseDto;
+}
+export interface AccountGroupIdentity { group_id: number; name: string; reserved_key: string | null }
+export interface GroupBalanceSummary { accounts_count: number; total_debit_balances: string; total_credit_balances: string; net_balance: string }
+export interface GroupAccountIdentity { account_id: number; account_number: string; name: string }
+export interface GroupStatementQuery extends AccountMovementQuery { account_id?: number }
+export interface GroupSummary { group: AccountGroupIdentity; summary: GroupBalanceSummary; balance_convention: 'DebitMinusCredit'; accounts: Array<GroupAccountIdentity & { balance: string; balance_side: 'Debit' | 'Credit' | 'Zero' }> }
+export interface GroupStatement extends Omit<EffectiveAccountStatement, 'account' | 'entries'> {
+  group: AccountGroupIdentity;
+  group_summary: GroupBalanceSummary;
+  selected_accounts_summary: GroupBalanceSummary;
+  scope: { account_id: number | null; balance_accounts: 'selected_account' | 'whole_group'; row_filters_change_balances: false };
+  accounts?: GroupSummary['accounts'];
+  entries: Array<AccountStatementEntry & { account: GroupAccountIdentity }>;
 }

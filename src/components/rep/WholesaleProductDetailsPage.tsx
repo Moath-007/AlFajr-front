@@ -129,7 +129,7 @@ export default function WholesaleProductDetailsPage({
               <img
                 src={resolveApiAssetUrl(image.url) ?? undefined}
                 alt={product.name}
-                className="h-full w-full object-cover"
+                className="h-full w-full product-image-fit"
               />
             ) : (
               <div className="grid h-full place-items-center">
@@ -151,7 +151,7 @@ export default function WholesaleProductDetailsPage({
                   <img
                     src={resolveApiAssetUrl(item.url) ?? undefined}
                     alt=""
-                    className="h-full w-full object-cover"
+                    className="h-full w-full product-image-fit"
                   />
                 </button>
               ))}

@@ -16,7 +16,9 @@ export interface ApiRequestOptions {
 const retryKeys = new Map<string, string>();
 const pendingCreates = new Map<string, Promise<unknown>>();
 const idempotentCreate = (path: string) => [
+  /^\/treasury\/main-cash\/initialize$/,
   /^\/accounts$/,
+  /^\/account-groups$/,
   /^\/orders(?:\/online)?$/,
   /^\/inventory\/\d+\/opening-stock$/,
   /^\/purchases(?:\/\d+\/returns)?$/,
@@ -24,6 +26,7 @@ const idempotentCreate = (path: string) => [
   /^\/purchase-returns\/account$/,
   /^\/accounts\/\d+\/(payments|disbursements|check-receipts|check-disbursements)$/,
   /^\/ledger\/vouchers$/,
+  /^\/financial-vouchers(?:\/\d+\/cancel)?$/,
   /^\/accounts\/\d+\/(?:opening-balance(?:\/cancel)?|discounts)$/,
   /^\/account-discounts\/\d+\/cancel$/,
   /^\/managed-checks\/\d+\/movements\/(DEPOSITED|SENT_TO_COLLECTION|RETURNED_FROM_BANK|ENDORSED|ENDORSEMENT_RETURNED|RETURNED_TO_SOURCE|RETRIEVED_FROM_SOURCE|CASHED)$/,
@@ -33,8 +36,9 @@ const idempotentCreate = (path: string) => [
 
 async function request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
   const returnMutation = (options.method === 'PUT' || options.method === 'DELETE') && /^\/(?:returns|purchase-returns)\/\d+(?:\/permanent)?$/.test(normalizePath(path));
+  const voucherMutation = options.method === 'PUT' && /^\/financial-vouchers\/\d+$/.test(normalizePath(path));
   const accountMutation = (options.method === 'PUT' || options.method === 'DELETE') && /^(?:\/accounts\/\d+\/opening-balance|\/account-discounts\/\d+(?:\/permanent)?)$/.test(normalizePath(path));
-  if (!(options.method === 'POST' && idempotentCreate(path)) && !returnMutation && !accountMutation) return performRequest<T>(path, options);
+  if (!(options.method === 'POST' && idempotentCreate(path)) && !returnMutation && !accountMutation && !voucherMutation) return performRequest<T>(path, options);
   const intent = `${normalizePath(path)}|${JSON.stringify(options.body ?? null)}`;
   const active = pendingCreates.get(intent);
   if (active) return active as Promise<T>;

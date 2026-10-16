@@ -252,7 +252,7 @@ export default function InvoiceEditor({
   );
   return (
     <form onSubmit={submit} className="invoice-editor min-w-0 space-y-5" dir="rtl">
-      <header className="rep-page-header">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-black text-brand">
@@ -262,7 +262,7 @@ export default function InvoiceEditor({
           </div>
           <p className="rep-subtitle">راجع بيانات الفاتورة والمنتجات، ثم احفظ التغييرات.</p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex">
+        <div className="flex flex-wrap gap-2">
           {items.length > 5 && <button type="button" className="btn-outline" onClick={() => { summarySection.current?.focus({ preventScroll: true }); summarySection.current?.scrollIntoView({ block: "start" }); }}>الإجمالي والحفظ</button>}
           <button type="button" className="btn-outline" disabled={saving} onClick={() => onNavigate(orderId ? `${path}/${orderId}` : path)}>{orderId ? "رجوع للتفاصيل" : "رجوع للفواتير"}</button>
         </div>
@@ -272,16 +272,20 @@ export default function InvoiceEditor({
       <fieldset disabled={!editable || saving} className="min-w-0 space-y-5">
         <section className="rep-section">
           <div className={"border-b border-stone-100 px-4 py-3"}><h2 className={"text-sm font-bold text-brand"}>بيانات الفاتورة</h2></div>
-          <div className={"grid min-w-0 items-start gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4"}>
+          <div className="grid min-w-0 items-start gap-4 p-4 sm:grid-cols-2">
             <div className={"min-w-0"}>
               <GeneralSaleAccountSelect floating {...accounts} onRetry={accounts.reload} value={account} onChange={setAccount}
                 label={order?.status === "Pending" ? "حساب البيع (يُطلب عند التأكيد)" : "حساب البيع *"} />
             </div>
             <label className="min-w-0"><span className="rep-label">بيانات التواصل</span>
-              <textarea className="rep-control block resize-y leading-6" rows={2} value={fields.contact}
+              <textarea className="rep-control block resize-y leading-6" rows={fields.contact.includes("\n") ? 2 : 1} value={fields.contact}
                 placeholder="اسم جهة التواصل أو الهاتف أو أي مرجع للفاتورة"
                 onChange={(e) => setFields((f) => ({ ...f, contact: e.target.value }))} />
             </label>
+          </div>
+          <details open={Boolean(fields.address || fields.notes)} className="border-t border-stone-100 px-4 pb-4">
+            <summary className="w-fit cursor-pointer rounded-lg py-3 text-sm font-bold text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold">عنوان التسليم والملاحظات <span className="font-normal text-stone-500">(اختياري)</span></summary>
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
             <label className="min-w-0"><span className="rep-label">عنوان التسليم</span>
               <textarea className="rep-control block resize-y leading-6" rows={2} value={fields.address} maxLength={255}
                 placeholder="العنوان، إن وجد" onChange={(e) => setFields((f) => ({ ...f, address: e.target.value }))} />
@@ -290,9 +294,10 @@ export default function InvoiceEditor({
               <textarea className="rep-control block resize-y leading-6" rows={2} value={fields.notes}
                 placeholder="ملاحظات إضافية، إن وجدت" onChange={(e) => setFields((f) => ({ ...f, notes: e.target.value }))} />
             </label>
-          </div>
+            </div>
+          </details>
         </section>
-        <div className={`grid min-w-0 items-start gap-5 ${"2xl:grid-cols-[minmax(0,1fr)_300px]"}`}>
+        <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
           <section className="rep-section min-w-0">
             <div className="rep-section-heading"><h2>المنتجات والكميات <span className="text-sm font-normal text-stone-500">({items.length})</span></h2><p>عدّل كمية كل منتج وسعره وخصمه بشكل مستقل.</p></div>
             <div className="border-b border-stone-100 p-4 sm:p-5">
@@ -331,17 +336,17 @@ export default function InvoiceEditor({
                   }} />
                   <span aria-hidden="true" className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-stone-300 bg-white transition-colors hover:border-brand peer-checked:border-brand peer-checked:bg-brand peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-gold peer-disabled:opacity-50">{item.bonus && <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />}</span><span className="lg:sr-only text-sm font-bold">بونص</span>
                 </label></td>
-                <td className="edit-value-cell"><span className="edit-mobile-label">القيمة</span><b className="tabular-nums text-brand">{formatMoney((Number(item.price) - Number(item.discount)) * item.quantity)}</b></td>
+                <td className="edit-value-cell"><span className="edit-mobile-label">القيمة</span><bdi dir="ltr" className="font-bold tabular-nums text-brand">{formatMoney((Number(item.price) - Number(item.discount)) * item.quantity)}</bdi></td>
                 <td className="edit-remove-cell"><button type="button" className="btn-ghost min-h-11 text-red-700 hover:bg-red-50" aria-label={`إزالة المنتج ${index + 1}`} onClick={() => setItems((c) => c.filter((_, n) => n !== index))}><Trash2 className="h-4 w-4" aria-hidden /><span className="lg:sr-only">إزالة</span></button></td>
               </tr>)}</tbody>
             </table>}
           </section>
-          <section ref={summarySection} tabIndex={-1} className={`rep-section scroll-mt-24 outline-none ${"2xl:sticky 2xl:top-24"}`}>
+          <section ref={summarySection} tabIndex={-1} className="rep-section scroll-mt-24 outline-none xl:sticky xl:top-24">
             <div className="rep-section-heading"><h2>الإجمالي والحفظ</h2><p>راجع الخصم والإجمالي قبل الحفظ.</p></div>
             <div className="space-y-5 p-4 sm:p-5">
-              <p className="flex flex-wrap justify-between gap-2 text-sm text-stone-500">مجموع المنتجات<b className="text-brand">{formatMoney(subtotal)}</b></p>
+              <p className="flex flex-wrap justify-between gap-2 text-sm text-stone-500">مجموع المنتجات<bdi dir="ltr" className="font-bold tabular-nums text-brand">{formatMoney(subtotal)}</bdi></p>
               <label className="block"><span className="rep-label">خصم الفاتورة (₪)</span><input className="rep-control tabular-nums" type="number" inputMode="decimal" min="0" step="0.01" value={fields.discount} onChange={(e) => setFields((f) => ({ ...f, discount: e.target.value }))} /></label>
-              <div className="border-t border-stone-100 pt-4"><p className="text-xs text-stone-500">الإجمالي النهائي · {items.length} منتج</p><p className="mt-2 text-2xl font-black tabular-nums text-brand" aria-live="polite">{formatMoney(subtotal - Number(fields.discount))}</p></div>
+              <div className="border-t border-stone-100 pt-4"><p className="text-xs text-stone-500">الإجمالي النهائي · {items.length} منتج</p><p className="mt-2 text-2xl font-black tabular-nums text-brand" aria-live="polite"><bdi dir="ltr">{formatMoney(subtotal - Number(fields.discount))}</bdi></p></div>
               <button className="btn-primary min-h-11 w-full" disabled={saving || accounts.loading}>{saving ? "جاري الحفظ…" : orderId ? "حفظ التعديل" : "إنشاء الفاتورة"}</button>
             </div>
           </section>

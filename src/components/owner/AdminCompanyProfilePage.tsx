@@ -306,6 +306,7 @@ export default function AdminCompanyProfilePage({
             />
           </label>
         </section>
+        <CurrencySettings onNotify={onNotify} />
         <CompanyPageImages images={images} drafts={imageDrafts} disabled={saving}
           onChange={(key, draft) => setImageDrafts(current => ({ ...current, [key]: draft }))} />
         <div className="company-save-bar sticky bottom-3 z-20 rounded-2xl border bg-white/95 p-3 shadow-xl backdrop-blur">
@@ -321,7 +322,7 @@ export default function AdminCompanyProfilePage({
           </button>
         </div>
       </form>
-      <CurrencySettings onNotify={onNotify} />
+
     </div>
   );
 }

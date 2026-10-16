@@ -1,3 +1,4 @@
+import CatalogOrdering from '@/components/products/CatalogOrdering';
 import { matchesSearchText } from '@/utils/searchText';
 import {
   useCallback,
@@ -44,6 +45,7 @@ export default function AdminProductSettingsPage({
   const [form, setForm] = useState<{
     item: CategoryResponseDto | null;
     name: string;
+    position: string;
     image: File | null;
     removeImage: boolean;
     hiddenOnline: boolean;
@@ -81,7 +83,7 @@ export default function AdminProductSettingsPage({
   );
   const openEdit = (item: CategoryResponseDto) => {
     setFormErrors([]);
-    setForm({ item, name: item.name, image: null, removeImage: false, hiddenOnline: !item.is_visible_online });
+    setForm({ item, position: String(item.sort_order), name: item.name, image: null, removeImage: false, hiddenOnline: !item.is_visible_online });
   };
   const preview = useMemo(
     () => (form?.image ? URL.createObjectURL(form.image) : null),
@@ -101,7 +103,9 @@ export default function AdminProductSettingsPage({
     try {
       if (form.item)
         await categoriesService.update(form.item.category_id, {
+          expected_sort_order: form.item.sort_order,
           name: form.name.trim(),
+          sort_order: form.position ? Number(form.position) : undefined,
           is_visible_online: !form.hiddenOnline,
           image: form.image ?? undefined,
           remove_image: form.removeImage,
@@ -109,6 +113,7 @@ export default function AdminProductSettingsPage({
       else
         await categoriesService.create({
           name: form.name.trim(),
+          sort_order: form.position ? Number(form.position) : undefined,
           is_visible_online: !form.hiddenOnline,
           image: form.image ?? undefined,
         });
@@ -155,6 +160,7 @@ export default function AdminProductSettingsPage({
   };
   return (
     <div className="categories-admin space-y-4" dir="rtl">
+      <CatalogOrdering onChanged={() => void load()} />
       <header className="flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-end">
         <div>
           <p className="text-xs font-black text-gold-dark">تنظيم الكتالوج</p>
@@ -169,7 +175,7 @@ export default function AdminProductSettingsPage({
           type="button"
           onClick={() => {
             setFormErrors([]);
-            setForm({ item: null, name: "", image: null, removeImage: false, hiddenOnline: false });
+            setForm({ item: null, position: "", name: "", image: null, removeImage: false, hiddenOnline: false });
           }}
           className="btn-primary shrink-0"
         >
@@ -298,7 +304,7 @@ export default function AdminProductSettingsPage({
                         </div>
                       </td>
                       <td className="category-name px-4 py-4 text-brand">
-                        {item.name}
+                        {item.name}<small className="block text-xs">ترتيب العرض: {item.sort_order}</small>
                       </td>
                       <td className="px-4">{item.products_count}</td>
                       <td className="px-4">
@@ -311,6 +317,7 @@ export default function AdminProductSettingsPage({
                             setFormErrors([]);
                             setForm({
                               item,
+                              position: String(item.sort_order),
                               name: item.name,
                               image: null,
                               removeImage: false,
@@ -341,7 +348,7 @@ export default function AdminProductSettingsPage({
                           className="h-12 w-14 rounded-lg object-cover"
                         />
                       )}
-                      <b className="category-name text-brand">{item.name}</b>
+                      <b className="category-name text-brand">{item.name}<small className="block text-xs">ترتيب العرض: {item.sort_order}</small></b>
                     </div>
                     <Status active={item.is_active} />
                   </div>
@@ -355,6 +362,7 @@ export default function AdminProductSettingsPage({
                         setFormErrors([]);
                         setForm({
                           item,
+                          position: String(item.sort_order),
                           name: item.name,
                           image: null,
                           removeImage: false,
@@ -395,6 +403,7 @@ export default function AdminProductSettingsPage({
         }
       >
         <form id="category-form" onSubmit={save} className="space-y-5">
+          <label><span className="rep-label">ترتيب العرض</span><input type="number" min="1" step="1" className="rep-control" placeholder="في النهاية تلقائياً" value={form?.position ?? ""} onChange={e=>form && setForm({...form,position:e.target.value})}/></label>
           {formErrors.length > 0 && (
             <div className="rep-error" role="alert">
               {formErrors.join("، ")}
@@ -545,3 +554,4 @@ function Actions({
     </div>
   );
 }
+

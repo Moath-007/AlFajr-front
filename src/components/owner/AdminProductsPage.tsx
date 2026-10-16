@@ -58,7 +58,7 @@ export default function AdminProductsPage({
   const [color, setColor] = useState("");
   const [active, setActive] = useState("");
   const [stock, setStock] = useState("");
-  const [sort, setSort] = useState("created_at:desc");
+  const [sort, setSort] = useState("display:asc");
   const [categories, setCategories] = useState<CategoryResponseDto[]>([]);
   const [colors, setColors] = useState<ColorResponseDto[]>([]);
   const [auxErrors, setAuxErrors] = useState<string[]>([]);
@@ -110,7 +110,7 @@ export default function AdminProductsPage({
       setLoading(true);
       setErrors([]);
       const [sort_by, sort_order] = sort.split(":") as [
-        "created_at" | "name" | "code",
+        "display" | "created_at" | "name" | "code",
         "asc" | "desc",
       ];
       return productsService
@@ -161,14 +161,14 @@ export default function AdminProductsPage({
     setColor("");
     setActive("");
     setStock("");
-    setSort("created_at:desc");
+    setSort("display:asc");
     setPage(1);
   };
   const advancedCount = [
     category,
     color,
     stock,
-    sort !== "created_at:desc" ? sort : "",
+    sort !== "display:asc" ? sort : "",
   ].filter(Boolean).length;
   const chips = [
     {
@@ -207,9 +207,9 @@ export default function AdminProductsPage({
     },
     {
       key: "sort",
-      value: sort === "created_at:desc" ? "" : sort,
+      value: sort === "display:asc" ? "" : sort,
       label: `الترتيب: ${{ "created_at:asc": "الأقدم", "name:asc": "الاسم", "code:asc": "الكود" }[sort] ?? ""}`,
-      clear: () => change(setSort)("created_at:desc"),
+      clear: () => change(setSort)("display:asc"),
     },
   ].filter((chip) => chip.value);
   const deleteProduct = async () => {
@@ -256,6 +256,7 @@ export default function AdminProductsPage({
             إدارة المنتجات وأصنافها وحالتها.
           </p>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => onNavigate("/owner/products/new")}
           className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-5 font-black text-white"
@@ -263,6 +264,8 @@ export default function AdminProductsPage({
           <Plus className="h-4 w-4" />
           منتج جديد
         </button>
+          <button type="button" className="btn-outline" onClick={() => onNavigate("/owner/products/ordering")}>ترتيب المنتجات</button>
+        </div>
       </header>
       {notice && (
         <div className="rounded-xl bg-emerald-50 p-3 font-bold text-emerald-800">
@@ -364,6 +367,7 @@ export default function AdminProductsPage({
               value={sort}
               onChange={change(setSort)}
               options={[
+                { value: "display:asc", label: "ترتيب العرض" },
                 { value: "created_at:desc", label: "الأحدث" },
                 { value: "created_at:asc", label: "الأقدم" },
                 { value: "name:asc", label: "الاسم" },
@@ -551,7 +555,7 @@ function image(p: ProductResponseDto) {
     p.images.find((x) => x.is_primary)?.url || p.images[0]?.url,
   );
 }
-function ProductImage({ product }: { product: ProductResponseDto }) {
+export function ProductImage({ product }: { product: ProductResponseDto }) {
   const src = image(product);
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [src]);
@@ -561,7 +565,7 @@ function ProductImage({ product }: { product: ProductResponseDto }) {
       alt=""
       loading="lazy"
       onError={() => setFailed(true)}
-      className="h-12 w-12 rounded-xl object-cover"
+      className="h-20 w-20 rounded-xl product-image-fit md:h-12 md:w-12"
     />
   ) : (
     <span className="grid h-12 w-12 place-items-center rounded-xl bg-stone-100">
@@ -599,7 +603,7 @@ function ProductRow({
         <div className="flex items-center gap-3">
           <ProductImage product={product} />
           <div>
-            <b className="block text-brand">{product.name}</b>
+            <b className="block text-brand">{product.name}</b><small className="block">ترتيب العرض: {product.sort_order}</small>
             <small dir="ltr">{product.code}</small>
           </div>
         </div>
@@ -655,7 +659,7 @@ function ProductCard({
             <Status active={product.is_active} />
           </div>
           <p className="text-xs text-stone-500">
-            {product.code} · {product.category.name}
+            {product.code} · {product.category.name}<small className="block">ترتيب العرض: {product.sort_order}</small>
           </p>
         </div>
       </button>

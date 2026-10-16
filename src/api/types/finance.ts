@@ -46,6 +46,7 @@ export interface PaymentCheckDto {
   return_reason?: string | null;
 }
 export interface PaymentDto {
+  financial_voucher_id?: number | null;
   money_account?: { account_id: number; name: string; kind: string } | null;
   id: NumericId;
   voucher_number?: string;

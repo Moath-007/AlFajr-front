@@ -1,3 +1,4 @@
+import '@/components/reports/ReportsLayout.css';
 import SearchableSelect from '@/components/ui/Select';
 import { ReportOptions, ReportAmount } from '@/components/reports/ReportControls';
 import { useEffect, useRef, useState } from 'react';
@@ -47,11 +48,11 @@ export default function RepresentativesReportPage() {
     }, 350);
     return () => window.clearTimeout(timer);
   }, [draft]);
-  return <main className="mx-auto max-w-[1350px] space-y-5 pb-10" dir="rtl">
+  return <main className="report-page mx-auto max-w-[1350px] space-y-4 pb-10" dir="rtl">
     <Link to="/owner/reports" className="text-sm font-bold text-gold-dark">← التقارير</Link>
     <header><h1 className="text-3xl font-black text-brand">تقرير المناديب</h1>
-      <p className="mt-2 text-sm text-stone-600">عدد وقيمة الفواتير التي أنشأها كل مندوب. تُحسب المكتملة بتاريخ إكمالها، والمعلقة بتاريخ إنشائها، والملغاة بتاريخ إلغائها. القبض غير محسوب هنا.</p></header>
-    <div className="grid items-end gap-3 rounded-2xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <details className="report-note mt-2"><summary>كيف تقرأ التقرير؟</summary><p className="mt-2 text-sm text-stone-600">عدد وقيمة الفواتير التي أنشأها كل مندوب. تُحسب المكتملة بتاريخ إكمالها، والمعلقة بتاريخ إنشائها، والملغاة بتاريخ إلغائها. القبض غير محسوب هنا.</p></details></header>
+    <div className="report-filters grid items-end gap-3 rounded-2xl border bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
       <RepDateInput label="من تاريخ" value={draft.from} onChange={(from) => setDraft({ ...draft, from })} max={draft.to || undefined} />
       <RepDateInput label="إلى تاريخ" value={draft.to} onChange={(to) => setDraft({ ...draft, to })} min={draft.from || undefined} />
       <SearchableSelect label="المندوب" searchable searchPlaceholder="ابحث باسم المندوب أو الهاتف" value={draft.rep} onChange={(rep) => setDraft({ ...draft, rep })} options={[{ value: '', label: 'كل المناديب' }, ...reps.map((r) => ({ value: String(r.user_id), label: [r.name, r.phone].filter(Boolean).join(' · ') }))]} />
@@ -65,7 +66,7 @@ export default function RepresentativesReportPage() {
     {!loading && data && <><div className="flex justify-end"><button className="btn-outline" disabled={loading || fullPrint.printing || Boolean(dateError)} onClick={() => void fullPrint.print((page, signal) => reportsService.representatives({ ...query, page, limit: 100 }, signal), 'تقرير المناديب')}>{fullPrint.printing ? 'جارٍ تجهيز الطباعة…' : 'طباعة التقرير كاملًا / PDF'}</button></div>
       <section ref={printRef} className="print-document space-y-4 rounded-2xl border bg-white p-4 sm:p-6">
         <PrintHeader company={null} title="تقرير المناديب" subtitle={`صفحة ${data.pagination.page} · الفواتير الحالية`} />
-        <p className="text-xs text-stone-600">الأرقام حسب حالة الفواتير الحالية، وقد تتغير عند تعديل فاتورة أو إلغائها. المبالغ هنا قيمة بيع الفواتير المكتملة؛ الدفعات والمردودات ليست محسوبة ضمنها.</p>
+        <details className="report-note"><summary>ملاحظات الأرقام</summary><p className="text-xs text-stone-600">الأرقام حسب حالة الفواتير الحالية، وقد تتغير عند تعديل فاتورة أو إلغائها. المبالغ هنا قيمة بيع الفواتير المكتملة؛ الدفعات والمردودات ليست محسوبة ضمنها.</p></details>
         <div className="print-active hidden overflow-x-auto md:block"><table className="w-full min-w-[850px] text-sm"><thead><tr className="bg-stone-100">{['المندوب', 'عدد الفواتير المكتملة', 'عدد الفواتير المعلقة', 'عدد الفواتير الملغاة', 'قيمة الفواتير المكتملة'].map((h) => <th key={h} className="border p-2 text-right">{h}</th>)}</tr></thead><tbody>{data.representatives.map((r) => <tr key={r.representative_id}><td className="border p-2">{r.name}</td><td className="border p-2">{r.completed_orders_count}</td><td className="border p-2">{r.pending_orders_count}</td><td className="border p-2">{r.cancelled_orders_count}</td><td className="border p-2"><ReportAmount value={r.completed_sales_document_amount} /></td></tr>)}</tbody></table></div>
         <div className="report-mobile-cards space-y-2 md:hidden print:hidden">{data.representatives.map((r) => <article key={r.representative_id} className="rounded-xl border p-3 text-sm"><b>{r.name}</b><p>مكتملة {r.completed_orders_count} · معلقة {r.pending_orders_count} · ملغاة {r.cancelled_orders_count}</p><p>قيمة الفواتير المكتملة <ReportAmount value={r.completed_sales_document_amount} /></p></article>)}</div>
         {!data.representatives.length && <p>لا توجد بيانات مطابقة.</p>}

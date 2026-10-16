@@ -7,7 +7,6 @@ import { useAuth } from '@/auth';
 import AccountPicker from '@/components/finance/AccountPicker';
 import type { PickedOrderItem } from '@/components/rep/RepProductPicker';
 import ReturnVariantSelect from '@/components/finance/ReturnVariantSelect';
-import CheckFiltersPopover from '@/components/finance/CheckFiltersPopover';
 import './PurchasesPage.css';
 import { RepSelect, RepDateInput } from '@/components/rep/RepFormControls';
 import { apiMessages } from '@/components/rep/repOrderUtils';
@@ -39,6 +38,7 @@ export default function PurchasesPage() {
   const [searchInput, setSearchInput] = useState('');
   const [accountFilter, setAccountFilter] = useState<number | null>(null);
   const [advanced, setAdvanced] = useState(false);
+  const [draftFilters,setDraftFilters]=useState<{account:number|null;from:string;to:string}>({account:null,from:'',to:''});
   const advancedTrigger = useRef<HTMLButtonElement>(null);
   const closeAdvanced = useCallback(() => { setAdvanced(false); advancedTrigger.current?.focus(); }, []);
   useEffect(() => { const timer = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300); return () => clearTimeout(timer); }, [searchInput]);
@@ -55,7 +55,7 @@ export default function PurchasesPage() {
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true); setError('');
-    try { const response = await purchasesService.list({page,limit:20,search,
+    try { const response = await purchasesService.list({page,limit:10,search,
       ...(status !== 'all' && {status:status === 'active' ? 'Completed' : 'Cancelled'}),date_from:from,date_to:to,account_id:accountFilter ?? undefined}, signal);
       if (!signal?.aborted) { if (page > Math.max(1, response.pagination.total_pages)) setPage(Math.max(1, response.pagination.total_pages)); setPurchases(response.items); setPages(response.pagination.total_pages); setCount(response.pagination.total); }
     }
@@ -100,11 +100,9 @@ export default function PurchasesPage() {
     <section className="purchase-quick-filters" aria-label="فلاتر المشتريات">
       <label><span className="rep-label">البحث</span><input type="search" className="rep-control" value={searchInput} onChange={event => setSearchInput(event.target.value)} placeholder="رقم الشراء أو الحساب أو الصنف" /></label>
       <RepSelect value={status} label="الحالة" onChange={value => { setStatus(value); setPage(1); }} options={[{value:'all',label:'كل الحالات'},{value:'active',label:'فعّالة'},{value:'cancelled',label:'ملغاة'}]} />
-      <button ref={advancedTrigger} type="button" className="btn-outline" aria-haspopup="dialog" aria-expanded={advanced} onClick={() => setAdvanced(current => !current)}><SlidersHorizontal size={17} />فلاتر إضافية{accountFilter || from || to ? ' (' + (Number(!!accountFilter) + Number(!!from || !!to)) + ')' : ''}</button>
+      <button ref={advancedTrigger} type="button" className="btn-outline" aria-haspopup="dialog" aria-expanded={advanced} onClick={() => {setDraftFilters({account:accountFilter,from,to});setAdvanced(true);}}><SlidersHorizontal size={17} />الفلاتر{accountFilter || from || to ? ' (' + (Number(!!accountFilter) + Number(!!from || !!to)) + ')' : ''}</button>
     </section>
-    <CheckFiltersPopover open={advanced} trigger={advancedTrigger} onClose={closeAdvanced} footer={<div className="flex items-center justify-between gap-2"><span className="text-xs text-stone-600">الفلاتر تُطبّق تلقائيًا</span><button type="button" className="btn-ghost" onClick={clearFilters}>مسح الكل</button></div>}>
-      <div className="space-y-3"><AccountPicker accounts={accounts} value={accountFilter} onChange={id => { setAccountFilter(id); setPage(1); }} label="الحساب العام" kinds={['General']} /><RepDateInput label="من تاريخ" value={from} max={to || undefined} onChange={value => { setFrom(value); setPage(1); }} /><RepDateInput label="إلى تاريخ" value={to} min={from || undefined} onChange={value => { setTo(value); setPage(1); }} /></div>
-    </CheckFiltersPopover>
+    <Modal open={advanced} onClose={closeAdvanced} title="فلاتر المشتريات" className="filters-drawer" footer={<div dir="rtl" className="grid grid-cols-2 gap-3"><button type="button" className="btn-primary" disabled={!!(draftFilters.from&&draftFilters.to&&draftFilters.from>draftFilters.to)} onClick={()=>{setAccountFilter(draftFilters.account);setFrom(draftFilters.from);setTo(draftFilters.to);setPage(1);closeAdvanced();}}>تطبيق الفلاتر</button><button type="button" className="btn-outline" onClick={()=>setDraftFilters({account:null,from:'',to:''})}>مسح الكل</button></div>}><div dir="rtl" className="space-y-5"><p className="text-sm text-stone-500">حدّد خياراتك، ثم اضغط تطبيق لتحديث النتائج.</p><RepSelect label="الحساب" value={String(draftFilters.account??0)} onChange={value=>setDraftFilters(v=>({...v,account:Number(value)||null}))} options={[{value:'0',label:'كل الحسابات'},...accounts.map(a=>({value:String(a.account_id),label:a.name}))]}/><RepDateInput label="من تاريخ" value={draftFilters.from} max={draftFilters.to||undefined} onChange={from=>setDraftFilters(v=>({...v,from}))}/><RepDateInput label="إلى تاريخ" value={draftFilters.to} min={draftFilters.from||undefined} onChange={to=>setDraftFilters(v=>({...v,to}))}/>{draftFilters.from&&draftFilters.to&&draftFilters.from>draftFilters.to&&<p role="alert" className="text-sm text-red-700">تاريخ البداية يجب أن يسبق تاريخ النهاية.</p>}</div></Modal>
     {chips.length > 0 && <div className="purchase-filter-chips">{chips.map((chip,index) => <button type="button" key={index} onClick={chip.clear}>{chip.label} ×</button>)}<button type="button" onClick={clearFilters}>مسح الكل</button></div>}
     <p className="text-sm text-stone-500">{count} شراء · صفحة {page} من {pages || 1}</p>
     <section className="purchase-results" aria-label="قائمة المشتريات">

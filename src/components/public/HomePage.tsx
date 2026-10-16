@@ -182,7 +182,7 @@ function ProductPreviewCard({ product }: { product: CatalogProductSummaryDto }) 
   return (
     <Link to={`/products/${product.id}`} state={{ catalogReturnTo: '/' }} className="group overflow-hidden rounded-xl border border-stone-200 bg-white text-right shadow-sm transition duration-200 hover:-translate-y-1 hover:border-[#C2A66D]/45 hover:shadow-xl hover:shadow-[#162E21]/[0.07] focus:outline-none focus:ring-4 focus:ring-[#C2A66D]/15">
       <span className="relative block aspect-[5/3] overflow-hidden bg-stone-100">
-        {imageUrl ? <img src={imageUrl} alt={product.name} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" loading="lazy" /> : <span className="flex h-full items-center justify-center"><PackageOpen className="h-10 w-10 text-stone-300" /></span>}
+        {imageUrl ? <img src={imageUrl} alt={product.name} className="h-full w-full product-image-fit" loading="lazy" /> : <span className="flex h-full items-center justify-center"><PackageOpen className="h-10 w-10 text-stone-300" /></span>}
         <span className="absolute right-2 top-2 rounded-md bg-white/90 px-2 py-0.5 text-[10px] font-bold text-[#162E21] shadow-sm backdrop-blur-sm sm:text-xs">{product.category.name}</span>
         {product.has_discount && <span className="absolute -left-11 top-3 w-36 -rotate-45 border-y border-white/40 bg-gradient-to-r from-[#851B18] via-[#B42318] to-[#D1493F] py-1 text-center text-[10px] font-black tracking-wide text-white shadow-[0_5px_14px_rgba(87,18,15,0.38)]">خصم</span>}
       </span>

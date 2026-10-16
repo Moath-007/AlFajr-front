@@ -76,7 +76,7 @@ export default function CartPage({
                     <img
                       src={item.image_url}
                       alt={item.product_name}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full product-image-fit"
                     />
                   ) : (
                     <div className="grid h-full place-items-center">

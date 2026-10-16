@@ -277,3 +277,9 @@ body::-webkit-scrollbar {
   .orders-table td:last-child:not([data-label]) { grid-column: 1 / -1; text-align: end; }
 }
 .orders-table .inline-flex.rounded-full { white-space: nowrap; }
+
+/* Shared product presentation: fit the full source within the existing card box.
+   Original white/transparent margins belong to the uploaded image and remain intact. */
+.product-image-fit { object-fit: contain; object-position: center; background-color: #fff; }
+
+.filters-drawer { position:fixed!important; inset-block:0!important; left:0!important; right:auto!important; width:min(420px,100vw)!important; max-width:none!important; height:100dvh!important; max-height:100dvh!important; border-radius:0!important; animation:none!important; }

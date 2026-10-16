@@ -523,7 +523,7 @@ export default function ProductsPage() {
   );
 }
 
-function CatalogCard({
+export function CatalogCard({
   product,
   returnTo,
   onPreview,
@@ -541,7 +541,7 @@ function CatalogCard({
               src={image}
               alt={product.name}
               loading="lazy"
-              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              className="h-full w-full product-image-fit"
             />
           ) : (
             <span className="flex h-full items-center justify-center">

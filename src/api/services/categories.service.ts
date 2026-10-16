@@ -7,6 +7,7 @@ import type {
 } from '../types';
 
 export const categoriesService = {
+  reorder: (id: number, sort_order: number, expected_sort_order: number) => apiClient.patch('/categories/'+id+'/position', {sort_order, expected_sort_order}),
   list: (signal?: AbortSignal) =>
     apiClient.get<CategoryResponseDto[]>('/categories/internal', { signal }),
   listPublic: (signal?: AbortSignal) =>
@@ -21,10 +22,12 @@ export const categoriesService = {
     apiClient.delete<CategoryResponseDto>(`/categories/${id}`, { signal }),
 };
 
-function categoryFormData(data: CreateCategoryDto & { remove_image?: boolean }) {
+function categoryFormData(data: CreateCategoryDto & { remove_image?: boolean; expected_sort_order?: number }) {
   const form = new FormData();
   form.append('name', data.name);
+  if (data.sort_order !== undefined) form.append('sort_order', String(data.sort_order));
   if (data.is_visible_online !== undefined) form.append('is_visible_online', String(data.is_visible_online));
+  if (data.expected_sort_order !== undefined) form.append('expected_sort_order', String(data.expected_sort_order));
   if (data.image) form.append('image', data.image);
   if (data.remove_image) form.append('remove_image', 'true');
   return form;

@@ -1,6 +1,7 @@
 import type { NumericId } from './common';
 
 export interface CategoryResponseDto {
+  sort_order: number;
   category_id: NumericId;
   name: string;
   image_url?: string | null;
@@ -10,12 +11,13 @@ export interface CategoryResponseDto {
 }
 
 export interface CreateCategoryDto {
+  sort_order?: number;
   is_visible_online?: boolean;
   name: string;
   image?: File;
 }
 
-export interface UpdateCategoryDto extends CreateCategoryDto { remove_image?: boolean; }
+export interface UpdateCategoryDto extends CreateCategoryDto { expected_sort_order?: number; remove_image?: boolean; }
 
 export interface UpdateCategoryStatusDto {
   is_active: boolean;

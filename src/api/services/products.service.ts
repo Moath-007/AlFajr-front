@@ -17,6 +17,8 @@ import type {
 } from "../types";
 
 export const productsService = {
+  reorder: (id: number, sort_order: number, expected_sort_order: number) => apiClient.patch('/products/'+id+'/position', {sort_order, expected_sort_order}),
+  ordering: (category_id: number, page: number, signal?: AbortSignal) => apiClient.get<{items: {product_id:number;name:string;code:string;sort_order:number}[];total:number;page:number;limit:number}>('/products/ordering?category_id='+category_id+'&page='+page, {signal}),
   permanentDelete: (id: number) =>
     apiClient.delete<{ message: string }>(`/products/${id}/permanent`),
   listAdmin: (query: AdminProductsQuery = {}, signal?: AbortSignal) =>
@@ -105,6 +107,7 @@ function withCatalogQuery(path: string, query: CatalogProductsQuery): string {
 
 function toCreateProductFormData(data: CreateProductDto): FormData {
   const formData = new FormData();
+  if (data.sort_order !== undefined) formData.append("sort_order", String(data.sort_order));
   formData.append("name", data.name);
   formData.append("code", data.code);
   if (data.description !== undefined)

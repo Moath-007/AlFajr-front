@@ -176,7 +176,8 @@ export default function PaymentDetailsModal({
               </p>
             </section>
           )}
-          {user?.role === "Admin" && (
+          {payment.financial_voucher_id && <Link className="btn-outline" to={`/${user?.role==='Admin'?'owner':'rep'}/vouchers?voucher=${payment.financial_voucher_id}`} onClick={onClose}>فتح السند المالي الكامل FV-{payment.financial_voucher_id}</Link>}
+          {user?.role === "Admin" && !payment.financial_voucher_id && (
             <div className="flex flex-wrap gap-2 border-t pt-3">
               {payment.check?.managed_check_id && (
                 <Link

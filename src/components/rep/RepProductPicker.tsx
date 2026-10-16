@@ -229,7 +229,7 @@ export default function RepProductPicker({
                       ) ?? undefined
                     }
                     alt={details.name}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full product-image-fit"
                   />
                 ) : (
                   <div className="grid h-full place-items-center">
@@ -393,7 +393,7 @@ export default function RepProductPicker({
                             undefined
                           }
                           alt={product.name}
-                          className="h-full w-full object-cover"
+                          className="h-full w-full product-image-fit"
                           loading="lazy"
                         />
                       ) : (

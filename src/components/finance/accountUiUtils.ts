@@ -1,5 +1,15 @@
 import { formatMoney } from '@/components/rep/repOrderUtils';
-import type { AccountMovementType, UserAccountKind } from '@/api';
+import type { AccountMovementType, UserAccountKind, AccountSource } from '@/api';
+export function accountSourceHref(source: AccountSource | null, base: string, admin: boolean) {
+  if (!source) return null;
+  if (source.kind === 'FinancialVoucher') return `${base}/vouchers?voucher=${source.id}`;
+  if (source.kind === 'Invoice') return `${base}/orders/${source.id}`;
+  if (source.kind === 'Purchase') return `${base}/purchases?purchase=${source.id}`;
+  if (source.kind === 'SalesReturn') return `${base}/returns?return=${source.id}`;
+  if (source.kind === 'Check') return admin ? `${base}/checks/${source.id}` : null;
+  if (['Payment', 'Discount', 'PurchaseReturn'].includes(source.kind)) return `${base}/account-sources/${source.kind}/${source.id}`;
+  return null;
+}
 export const accountKindLabels: Record<UserAccountKind, string> = {
   General: 'عام',
   Cash: 'صندوق',
@@ -34,15 +44,19 @@ export function currentMonth() {
 
 export function statementAmount(value: string, mode: 'balance' | 'change') {
   const amount = Number(value);
-  if (mode === 'balance') return (amount > 0 ? '+' : amount < 0 ? '-' : '') + formatMoney(Math.abs(amount));
+  if (mode === 'balance') return (amount > 0 ? '+' : amount < 0 ? '-' : '') + formatMoney(Math.abs(amount)) + ' · ' + balanceLabel(value);
   const label = amount === 0 ? '' : amount > 0 ? 'زيادة' : 'دائن';
   return formatMoney(Math.abs(amount)) + (label ? ' · ' + label : '');
 }
 
-export function accountAmountColor(value: string, side: 'balance' | 'debit' | 'credit' = 'balance', kind: UserAccountKind = 'General') {
+export function balanceLabel(value: string | number) {
+  return Number(value) > 0 ? 'مدين' : Number(value) < 0 ? 'دائن' : 'متوازن';
+}
+export function accountAmountColor(value: string, side: 'balance' | 'debit' | 'credit' = 'balance', _kind: UserAccountKind = 'General') {
+  void _kind;
   const amount = Number(value);
   if (amount === 0) return 'text-stone-400';
-  const debit = side === 'debit' || (side === 'balance' && (kind === 'General' ? amount < 0 : amount > 0));
+  const debit = side === 'debit' || (side === 'balance' && amount > 0);
   return debit ? 'text-red-600' : 'text-emerald-700';
 }
 export const financialDirectionLabels = {

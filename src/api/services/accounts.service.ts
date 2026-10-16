@@ -13,6 +13,7 @@ import type {
   AccountDiscountInput,
   AccountMovementQuery,
   EffectiveAccountStatement,
+  GroupStatement, GroupStatementQuery, GroupSummary,
 } from "../types/accounts";
 const queryString = (query: AccountsQuery | AccountMovementQuery) => {
   const params = new URLSearchParams();
@@ -22,6 +23,13 @@ const queryString = (query: AccountsQuery | AccountMovementQuery) => {
   return params.size ? `?${params}` : "";
 };
 export const accountsService = {
+  get:(id:number,signal?:AbortSignal)=>apiClient.get<AccountIdentityOption>('/accounts/'+id+'/identity',{signal}),
+  groups:(query:AccountsQuery={})=>apiClient.get<{items:import('../types/accounts').AccountGroupIdentity[];pagination:AccountIdentityList['pagination']}>('/account-groups'+queryString(query)),
+  createGroup:(name:string)=>apiClient.post<import('../types/accounts').AccountGroupIdentity>('/account-groups',{name}),
+  renameGroup:(id:number,name:string)=>apiClient.patch('/account-groups/'+id,{name}),
+  deleteGroup:(id:number)=>apiClient.delete('/account-groups/'+id),
+  groupSummary: (id: number, signal?: AbortSignal) => apiClient.get<Omit<GroupSummary,'accounts'>>(`/account-groups/${id}/summary-compact`, { signal }),
+  groupStatement: (id: number, query: GroupStatementQuery = {}, signal?: AbortSignal) => apiClient.get<GroupStatement>(`/account-groups/${id}/statement-compact${queryString(query)}`, { signal }),
   allOptions: async (
     query: Omit<AccountsQuery, "page" | "limit"> = {},
     signal?: AbortSignal,

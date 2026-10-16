@@ -52,6 +52,8 @@ export default function AdminProductFormPage({
     code: "",
     description: "",
     category_id: "",
+    sort_order: "",
+    expected_sort_order: 0,
     is_active: true,
     is_featured: false,
   });
@@ -162,6 +164,8 @@ export default function AdminProductFormPage({
       code: p.code,
       description: p.description || "",
       category_id: String(p.category.id),
+      sort_order: String(p.sort_order),
+      expected_sort_order: p.sort_order,
       is_active: p.is_active,
       is_featured: p.is_featured ?? false,
     };
@@ -278,8 +282,10 @@ export default function AdminProductFormPage({
           code: fields.code.trim(),
           description: fields.description.trim() || undefined,
           category_id: Number(fields.category_id),
+          sort_order: fields.sort_order ? Number(fields.sort_order) : undefined,
           is_featured: fields.is_featured,
           is_active: fields.is_active,
+          expected_sort_order: fields.expected_sort_order,
           variants: payloadVariants(),
         });
         successMessage = updateResult.message;
@@ -303,6 +309,7 @@ export default function AdminProductFormPage({
           code: fields.code.trim(),
           description: fields.description.trim() || undefined,
           category_id: Number(fields.category_id),
+          sort_order: fields.sort_order ? Number(fields.sort_order) : undefined,
           variants: payloadVariants(),
           primary_image: primaryCreate,
           additional_images: newImages,
@@ -389,6 +396,7 @@ export default function AdminProductFormPage({
           <section className="product-editor-basics rounded-2xl border bg-white p-5">
             <h2 className="font-black text-brand">البيانات الأساسية</h2>
             <div className="product-editor-fields mt-4 grid gap-4 sm:grid-cols-2">
+              <label><span className="rep-label">ترتيب العرض داخل التصنيف</span><input type="number" min="1" step="1" className="rep-control" placeholder="في النهاية تلقائياً" value={fields.sort_order} onChange={e=>setFields({...fields,sort_order:e.target.value})}/></label>
               <Field
                 label="اسم المنتج *"
                 value={fields.name}
@@ -404,7 +412,7 @@ export default function AdminProductFormPage({
                 searchable
                 value={fields.category_id}
                 onChange={(category_id) =>
-                  setFields({ ...fields, category_id })
+                  setFields({ ...fields, category_id, sort_order: "" })
                 }
                 placeholder="اختر التصنيف"
                 searchPlaceholder="ابحث عن تصنيف"
@@ -423,12 +431,7 @@ export default function AdminProductFormPage({
                   }
                 />
               </label>
-              <div className={`product-editor-toggles grid gap-3 ${editing ? "sm:grid-cols-2" : ""}`}>
-              <label className={`product-editor-status flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 transition ${fields.is_featured ? "border-emerald-200 bg-emerald-50/60" : "border-stone-200 bg-stone-50"}`}>
-                <span><b className="block text-sm text-brand">منتج مميز</b><small className="text-stone-500">يظهر قبل المنتجات العادية في ترتيب المنتجات.</small></span>
-                <input type="checkbox" aria-label="منتج مميز" className="peer sr-only" checked={fields.is_featured} onChange={e => setFields({ ...fields, is_featured: e.target.checked })} />
-                <span className="relative h-7 w-12 shrink-0 rounded-full bg-stone-300 transition peer-checked:bg-emerald-600 peer-focus-visible:ring-2 peer-focus-visible:ring-gold peer-focus-visible:ring-offset-2 after:absolute after:right-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:-translate-x-5" aria-hidden="true" />
-              </label>
+              <div className="product-editor-toggles grid gap-3">
               {editing && (
                 <label
                   className={`product-editor-status flex cursor-pointer items-center justify-between gap-4 rounded-xl border p-4 transition ${fields.is_active ? "border-emerald-200 bg-emerald-50/60" : "border-stone-200 bg-stone-50"}`}
